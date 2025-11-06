@@ -2016,20 +2016,23 @@ void QuantBot::build(int militaryValue) {
 								itemID = Structure_Palace;
 							}
 
-							if (pBuilder->isAvailableToBuild(itemID) && findPlaceLocation(itemID).isValid() && itemID != NONE_ID) {
-								doProduceItem(pBuilder, itemID);
-								itemCount[itemID]++;
-							} else {
-								// If we can't build the desired structure, try to expand buildable area with concrete slabs
-								// This helps create more valid placement locations for future buildings
-								if (pBuilder->isAvailableToBuild(Structure_Slab1)) {
-									Coord slabLocation = findPlaceLocationSimple(Structure_Slab1);
-									if (slabLocation.isValid()) {
-										doProduceItem(pBuilder, Structure_Slab1);
-										logDebug("Building concrete slab to expand buildable area at (%d,%d)", slabLocation.x, slabLocation.y);
-									}
+						if (pBuilder->isAvailableToBuild(itemID) && findPlaceLocation(itemID).isValid() && itemID != NONE_ID) {
+							doProduceItem(pBuilder, itemID);
+							itemCount[itemID]++;
+						}
+						/* DISABLED: Concrete slab planner causes early-game AI spikes (full-map scans)
+						else {
+							// If we can't build the desired structure, try to expand buildable area with concrete slabs
+							// This helps create more valid placement locations for future buildings
+							if (pBuilder->isAvailableToBuild(Structure_Slab1)) {
+								Coord slabLocation = findPlaceLocationSimple(Structure_Slab1);
+								if (slabLocation.isValid()) {
+									doProduceItem(pBuilder, Structure_Slab1);
+									logDebug("Building concrete slab to expand buildable area at (%d,%d)", slabLocation.x, slabLocation.y);
 								}
 							}
+						}
+						*/
 
 						}
 					}
