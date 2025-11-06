@@ -820,10 +820,10 @@ private:
     
     // Phase 1: Budget Negotiation System
     // Start at 15k (middle of range), adapt up or down based on FPS
-    size_t negotiatedBudget = 15000;  // Current token budget (adaptive 8k-25k)
+    size_t negotiatedBudget = 15000;  // Current token budget (adaptive 5k-25k)
     size_t carryOverTokens = 0;       // Unused tokens from previous cycle
     
-    static constexpr size_t kMinBudget = 8000;    // Minimum 8k tokens/cycle
+    static constexpr size_t kMinBudget = 5000;    // Minimum 5k tokens/cycle
     static constexpr size_t kMaxBudget = 25000;   // Maximum 25k tokens/cycle
     static constexpr size_t kHardCap = 30000;     // With carry-over
     static constexpr size_t kDebtCap = 10000;     // Max carry-over tokens
