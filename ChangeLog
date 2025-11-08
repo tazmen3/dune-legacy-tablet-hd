@@ -1,3 +1,21 @@
+version 0.98.6.6
+	* NEW: Dynamic Performance Optimization for Multiplayer
+		- Adaptive token budget (5k-25k) automatically scales pathfinding based on real-time FPS
+		- "Slowest peer wins" protocol: host monitors all clients and adjusts budget to keep everyone in sync
+		- Deterministic budget negotiation via network packets (NETWORKPACKET_CLIENTSTATS, NETWORKPACKET_SETPATHBUDGET)
+		- Budget adjusts every 375 cycles (~7.5s): reduce by 4k if any peer < 50 FPS, increase by 500 if all > 80 FPS
+		- Queue depth gate: blocks increases if pathfinding queue exceeds 300 requests
+		- Graceful degradation: 15k → 11k → 7k → 5k minimum to support slower hardware
+	* FIX: Critical host recognition bug (host incorrectly identified as client, preventing budget negotiation)
+	* FIX: AI performance spikes eliminated (disabled broken QuantBot concrete slab planner)
+	* FIX: Budget desync detection with automatic re-sync protocol
+	* FIX: Disconnected client handling (clears stale stats to prevent permanent budget penalties)
+	* FIX: Missing client stats timeout (host reuses stale data or forces reductions)
+	* IMPROVEMENT: Minimum pathfinding budget lowered to 5k tokens/cycle for struggling PCs
+	* IMPROVEMENT: Cycle-based budget adjustment (deterministic for multiplayer)
+	* IMPROVEMENT: Enhanced performance logging (budget changes, FPS averages, queue statistics)
+	* IMPROVEMENT: Server state persistence via new stopAnnouncing() function (keeps bIsServer=true during gameplay)
+
 version 0.98.4
 	* Fix cursor system to match 0.98.3 implementation
 	* Restore software cursor drawing for both menus and gameplay

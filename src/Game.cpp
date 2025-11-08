@@ -487,11 +487,13 @@ void Game::processPathRequests() {
         frameTiming.maxPathQueueLength = queueDepth;
     }
 
-    // PHASE 1: NEGOTIATED TOKEN BUDGET WITH CARRY-OVER
-    // Start at 15k tokens/cycle, adapt between 8k-25k based on FPS
+    // PHASE 1: NEGOTIATED TOKEN BUDGET WITH CARRY-OVER (single-player only)
+    // Start at 15k tokens/cycle, adapt between 5k-25k based on FPS
     // NEVER scale UP aggressively (that caused the freeze!)
+    // Carry-over is DISABLED in multiplayer to prevent desync
     
     // Calculate budget with carry-over (capped at kHardCap)
+    // Note: carryOverTokens is always 0 in multiplayer
     size_t budget = std::min<size_t>(
         negotiatedBudget + carryOverTokens,
         kHardCap
@@ -551,12 +553,23 @@ void Game::processPathRequests() {
     }
     
     // PHASE 1.2: BANK UNUSED TOKENS FOR NEXT CYCLE
-    if (tokensUsedThisCycle < budget) {
-        // Bank unused tokens (capped at kDebtCap)
+    // MULTIPLAYER FIX: Disable carry-over in multiplayer to prevent desync
+    // Carry-over can accumulate drift if pathfinding is even slightly non-deterministic
+    if (tokensUsedThisCycle < budget && pNetworkManager == nullptr) {
+        // Bank unused tokens (capped at kDebtCap) - SINGLE-PLAYER ONLY
         carryOverTokens = std::min<size_t>(
             kDebtCap,
             budget - tokensUsedThisCycle
         );
+    } else if(pNetworkManager != nullptr) {
+        // Multiplayer: Always discard unused tokens to maintain sync
+        carryOverTokens = 0;
+    }
+    
+    // DESYNC DETECTION: Log token usage on specific cycles for debugging
+    if(pNetworkManager != nullptr && (gameCycleCount % 375 == 0)) {
+        SDL_Log("[DESYNC DEBUG] Cycle %d: budget=%zu, tokensUsed=%zu, carryOver=%zu (always 0 in MP), queue=%zu",
+                gameCycleCount, negotiatedBudget, tokensUsedThisCycle, carryOverTokens, pathRequestQueue.size());
     }
     
     // Track token budget exhaustion
@@ -898,13 +911,6 @@ void Game::makeHostBudgetDecision() {
         return;  // Skip this decision cycle
     }
     
-    // LOGGING: Host decision inputs
-    SDL_Log("[PathBudget HOST] ═══ DECISION CYCLE %d ═══", gameCycleCount);
-    SDL_Log("[PathBudget HOST] Inputs: minFps=%.1f (host=%.1f), maxQueue=%zu (host=%zu), current budget=%zu",
-            minFps, hostFps, maxQueueDepth, hostQueueDepth, negotiatedBudget);
-    logPerformance("[HOST DECISION] Cycle %d: minFps=%.1f, maxQueue=%zu, budget=%zu",
-            gameCycleCount, minFps, maxQueueDepth, negotiatedBudget);
-    
     // Decision logic: "Slowest peer wins"
     size_t newBudget = negotiatedBudget;
     const char* decisionReason = "STABLE";
@@ -914,11 +920,6 @@ void Game::makeHostBudgetDecision() {
         newBudget = negotiatedBudget >= 4000 + kMinBudget ? 
                     negotiatedBudget - 4000 : kMinBudget;
         decisionReason = "REDUCE (low FPS)";
-        
-        SDL_Log("[PathBudget HOST] Decision: REDUCE budget (minFps=%.1f < 50) → %zu → %zu",
-                minFps, negotiatedBudget, newBudget);
-        logPerformance("[HOST DECISION] Cycle %d: REDUCE %zu → %zu (minFps=%.1f < 50)",
-                gameCycleCount, negotiatedBudget, newBudget, minFps);
     }
     else if(minFps > 80.0 && negotiatedBudget < kMaxBudget) {
         // ALL peers have good FPS → consider INCREASE
@@ -926,42 +927,31 @@ void Game::makeHostBudgetDecision() {
         // Queue depth gate: block increases if ANY peer has high queue
         if(maxQueueDepth > 300) {
             decisionReason = "BLOCKED (high queue)";
-            
-            SDL_Log("[PathBudget HOST] Decision: FPS good (%.1f) but queue too high (%zu) - BLOCKED",
-                    minFps, maxQueueDepth);
-            logPerformance("[HOST DECISION] Cycle %d: BLOCKED (minFps=%.1f > 80 but maxQueue=%zu > 300)",
-                    gameCycleCount, minFps, maxQueueDepth);
             newBudget = negotiatedBudget;  // Keep current
         } else {
             // Safe to increase
             newBudget = std::min<size_t>(negotiatedBudget + 500, kMaxBudget);
             decisionReason = "INCREASE (high FPS)";
-            
-            SDL_Log("[PathBudget HOST] Decision: INCREASE budget (minFps=%.1f > 80, maxQueue=%zu < 300) → %zu → %zu",
-                    minFps, maxQueueDepth, negotiatedBudget, newBudget);
-            logPerformance("[HOST DECISION] Cycle %d: INCREASE %zu → %zu (minFps=%.1f > 80, maxQueue=%zu < 300)",
-                    gameCycleCount, negotiatedBudget, newBudget, minFps, maxQueueDepth);
         }
     }
     else {
         // Stable - no change needed
         decisionReason = "STABLE (FPS in range)";
-        SDL_Log("[PathBudget HOST] Decision: STABLE (minFps=%.1f in 50-80 range)", minFps);
-        logPerformance("[HOST DECISION] Cycle %d: STABLE (minFps=%.1f in 50-80 range)",
-                gameCycleCount, minFps);
     }
     
-    // LOGGING: Final decision summary
-    SDL_Log("[PathBudget HOST] ═══ DECISION: %s ═══", decisionReason);
-    
-    // If budget changed, broadcast to all clients
+    // LOGGING: Only log on actual budget changes (reduce host overhead)
     if(newBudget != negotiatedBudget) {
+        SDL_Log("[PathBudget HOST] ═══ BUDGET CHANGE CYCLE %d ═══", gameCycleCount);
+        SDL_Log("[PathBudget HOST] Inputs: minFps=%.1f (host=%.1f), maxQueue=%zu (host=%zu)",
+                minFps, hostFps, maxQueueDepth, hostQueueDepth);
+        SDL_Log("[PathBudget HOST] Decision: %s → %zu → %zu",
+                decisionReason, negotiatedBudget, newBudget);
+        logPerformance("[HOST DECISION] Cycle %d: %s %zu → %zu (minFps=%.1f, maxQueue=%zu)",
+                gameCycleCount, decisionReason, negotiatedBudget, newBudget, minFps, maxQueueDepth);
+        
         broadcastBudgetChange(newBudget);
-    } else {
-        SDL_Log("[PathBudget HOST] No change - budget stays at %zu", negotiatedBudget);
-        logPerformance("[HOST DECISION] Cycle %d: No change (budget=%zu, reason=%s)",
-                gameCycleCount, negotiatedBudget, decisionReason);
     }
+    // Silent when stable (no logging overhead)
     
     // Don't clear clientStats! We need to keep them to detect missing updates
     // The stats will be updated when new packets arrive (missedUpdates reset to 0)
@@ -3742,7 +3732,7 @@ bool Game::handleNetworkUpdates() {
                 bMenu = true;
             }
         }
-        SDL_Delay(10);
+        SDL_Delay(1);  // Reduced from 10ms to 1ms to improve host performance
     } else {
         startWaitingForOtherPlayersTime = 0;
         if(pWaitingForOtherPlayers != nullptr) {

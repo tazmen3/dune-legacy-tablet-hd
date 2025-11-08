@@ -821,12 +821,12 @@ private:
     // Phase 1: Budget Negotiation System
     // Start at 15k (middle of range), adapt up or down based on FPS
     size_t negotiatedBudget = 15000;  // Current token budget (adaptive 5k-25k)
-    size_t carryOverTokens = 0;       // Unused tokens from previous cycle
+    size_t carryOverTokens = 0;       // Unused tokens from previous cycle (SINGLE-PLAYER ONLY - disabled in multiplayer to prevent desync)
     
     static constexpr size_t kMinBudget = 5000;    // Minimum 5k tokens/cycle
     static constexpr size_t kMaxBudget = 25000;   // Maximum 25k tokens/cycle
-    static constexpr size_t kHardCap = 30000;     // With carry-over
-    static constexpr size_t kDebtCap = 10000;     // Max carry-over tokens
+    static constexpr size_t kHardCap = 30000;     // With carry-over (not used in multiplayer)
+    static constexpr size_t kDebtCap = 10000;     // Max carry-over tokens (not used in multiplayer)
     
     static constexpr int kBudgetCheckInterval = 375;  // Check every 375 cycles (~7.5s at 50Hz)
     
