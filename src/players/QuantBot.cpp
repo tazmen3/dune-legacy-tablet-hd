@@ -792,129 +792,85 @@ Coord QuantBot::findMcvPlaceLocation(const MCV* pMCV) {
 }
 
 Coord QuantBot::findPlaceLocation(Uint32 itemID) {
-	// Will over allocate space for small maps so its not clean
-	// But should allow Richard to compile
-	int buildLocationScore[128][128] = { {0} };
-
-	int bestLocationX = -1;
-	int bestLocationY = -1;
-	int bestLocationScore = -10000;
 	int newSizeX = getStructureSize(itemID).x;
 	int newSizeY = getStructureSize(itemID).y;
+	
+	squadRallyLocation = findSquadRallyLocation();
+	Coord baseCenter = findBaseCentre(getHouse()->getHouseID());
+	
+	int bestLocationScore = -10000;
 	Coord bestLocation = Coord::Invalid();
+	
+	bool itemIsBuilder = (itemID == Structure_HeavyFactory
+		|| itemID == Structure_RepairYard
+		|| itemID == Structure_LightFactory
+		|| itemID == Structure_WOR
+		|| itemID == Structure_Barracks
+		|| itemID == Structure_StarPort);
 
-	for (const StructureBase* pStructureExisting : getStructureList()) {
-		if (pStructureExisting->getOwner() == getHouse()) {
+	// Check all map tiles for valid building placement
+	for (int placeLocationX = 0; placeLocationX <= getMap().getSizeX() - newSizeX; placeLocationX++) {
+		for (int placeLocationY = 0; placeLocationY <= getMap().getSizeY() - newSizeY; placeLocationY++) {
+			// First check if this location is valid for building
+			if (getMap().okayToPlaceStructure(placeLocationX, placeLocationY, newSizeX, newSizeY,
+				false, (itemID == Structure_ConstructionYard) ? nullptr : getHouse())) {
 
-			int existingStartX = pStructureExisting->getX();
-			int existingStartY = pStructureExisting->getY();
+				int locationScore = 0;
+				int placeLocationEndX = placeLocationX + newSizeX;
+				int placeLocationEndY = placeLocationY + newSizeY;
 
-			int existingSizeX = pStructureExisting->getStructureSizeX();
-			int existingSizeY = pStructureExisting->getStructureSizeY();
+				// Big bonus if building is directly at the map edge
+				bool atMapEdge = (placeLocationX == 0 || placeLocationX + newSizeX >= getMap().getSizeX() ||
+				                  placeLocationY == 0 || placeLocationY + newSizeY >= getMap().getSizeY());
+				if (atMapEdge) {
+					locationScore += 50;  // Strong bonus for edge placement
+				}
 
-			int existingEndX = existingStartX + existingSizeX;
-			int existingEndY = existingStartY + existingSizeY;
-
-			squadRallyLocation = findSquadRallyLocation();
-
-			bool existingIsBuilder = (pStructureExisting->getItemID() == Structure_HeavyFactory
-				|| pStructureExisting->getItemID() == Structure_RepairYard
-				|| pStructureExisting->getItemID() == Structure_LightFactory
-				|| pStructureExisting->getItemID() == Structure_WOR
-				|| pStructureExisting->getItemID() == Structure_Barracks
-				|| pStructureExisting->getItemID() == Structure_StarPort);
-
-			bool sizeMatchX = (existingSizeX == newSizeX);
-			bool sizeMatchY = (existingSizeY == newSizeY);
-
-
-			for (int placeLocationX = existingStartX - newSizeX; placeLocationX <= existingEndX; placeLocationX++) {
-				for (int placeLocationY = existingStartY - newSizeY; placeLocationY <= existingEndY; placeLocationY++) {
-					if (getMap().tileExists(placeLocationX, placeLocationY)) {
-						if (getMap().okayToPlaceStructure(placeLocationX, placeLocationY, newSizeX, newSizeY,
-							false, (itemID == Structure_ConstructionYard) ? nullptr : getHouse())) {
-
-							int placeLocationEndX = placeLocationX + newSizeX;
-							int placeLocationEndY = placeLocationY + newSizeY;
-
-							bool alignedX = (placeLocationX == existingStartX && sizeMatchX);
-							bool alignedY = (placeLocationY == existingStartY && sizeMatchY);
-
-							// bool placeGapExists = (placeLocationEndX < existingStartX || placeLocationX > existingEndX || placeLocationEndY < existingStartY || placeLocationY > existingEndY);
-
-							// How many free spaces the building will have if placed
-							for (int i = placeLocationX - 1; i <= placeLocationEndX; i++) {
-								for (int j = placeLocationY - 1; j <= placeLocationEndY; j++) {
-									if (getMap().tileExists(i, j) && (getMap().getSizeX() > i) && (0 <= i) && (getMap().getSizeY() > j) && (0 <= j)) {
-										// Favor edge of map placement
-										if ((i == 0) || (i == getMap().getSizeX() - 1) || (j == 0) || (j == getMap().getSizeY() - 1)) {
-											buildLocationScore[placeLocationX][placeLocationY] += 10;
-										}
-
-										if (getMap().getTile(i, j)->hasAStructure()) {
-											// If one of our buildings is nearby favour the location
-											// if it is someone elses building don't favour it
-											if (getMap().getTile(i, j)->getOwner() == getHouse()->getHouseID()) {
-												buildLocationScore[placeLocationX][placeLocationY] += 3;
-											}
-											else {
-												buildLocationScore[placeLocationX][placeLocationY] -= 10;
-											}
-										}
-										else if (!getMap().getTile(i, j)->isRock()) {
-											// square isn't rock, favour it
-											buildLocationScore[placeLocationX][placeLocationY] += 5;
-										}
-										else if (getMap().getTile(i, j)->hasAGroundObject()) {
-											if (getMap().getTile(i, j)->getOwner() != getHouse()->getHouseID()) {
-												// try not to build next to units which aren't yours
-												buildLocationScore[placeLocationX][placeLocationY] -= 100;
-											}
-											else if (itemID != Structure_RocketTurret) {
-												buildLocationScore[placeLocationX][placeLocationY] -= 20;
-											}
-										}
-									}
-									else {
-										// penalise if outside of map
-										buildLocationScore[placeLocationX][placeLocationY] -= 200;
-									}
+				// Evaluate surrounding tiles
+				for (int i = placeLocationX - 1; i <= placeLocationEndX; i++) {
+					for (int j = placeLocationY - 1; j <= placeLocationEndY; j++) {
+						if (getMap().tileExists(i, j) && (getMap().getSizeX() > i) && (0 <= i) && (getMap().getSizeY() > j) && (0 <= j)) {
+							if (getMap().getTile(i, j)->hasAStructure()) {
+								// Favor being near our buildings, avoid enemy buildings
+								if (getMap().getTile(i, j)->getOwner() == getHouse()->getHouseID()) {
+									locationScore += 3;
+								}
+								else {
+									locationScore -= 10;
 								}
 							}
-
-							//encourage structure alignment
-							if (alignedX) {
-								buildLocationScore[placeLocationX][placeLocationX] += 10;
+							else if (!getMap().getTile(i, j)->isRock()) {
+								// Favor non-rock tiles (easier building)
+								locationScore += 5;
 							}
-
-							if (alignedY) {
-								buildLocationScore[placeLocationX][placeLocationY] += 10;
-							}
-
-							// Add building specific scores
-							if (existingIsBuilder || itemID == Structure_GunTurret || itemID == Structure_RocketTurret) {
-								buildLocationScore[placeLocationX][placeLocationY] -= lround(blockDistance(squadRallyLocation, Coord(placeLocationX, placeLocationY)) / 2);
-
-								buildLocationScore[placeLocationX][placeLocationY] -= lround(blockDistance(findBaseCentre(getHouse()->getHouseID()), Coord(placeLocationX, placeLocationY)));
-							}
-
-							// Pick this location if it has the best score
-							if (buildLocationScore[placeLocationX][placeLocationY] > bestLocationScore) {
-								bestLocationScore = buildLocationScore[placeLocationX][placeLocationY];
-								bestLocationX = placeLocationX;
-								bestLocationY = placeLocationY;
-								//logDebug("Build location for item:%d  x:%d y:%d score:%d", itemID, bestLocationX, bestLocationY, bestLocationScore);
+							else if (getMap().getTile(i, j)->hasAGroundObject()) {
+								if (getMap().getTile(i, j)->getOwner() != getHouse()->getHouseID()) {
+									// Avoid building next to enemy units
+									locationScore -= 100;
+								}
+								else if (itemID != Structure_RocketTurret) {
+									locationScore -= 20;
+								}
 							}
 						}
+						// Don't penalize tiles outside map - edge placement should be encouraged
 					}
+				}
+
+				// Building-specific positioning - reduce distance penalty to not overwhelm edge bonus
+				if (itemIsBuilder || itemID == Structure_GunTurret || itemID == Structure_RocketTurret) {
+					// Lighter penalty for distance - don't want to completely negate edge bonus
+					locationScore -= lround(blockDistance(squadRallyLocation, Coord(placeLocationX, placeLocationY)) / 4);
+					locationScore -= lround(blockDistance(baseCenter, Coord(placeLocationX, placeLocationY)) / 2);
+				}
+
+				// Pick this location if it has the best score
+				if (locationScore > bestLocationScore) {
+					bestLocationScore = locationScore;
+					bestLocation = Coord(placeLocationX, placeLocationY);
 				}
 			}
 		}
-	}
-
-
-	if (bestLocationScore != -10000) {
-		bestLocation = Coord(bestLocationX, bestLocationY);
 	}
 	
 	return bestLocation;
