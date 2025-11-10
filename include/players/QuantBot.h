@@ -102,6 +102,7 @@ private:
     Coord findMcvPlaceLocation(const MCV* pMCV);
     Coord findPlaceLocation(Uint32 itemID);
     Coord findPlaceLocationSimple(Uint32 itemID);
+    Coord findSlabPlaceLocation(Uint32 itemID);
     Coord findTurretPlaceLocation(Uint32 itemID);
     Coord findSquadCenter(int houseID);
     Coord findBaseCentre(int houseID);

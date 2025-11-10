@@ -762,30 +762,78 @@ void QuantBot::onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID)
 }
 
 Coord QuantBot::findMcvPlaceLocation(const MCV* pMCV) {
-	Coord bestLocation = findPlaceLocation(Structure_ConstructionYard);
+	// Always search for best location near the MCV's current position
+	// This works for both first MCV and expansion MCVs
+	int bestLocationScore = -10000;
+	Coord bestLocation = Coord::Invalid();
+	Coord mcvLocation = pMCV->getLocation();
 
-	if (bestLocation == Coord::Invalid()) {
-		logDebug("No MCV deploy location adjacent to existing base structures was found, move to full search | ");
+	// Don't place on the very edge of the map
+	for (int placeLocationX = 1; placeLocationX < getMap().getSizeX() - 1; placeLocationX++) {
+		for (int placeLocationY = 1; placeLocationY < getMap().getSizeY() - 1; placeLocationY++) {
+			Coord placeLocation(placeLocationX, placeLocationY);
 
-		int bestLocationScore = 1000;
-
-		// Don't place on the very edge of the map
-		for (int placeLocationX = 1; placeLocationX < getMap().getSizeX() - 1; placeLocationX++) {
-			for (int placeLocationY = 1; placeLocationY < getMap().getSizeY() - 1; placeLocationY++) {
-				Coord placeLocation = Coord::Invalid();
-				placeLocation.x = placeLocationX;
-				placeLocation.y = placeLocationY;
-
-				if (getMap().okayToPlaceStructure(placeLocationX, placeLocationY, 2, 2, false, nullptr)) {
-					int locationScore = lround(blockDistance(pMCV->getLocation(), placeLocation));
-					if (locationScore < bestLocationScore) {
-						bestLocationScore = locationScore;
-						bestLocation.x = placeLocationX;
-						bestLocation.y = placeLocationY;
+			if (getMap().okayToPlaceStructure(placeLocationX, placeLocationY, 2, 2, false, nullptr)) {
+				int locationScore = 0;
+				
+				// Calculate distance penalty (closer is better)
+				int distance = lround(blockDistance(mcvLocation, placeLocation));
+				locationScore -= distance * 10;  // Strong penalty for distance - MCVs should deploy near where they spawn
+				
+				// Calculate available rock in the area (more buildable space is better)
+				int availableRock = 0;
+				int searchRadius = 12;  // Search area around potential deployment location
+				
+				for (int x = placeLocationX - searchRadius; x <= placeLocationX + searchRadius; x++) {
+					for (int y = placeLocationY - searchRadius; y <= placeLocationY + searchRadius; y++) {
+						if (getMap().tileExists(x, y)) {
+							const Tile* pTile = getMap().getTile(x, y);
+							// Count rock tiles that aren't mountains (buildable with concrete)
+							if (pTile->isRock() && !pTile->isMountain() && !pTile->hasAGroundObject()) {
+								availableRock++;
+							}
+						}
 					}
+				}
+				
+				// Score based on available rock
+				// A 2x2 building needs 4 tiles, so 6 buildings = 24 tiles minimum
+				// But we want more space for growth
+				int buildingSites = availableRock / 4;  // Rough estimate of potential building count
+				
+				if (buildingSites >= 6) {
+					// Location has room for 6+ buildings, give good base score
+					locationScore += 200;
+					// Additional bonus for even more space (diminishing returns)
+					locationScore += (buildingSites - 6) * 5;
+				} else {
+					// Not enough space - heavy penalty
+					locationScore += buildingSites * 15;  // Still give some credit
+					locationScore -= 100;  // But penalize insufficient space heavily
+				}
+				
+				// Bonus for being somewhat central but not too far
+				// Prefer locations that aren't at extreme corners
+				int distanceFromCenter = lround(blockDistance(placeLocation, 
+					Coord(getMap().getSizeX() / 2, getMap().getSizeY() / 2)));
+				int mapRadius = (getMap().getSizeX() + getMap().getSizeY()) / 4;
+				
+				if (distanceFromCenter < mapRadius / 2) {
+					locationScore += 20;  // Bonus for being near map center
+				}
+				
+				// Pick best location
+				if (locationScore > bestLocationScore) {
+					bestLocationScore = locationScore;
+					bestLocation = placeLocation;
 				}
 			}
 		}
+	}
+	
+	if (bestLocation.isValid()) {
+		logDebug("MCV deployment location found at (%d, %d) with score %d", 
+			bestLocation.x, bestLocation.y, bestLocationScore);
 	}
 
 	return bestLocation;
@@ -868,6 +916,109 @@ Coord QuantBot::findPlaceLocation(Uint32 itemID) {
 				if (locationScore > bestLocationScore) {
 					bestLocationScore = locationScore;
 					bestLocation = Coord(placeLocationX, placeLocationY);
+				}
+			}
+		}
+	}
+	
+	return bestLocation;
+}
+
+Coord QuantBot::findSlabPlaceLocation(Uint32 itemID) {
+	int slabSizeX = getStructureSize(itemID).x;
+	int slabSizeY = getStructureSize(itemID).y;
+	
+	int bestLocationScore = -10000;
+	Coord bestLocation = Coord::Invalid();
+
+	// Check all map tiles for valid slab placement
+	for (int x = 0; x <= getMap().getSizeX() - slabSizeX; x++) {
+		for (int y = 0; y <= getMap().getSizeY() - slabSizeY; y++) {
+			// Check if this location is valid for slab placement
+			if (getMap().okayToPlaceStructure(x, y, slabSizeX, slabSizeY, false, getHouse())) {
+				
+				int locationScore = 0;
+				bool hasExistingSlab = false;
+				
+				// Check if any of the slab tiles already have concrete
+				for (int i = x; i < x + slabSizeX; i++) {
+					for (int j = y; j < y + slabSizeY; j++) {
+						if (getMap().getTile(i, j)->isConcrete()) {
+							hasExistingSlab = true;
+							break;
+						}
+					}
+					if (hasExistingSlab) break;
+				}
+				
+				// Skip if already has concrete - we don't want to place over existing slabs
+				if (hasExistingSlab) {
+					continue;
+				}
+				
+				// Count adjacent tiles that would benefit from slab extension
+				int adjacentOwnedTiles = 0;
+				int adjacentRockTiles = 0;
+				int nearbyStructures = 0;
+				
+				for (int i = x - 1; i <= x + slabSizeX; i++) {
+					for (int j = y - 1; j <= y + slabSizeY; j++) {
+						if (getMap().tileExists(i, j)) {
+							const Tile* pTile = getMap().getTile(i, j);
+							
+							// Count owned tiles (structures or concrete)
+							if (pTile->getOwner() == getHouse()->getHouseID()) {
+								adjacentOwnedTiles++;
+								
+								if (pTile->hasAStructure()) {
+									nearbyStructures++;
+								}
+							}
+							
+							// Count rock tiles that could become buildable
+							if (pTile->isRock() && !pTile->isConcrete()) {
+								adjacentRockTiles++;
+							}
+						}
+					}
+				}
+				
+				// SCORING: Favor extending base perimeter
+				// 1. Must be near owned territory
+				locationScore += adjacentOwnedTiles * 5;
+				
+				// 2. Bonus for being near structures (indicates active base area)
+				locationScore += nearbyStructures * 10;
+				
+				// 3. Big bonus for opening up rock areas (going through passes)
+				// The more rock around, the more valuable to place slab here
+				locationScore += adjacentRockTiles * 8;
+				
+				// 4. Bonus for being at perimeter (near edges of owned area)
+				// Check if this is at the edge of buildable area
+				bool atPerimeter = false;
+				for (int i = x - 3; i <= x + slabSizeX + 2; i++) {
+					for (int j = y - 3; j <= y + slabSizeY + 2; j++) {
+						if (getMap().tileExists(i, j)) {
+							const Tile* pTile = getMap().getTile(i, j);
+							// If there's unowned rock nearby, we're at perimeter
+							if (pTile->isRock() && !pTile->isConcrete() && pTile->getOwner() != getHouse()->getHouseID()) {
+								atPerimeter = true;
+								break;
+							}
+						}
+					}
+					if (atPerimeter) break;
+				}
+				
+				if (atPerimeter) {
+					locationScore += 30;  // Strong bonus for perimeter expansion
+				}
+				
+				// Pick this location if it has the best score
+				if (locationScore > bestLocationScore) {
+					bestLocationScore = locationScore;
+					bestLocation = Coord(x, y);
 				}
 			}
 		}
@@ -1972,42 +2123,47 @@ void QuantBot::build(int militaryValue) {
 								itemID = Structure_Palace;
 							}
 
-						if (pBuilder->isAvailableToBuild(itemID) && findPlaceLocation(itemID).isValid() && itemID != NONE_ID) {
-							doProduceItem(pBuilder, itemID);
-							itemCount[itemID]++;
+					if (pBuilder->isAvailableToBuild(itemID) && findPlaceLocation(itemID).isValid() && itemID != NONE_ID) {
+						doProduceItem(pBuilder, itemID);
+						itemCount[itemID]++;
+					}
+					else {
+						// If we can't build the desired structure, try to expand buildable area with concrete slabs
+						// Prefer 4-slab if available, otherwise use 1-slab
+						Uint32 slabType = NONE_ID;
+						if (pBuilder->isAvailableToBuild(Structure_Slab4)) {
+							slabType = Structure_Slab4;
+						} else if (pBuilder->isAvailableToBuild(Structure_Slab1)) {
+							slabType = Structure_Slab1;
 						}
-						/* DISABLED: Concrete slab planner causes early-game AI spikes (full-map scans)
-						else {
-							// If we can't build the desired structure, try to expand buildable area with concrete slabs
-							// This helps create more valid placement locations for future buildings
-							if (pBuilder->isAvailableToBuild(Structure_Slab1)) {
-								Coord slabLocation = findPlaceLocationSimple(Structure_Slab1);
-								if (slabLocation.isValid()) {
-									doProduceItem(pBuilder, Structure_Slab1);
-									logDebug("Building concrete slab to expand buildable area at (%d,%d)", slabLocation.x, slabLocation.y);
-								}
+						
+						if (slabType != NONE_ID) {
+							Coord slabLocation = findSlabPlaceLocation(slabType);
+							if (slabLocation.isValid()) {
+								doProduceItem(pBuilder, slabType);
+								logDebug("Building concrete slab to expand buildable area at (%d,%d)", slabLocation.x, slabLocation.y);
 							}
 						}
-						*/
+					}
 
 						}
 					}
 
-					if (pBuilder->isWaitingToPlace()) {
-						Uint32 itemToBePlaced = pBuilder->getCurrentProducedItem();
-						Coord location;
-						
-						// Use appropriate placement method based on item type
-						if (itemToBePlaced == Structure_Slab1) {
-							// For concrete slabs, use simple method to find any valid location
-							location = findPlaceLocationSimple(itemToBePlaced);
-						} else if (itemToBePlaced == Structure_RocketTurret || itemToBePlaced == Structure_GunTurret) {
-							// For turrets, use specialized placement that favors perimeter and enemy direction
-							location = findTurretPlaceLocation(itemToBePlaced);
-						} else {
-							// For other structures, use normal method that favors adjacency
-							location = findPlaceLocation(itemToBePlaced);
-						}
+				if (pBuilder->isWaitingToPlace()) {
+					Uint32 itemToBePlaced = pBuilder->getCurrentProducedItem();
+					Coord location;
+					
+					// Use appropriate placement method based on item type
+					if (itemToBePlaced == Structure_Slab1 || itemToBePlaced == Structure_Slab4) {
+						// For concrete slabs, use specialized slab placement method
+						location = findSlabPlaceLocation(itemToBePlaced);
+					} else if (itemToBePlaced == Structure_RocketTurret || itemToBePlaced == Structure_GunTurret) {
+						// For turrets, use specialized placement that favors perimeter and enemy direction
+						location = findTurretPlaceLocation(itemToBePlaced);
+					} else {
+						// For other structures, use normal method that favors adjacency
+						location = findPlaceLocation(itemToBePlaced);
+					}
 
 						if (location.isValid()) {
 							doPlaceStructure(pConstYard, location.x, location.y);
