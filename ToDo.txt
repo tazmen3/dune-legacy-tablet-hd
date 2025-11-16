@@ -1,6 +1,8 @@
 Todo:
 -----
 
+✅ DONE - Internet multiplayer working - metaserver restored at https://dunelegacy.sourceforge.net/metaserver/metaserver.php
+
 Reinforcements are delivered in reverse order (really?)
 
 Make command queues for units possible (e.g. waypoints during movement, hit and run, etc.)
@@ -22,6 +24,34 @@ Rework message queue to drop redundant messages
 Test XMI playback on Windows 7
 
 Test Menu music change with directory player
+
+AI / Bot Improvements:
+----------------------
+
+Fix support bot (QuantBot) so it builds well for multiplayer
+
+Fix nuke targeting to make sure it targets a building
+
+Move to a weighted distribution for prioritising build as opposed to a complex decision tree
+- Priority and numbers based on: money, tech tree, remaining spice, harvesters, rocket defence, power requirement
+
+MCV deployment should favour locations further from existing construction yard
+
+Allow launchers to kite again
+
+Add a start location for moving units which is on sand
+
+Make original campaign AI
+
+Map Editor:
+-----------
+
+Update map editor to double map size available
+
+Modding:
+--------
+
+Allow for modifications to be created and used
 
 Ideas:
 ------
