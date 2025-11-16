@@ -27,7 +27,7 @@
 #define AUDIO_FREQUENCY     44100
 
 #define DEFAULT_PORT        28747
-#define DEFAULT_METASERVER  "http://dunelegacy.sourceforge.net/metaserver/metaserver.php"
+#define DEFAULT_METASERVER  "https://dunelegacy.com/metaserver/metaserver.php"
 
 #define SAVEMAGIC           8675309
 #define SAVEGAMEVERSION     9704

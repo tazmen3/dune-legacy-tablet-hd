@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <stdio.h>
+#include <curl/curl.h>
 #include <enet/enet.h>
 
 std::string getDomainFromURL(const std::string& url) {
@@ -30,6 +31,8 @@ std::string getDomainFromURL(const std::string& url) {
 
     if(url.substr(0,7) == "http://") {
         domainStart += 7;
+    } else if(url.substr(0,8) == "https://") {
+        domainStart += 8;
     }
 
     size_t domainEnd = url.find_first_of(":/", domainStart);
@@ -42,6 +45,8 @@ std::string getFilePathFromURL(const std::string& url) {
 
     if(url.substr(0,7) == "http://") {
         domainStart += 7;
+    } else if(url.substr(0,8) == "https://") {
+        domainStart += 8;
     }
 
     size_t domainEnd = url.find_first_of('/', domainStart);
@@ -54,6 +59,8 @@ int getPortFromURL(const std::string& url) {
 
     if(url.substr(0,7) == "http://") {
         domainStart += 7;
+    } else if(url.substr(0,8) == "https://") {
+        domainStart += 8;
     }
 
     size_t domainEnd = url.find_first_of(":/", domainStart);
@@ -93,103 +100,89 @@ std::string percentEncode(const std::string & s) {
 }
 
 
+// Callback function for libcurl to write data
+static size_t curlWriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t totalSize = size * nmemb;
+    std::string* str = static_cast<std::string*>(userp);
+    str->append(static_cast<char*>(contents), totalSize);
+    return totalSize;
+}
+
 std::string loadFromHttp(const std::string& url, const std::map<std::string, std::string>& parameters) {
-
-    std::string domain = getDomainFromURL(url);
-
-    std::string filepath = getFilePathFromURL(url);
-
-    int port = getPortFromURL(url);
-
-    if(port < 0 || port > 65535) {
-        THROW(std::runtime_error, "Invalid port number");
-    }
-
-    if(port == 0) {
-        port = PORT_HTTP;
-    }
-
+    // Build URL with parameters
+    std::string fullUrl = url;
+    
     for(const auto& param : parameters) {
-        if(filepath.find_first_of('?') == std::string::npos) {
+        if(fullUrl.find_first_of('?') == std::string::npos) {
             // first parameter
-            filepath += "?";
+            fullUrl += "?";
         } else {
-            filepath += "&";
+            fullUrl += "&";
         }
-
-        filepath += percentEncode(param.first) + "=" + percentEncode(param.second);
+        fullUrl += percentEncode(param.first) + "=" + percentEncode(param.second);
     }
-
-    return loadFromHttp(domain, filepath, (unsigned short) port);
+    
+    // Initialize curl
+    CURL* curl = curl_easy_init();
+    if(!curl) {
+        THROW(std::runtime_error, "Failed to initialize libcurl");
+    }
+    
+    std::string responseData;
+    
+    // Set curl options
+    curl_easy_setopt(curl, CURLOPT_URL, fullUrl.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlWriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseData);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L); // Follow redirects (HTTP -> HTTPS)
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L); // Max 5 redirects
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L); // 30 second timeout
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "DuneLegacy/1.0");
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L); // Verify SSL certificates
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L); // Verify hostname
+    
+    // Perform the request
+    CURLcode res = curl_easy_perform(curl);
+    
+    if(res != CURLE_OK) {
+        std::string error = curl_easy_strerror(res);
+        curl_easy_cleanup(curl);
+        THROW(std::runtime_error, "HTTP request failed: " + error);
+    }
+    
+    // Check HTTP response code
+    long httpCode = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+    
+    curl_easy_cleanup(curl);
+    
+    if(httpCode != 200) {
+        THROW(std::runtime_error, "Server Error: Received HTTP status code " + std::to_string(httpCode));
+    }
+    
+    return responseData;
 }
 
 std::string loadFromHttp(const std::string& domain, const std::string& filepath, unsigned short port) {
-    ENetAddress address;
-    if(enet_address_set_host(&address, domain.c_str()) < 0) {
-        THROW(std::runtime_error, "Cannot resolve '" + domain + "'");
+    // Build URL from components
+    std::string url;
+    
+    if(port == 443) {
+        url = "https://";
+    } else {
+        url = "http://";
     }
-
-    address.port = port;
-
-    ENetSocket httpSocket = enet_socket_create(ENET_SOCKET_TYPE_STREAM);
-    if(httpSocket == ENET_SOCKET_NULL) {
-        THROW(std::runtime_error, "Unable to create socket");
+    
+    url += domain;
+    
+    if((port != 80 && port != 443) || port == 0) {
+        url += ":" + std::to_string(port);
     }
-
-    if(enet_socket_connect(httpSocket, &address) < 0) {
-        THROW(std::runtime_error, "Unable to connect to '" + domain + "'");
-    }
-
-
-    const std::string newline = "\x0D\x0A";
-    const std::string doubleNewline = newline + newline;
-    std::string request = "GET " + filepath + " HTTP/1.0" + newline + "Host: " + domain + doubleNewline;
-
-    ENetBuffer sendBuffer;
-    memset(&sendBuffer, 0, sizeof(sendBuffer));
-    sendBuffer.data = (void*) request.c_str();
-    sendBuffer.dataLength = request.size();
-
-    if(enet_socket_send(httpSocket, nullptr, &sendBuffer, 1) < 0) {
-        THROW(std::runtime_error, "Error while sending HTTP request to '" + domain + "'");
-    }
-
-    std::string result;
-
-    char resultBuffer[1024];
-
-    while(true) {
-
-        ENetBuffer receiveBuffer;
-        memset(&receiveBuffer, 0, sizeof(sendBuffer));
-        receiveBuffer.data = resultBuffer;
-        receiveBuffer.dataLength = sizeof(resultBuffer);
-
-        int receiveLength = enet_socket_receive(httpSocket, nullptr, &receiveBuffer, 1);
-
-        if(receiveLength < 0) {
-            THROW(std::runtime_error, "Error while receiving from '" + domain + "'");
-        }
-
-        result.append(resultBuffer, receiveLength);
-
-        if((size_t) receiveLength < sizeof(resultBuffer)) {
-            break;
-        }
-
-    }
-
-    enet_socket_destroy(httpSocket);
-
-    if(result.substr(9,3) != "200") {
-        THROW(std::runtime_error, "Server Error: Received status code '" + result.substr(9,3) + "' from " + domain + ": " + result.substr(0, result.find(newline)));
-    }
-
-    size_t contentStart = result.find(doubleNewline);
-
-    std::string content = result.substr(contentStart + doubleNewline.length());
-
-    return content;
+    
+    url += filepath;
+    
+    // Use the URL-based version
+    return loadFromHttp(url, std::map<std::string, std::string>());
 }
 
 

@@ -59,6 +59,7 @@ option(DUNELEGACY_STATIC_RUNTIME "Use static runtime libraries" OFF)
 find_package(SDL2 CONFIG REQUIRED)
 find_package(SDL2_mixer CONFIG REQUIRED)
 find_package(SDL2_ttf CONFIG REQUIRED)
+find_package(CURL REQUIRED)
 
 # Platform-specific settings
 if(WIN32)
