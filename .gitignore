@@ -80,3 +80,4 @@ analysis/
 
 # VSCode settings (user-specific)
 .vscode/
+dist/

@@ -92,6 +92,8 @@ private:
     HBox        audioHBox;
     Checkbox    playSFXCheckbox;
     Checkbox    playMusicCheckbox;
+    HBox        audioHBox2;
+    Checkbox    playCreditsSFXCheckbox;
 
     HBox        networkPortHBox;
     TextBox     portTextBox;

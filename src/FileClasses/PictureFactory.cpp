@@ -598,7 +598,8 @@ sdl2::surface_ptr PictureFactory::createOptionsMenu() const {
     }
     SDL_SetColorKey(tmp.get(), SDL_TRUE, 0);
 
-    auto Pic = getSubPicture(background.get(),0,0,tmp->w,tmp->h);
+    // Add 15 pixels extra height for Credits SFX checkbox and buttons
+    auto Pic = getSubPicture(background.get(),0,0,tmp->w,tmp->h + 15);
     SDL_BlitSurface(tmp.get(),nullptr,Pic.get(),nullptr);
 
     tmp.reset();

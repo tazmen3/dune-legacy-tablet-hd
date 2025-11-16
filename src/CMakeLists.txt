@@ -430,11 +430,14 @@ else()
 endif()
 
 # Install data directory
-install(
-    DIRECTORY ${DATA_DIR}/
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
-    FILES_MATCHING PATTERN "*.*"
-)
+# For macOS bundles, data files are already inside the .app via POST_BUILD commands
+if(NOT APPLE)
+    install(
+        DIRECTORY ${DATA_DIR}/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
+        FILES_MATCHING PATTERN "*.*"
+    )
+endif()
 
 # Install executable
 install(TARGETS dunelegacy

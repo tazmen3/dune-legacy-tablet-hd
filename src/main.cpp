@@ -847,6 +847,7 @@ int main(int argc, char *argv[]) {
             settings.audio.musicVolume = myINIFile.getIntValue("Audio","Music Volume", 64);
             settings.audio.playSFX = myINIFile.getBoolValue("Audio","Play SFX", true);
             settings.audio.sfxVolume = myINIFile.getIntValue("Audio","SFX Volume", 64);
+            settings.audio.playCreditsSFX = myINIFile.getBoolValue("Audio","Play Credits SFX", true);
 
             settings.network.serverPort = myINIFile.getIntValue("Network","ServerPort",DEFAULT_PORT);
             settings.network.metaServer = myINIFile.getStringValue("Network","MetaServer",DEFAULT_METASERVER);

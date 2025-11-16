@@ -187,6 +187,7 @@ public:
         bool        playMusic;
         int         musicVolume;
         std::string musicType;
+        bool        playCreditsSFX;
     } audio;
 
     class NetworkClass {

@@ -216,6 +216,16 @@ OptionsMenu::OptionsMenu() : MenuBase()
 
     mainVBox.addWidget(&audioHBox, 0.01);
 
+    audioHBox2.addWidget(Spacer::create(), 0.5);
+    playCreditsSFXCheckbox.setText(_("Play Credits SFX"));
+    playCreditsSFXCheckbox.setChecked(settings.audio.playCreditsSFX);
+    playCreditsSFXCheckbox.setOnClick(std::bind(&OptionsMenu::onChangeOption, this, true));
+    audioHBox2.addWidget(&playCreditsSFXCheckbox, 240);
+    audioHBox2.addWidget(Spacer::create(), 240);
+    audioHBox2.addWidget(Spacer::create(), 0.5);
+
+    mainVBox.addWidget(&audioHBox2, 0.01);
+
     mainVBox.addWidget(Spacer::create(), 0.2);
 
     networkPortHBox.addWidget(Spacer::create(), 0.5);
@@ -301,6 +311,7 @@ void OptionsMenu::onChangeOption(bool bInteractive) {
 
     bChanged |= (settings.audio.playSFX != playSFXCheckbox.isChecked());
     bChanged |= (settings.audio.playMusic != playMusicCheckbox.isChecked());
+    bChanged |= (settings.audio.playCreditsSFX != playCreditsSFXCheckbox.isChecked());
 
     bChanged |= (settings.gameOptions != currentGameOptions);
 
@@ -367,6 +378,7 @@ void OptionsMenu::onOptionsOK() {
 
     settings.audio.playSFX = playSFXCheckbox.isChecked();
     settings.audio.playMusic = playMusicCheckbox.isChecked();
+    settings.audio.playCreditsSFX = playCreditsSFXCheckbox.isChecked();
 
     settings.gameOptions = currentGameOptions;
 
@@ -438,6 +450,7 @@ void OptionsMenu::saveConfiguration2File() {
 
     myINIFile.setBoolValue("Audio","Play SFX",settings.audio.playSFX);
     myINIFile.setBoolValue("Audio","Play Music",settings.audio.playMusic);
+    myINIFile.setBoolValue("Audio","Play Credits SFX",settings.audio.playCreditsSFX);
 
     myINIFile.setIntValue("Game Options","Game Speed",settings.gameOptions.gameSpeed);
     myINIFile.setBoolValue("Game Options","Concrete Required",settings.gameOptions.concreteRequired);

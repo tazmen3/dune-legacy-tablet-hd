@@ -24,7 +24,11 @@ fi
 
 # Extract version from app bundle
 VERSION=$(defaults read "$(pwd)/${APP_PATH}/Contents/Info.plist" CFBundleShortVersionString)
-DMG_NAME="DuneLegacy-${VERSION}-macOS.dmg"
+
+# Output to dist/ directory
+OUTPUT_DIR="dist"
+mkdir -p "$OUTPUT_DIR"
+DMG_NAME="$OUTPUT_DIR/DuneLegacy-${VERSION}-macOS.dmg"
 VOLUME_NAME="Dune Legacy ${VERSION}"
 
 echo "Creating DMG from: $APP_PATH"

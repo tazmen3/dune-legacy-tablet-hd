@@ -81,17 +81,22 @@ InGameSettingsMenu::InGameSettingsMenu() : Window(0,0,0,0) {
     scrollSpeedPlus.setOnClick(std::bind(&InGameSettingsMenu::onScrollSpeedPlus, this));
     windowWidget.addWidget(&scrollSpeedPlus, Point(172,114), scrollSpeedPlus.getSize());
 
+    // Credits SFX checkbox
+    playCreditsSFXCheckbox.setText(_("Credits SFX"));
+    playCreditsSFXCheckbox.setTextColor(color2);
+    playCreditsSFXCheckbox.setChecked(settings.audio.playCreditsSFX);
+    windowWidget.addWidget(&playCreditsSFXCheckbox, Point(5,127), Point(180,22));
 
     // buttons
     okButton.setText(_("OK"));
     okButton.setTextColor(color2);
     okButton.setOnClick(std::bind(&InGameSettingsMenu::onOK, this));
-    windowWidget.addWidget(&okButton, Point(12,134), Point(79,15));
+    windowWidget.addWidget(&okButton, Point(12,152), Point(79,13));
 
     cancelButton.setText(_("Cancel"));
     cancelButton.setTextColor(color2);
     cancelButton.setOnClick(std::bind(&InGameSettingsMenu::onCancel, this));
-    windowWidget.addWidget(&cancelButton, Point(101,134), Point(79,15));
+    windowWidget.addWidget(&cancelButton, Point(101,152), Point(79,13));
 
     init();
 }
@@ -144,12 +149,14 @@ void InGameSettingsMenu::onOK() {
     settings.general.scrollSpeed = scrollSpeed;
     settings.audio.sfxVolume = soundPlayer->getSfxVolume();
     settings.audio.musicVolume = musicPlayer->getMusicVolume();
+    settings.audio.playCreditsSFX = playCreditsSFXCheckbox.isChecked();
     settings.gameOptions.gameSpeed = newGamespeed;
 
     INIFile myINIFile(getConfigFilepath());
     myINIFile.setIntValue("General","Scroll Speed", settings.general.scrollSpeed);
     myINIFile.setIntValue("Audio","Music Volume", settings.audio.musicVolume);
     myINIFile.setIntValue("Audio","SFX Volume", settings.audio.sfxVolume);
+    myINIFile.setBoolValue("Audio","Play Credits SFX", settings.audio.playCreditsSFX);
     myINIFile.setIntValue("Game Options","Game Speed", settings.gameOptions.gameSpeed);
     myINIFile.saveChangesTo(getConfigFilepath());
 

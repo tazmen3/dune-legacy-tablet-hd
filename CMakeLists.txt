@@ -216,6 +216,14 @@ elseif(APPLE)
     set(CPACK_PACKAGE_FILE_NAME "DuneLegacy-${PROJECT_VERSION}-macOS")
     set(MACOSX_BUNDLE_ICON_FILE "dunelegacy.icns")
     
+    # Install README and release notes to DMG root (not inside .app)
+    install(FILES README DESTINATION . COMPONENT Runtime)
+    install(FILES "release_notes/RELEASE_NOTES_${PROJECT_VERSION}.md" 
+            DESTINATION . 
+            RENAME "Release Notes.md"
+            COMPONENT Runtime
+            OPTIONAL)
+    
     # Optional: Add custom DMG background and layout if files exist
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/dmg_background.png")
         set(CPACK_DMG_BACKGROUND_IMAGE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/dmg_background.png")

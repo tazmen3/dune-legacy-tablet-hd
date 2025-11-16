@@ -329,7 +329,7 @@ void House::update() {
     numVisibleFriendlyUnits = 0;
 
     if (oldCredits != getCredits()) {
-        if((this == pLocalHouse) && (getCredits() > 0)) {
+        if((this == pLocalHouse) && (getCredits() > 0) && settings.audio.playCreditsSFX) {
             soundPlayer->playSound(Sound_CreditsTick);
         }
         oldCredits = getCredits();

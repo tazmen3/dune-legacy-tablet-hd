@@ -23,6 +23,7 @@
 #include <GUI/TextButton.h>
 #include <GUI/PictureButton.h>
 #include <GUI/ProgressBar.h>
+#include <GUI/Checkbox.h>
 #include "Definitions.h"
 
 class InGameSettingsMenu : public Window
@@ -81,6 +82,8 @@ private:
     PictureButton   scrollSpeedPlus;
     PictureButton   scrollSpeedMinus;
     ProgressBar     scrollSpeedBar;
+
+    Checkbox        playCreditsSFXCheckbox;
 
     int     newGamespeed;
     int     previousVolume;
