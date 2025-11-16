@@ -76,3 +76,6 @@ scripts/sourceforge-config.sh
 # Documentation and analysis folders
 documents/
 analysis/
+
+# VSCode settings (user-specific)
+.vscode/
