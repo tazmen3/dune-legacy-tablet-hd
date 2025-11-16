@@ -4,6 +4,7 @@ depcomp
 autom4te.cache
 bin/
 build/
+build-vcpkg/
 external/
 docs/
 missing

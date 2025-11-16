@@ -1,6 +1,6 @@
 
 #import <Cocoa/Cocoa.h>
-#import "MacFunctions.h"
+#import <misc/MacFunctions.h>
 
 static char macLanguage[3] = "  ";
 
@@ -24,7 +24,8 @@ void getMacApplicationSupportFolder(char* buffer, int len) {
 
 	if(error == noErr) {
 		CFURLRef url = CFURLCreateFromFSRef(kCFAllocatorDefault, &appSupportFolder);
-		appSupportFolderString = [(NSURL*) url path];
+		appSupportFolderString = [(__bridge NSURL*) url path];
+		CFRelease(url);
 	} else {
 		appSupportFolderString = [@"~/Library/Application Support" stringByExpandingTildeInPath];
 	}

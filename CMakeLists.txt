@@ -22,9 +22,8 @@ endif()
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     if(APPLE)
         set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum OS X deployment version" FORCE)
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -flto -ffast-math -march=native -mtune=native")
-        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -flto -ffast-math -march=native -mtune=native")
-        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -flto")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math")
+        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -ffast-math")
     endif()
 endif()
 
@@ -55,11 +54,11 @@ option(DUNELEGACY_BUILD_TESTS "Build test suite" OFF)
 option(DUNELEGACY_ENABLE_PCH "Enable precompiled headers" ON)
 option(DUNELEGACY_STATIC_RUNTIME "Use static runtime libraries" OFF)
 
-# Check for required packages with specific versions
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(SDL2 REQUIRED sdl2>=2.32.2)
-pkg_check_modules(SDL2_MIXER REQUIRED SDL2_mixer>=2.8.1)
-pkg_check_modules(SDL2_TTF REQUIRED SDL2_ttf>=2.24.0)
+# Find required packages
+# When using vcpkg, these will be automatically found via CMAKE_TOOLCHAIN_FILE
+find_package(SDL2 CONFIG REQUIRED)
+find_package(SDL2_mixer CONFIG REQUIRED)
+find_package(SDL2_ttf CONFIG REQUIRED)
 
 # Platform-specific settings
 if(WIN32)
@@ -107,16 +106,19 @@ if(DUNELEGACY_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-# Create a custom target for copying data files
-add_custom_target(copy_data ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_SOURCE_DIR}/data/"
-    "${CMAKE_BINARY_DIR}/bin/"
-    COMMENT "Copying data files directly to bin directory"
-)
-
-# Add dependency to ensure data files are copied after main target is built
-add_dependencies(copy_data dunelegacy)
+# Create a custom target for copying data files (non-macOS platforms)
+# macOS bundles handle data copying in src/CMakeLists.txt
+if(NOT APPLE)
+    add_custom_target(copy_data ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/data/"
+        "${CMAKE_BINARY_DIR}/bin/"
+        COMMENT "Copying data files directly to bin directory"
+    )
+    
+    # Add dependency to ensure data files are copied after main target is built
+    add_dependencies(copy_data dunelegacy)
+endif()
 
 # Windows-specific file operations
 if(WIN32)
@@ -127,53 +129,13 @@ if(WIN32)
         file(COPY "${PAK_FILE}" DESTINATION "${CMAKE_BINARY_DIR}/bin/")
     endforeach()
     
-    # SDL2 DLL handling
-    find_program(SDL2_DLL_PATH "SDL2.dll" 
-        HINTS ${SDL2_LIBRARY_DIRS} ${SDL2_LIBDIR} 
-        PATH_SUFFIXES bin
-        DOC "Path to SDL2.dll")
-    find_program(SDL2_MIXER_DLL_PATH "SDL2_mixer.dll"
-        HINTS ${SDL2_MIXER_LIBRARY_DIRS} ${SDL2_MIXER_LIBDIR}
-        PATH_SUFFIXES bin
-        DOC "Path to SDL2_mixer.dll")
-    find_program(SDL2_TTF_DLL_PATH "SDL2_ttf.dll"
-        HINTS ${SDL2_TTF_LIBRARY_DIRS} ${SDL2_TTF_LIBDIR}
-        PATH_SUFFIXES bin
-        DOC "Path to SDL2_ttf.dll")
-        
-    # Copy SDL2 DLLs (either from found locations or fallback)
-    # SDL2.dll
-    if(SDL2_DLL_PATH)
-        file(COPY "${SDL2_DLL_PATH}" DESTINATION "${CMAKE_BINARY_DIR}/bin/")
-        message(STATUS "Copying SDL2.dll from ${SDL2_DLL_PATH}")
-    elseif(EXISTS "${CMAKE_SOURCE_DIR}/bin/Release-x64/SDL2.dll")
-        file(COPY "${CMAKE_SOURCE_DIR}/bin/Release-x64/SDL2.dll" DESTINATION "${CMAKE_BINARY_DIR}/bin/")
-        message(STATUS "Copying SDL2.dll from fallback location")
-    else()
-        message(WARNING "SDL2.dll not found. Please copy it manually to the build/bin directory.")
-    endif()
-    
-    # SDL2_mixer.dll
-    if(SDL2_MIXER_DLL_PATH)
-        file(COPY "${SDL2_MIXER_DLL_PATH}" DESTINATION "${CMAKE_BINARY_DIR}/bin/")
-        message(STATUS "Copying SDL2_mixer.dll from ${SDL2_MIXER_DLL_PATH}")
-    elseif(EXISTS "${CMAKE_SOURCE_DIR}/bin/Release-x64/SDL2_mixer.dll")
-        file(COPY "${CMAKE_SOURCE_DIR}/bin/Release-x64/SDL2_mixer.dll" DESTINATION "${CMAKE_BINARY_DIR}/bin/")
-        message(STATUS "Copying SDL2_mixer.dll from fallback location")
-    else()
-        message(WARNING "SDL2_mixer.dll not found. Please copy it manually to the build/bin directory.")
-    endif()
-    
-    # SDL2_ttf.dll
-    if(SDL2_TTF_DLL_PATH)
-        file(COPY "${SDL2_TTF_DLL_PATH}" DESTINATION "${CMAKE_BINARY_DIR}/bin/")
-        message(STATUS "Copying SDL2_ttf.dll from ${SDL2_TTF_DLL_PATH}")
-    elseif(EXISTS "${CMAKE_SOURCE_DIR}/bin/Release-x64/SDL2_ttf.dll")
-        file(COPY "${CMAKE_SOURCE_DIR}/bin/Release-x64/SDL2_ttf.dll" DESTINATION "${CMAKE_BINARY_DIR}/bin/")
-        message(STATUS "Copying SDL2_ttf.dll from fallback location")
-    else()
-        message(WARNING "SDL2_ttf.dll not found. Please copy it manually to the build/bin directory.")
-    endif()
+    # When using vcpkg, CMake will automatically handle DLL copying via vcpkg_copy_pdbs
+    # and vcpkg's automatic DLL copying for dependencies
+    # However, we add a custom command to ensure DLLs are in the right place
+    add_custom_command(TARGET dunelegacy POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E echo "Checking for SDL2 DLLs..."
+        COMMENT "vcpkg will automatically copy required DLLs to output directory"
+    )
 endif()
 
 # Install data files
