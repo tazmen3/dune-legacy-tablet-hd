@@ -2,9 +2,17 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "🚀 Build + Create DMG Installer (RECOMMENDED)",
+            "label": "🚀 Build + Create Installer (RECOMMENDED)",
             "type": "shell",
-            "command": "cmake --build build-vcpkg --target dmg --config Release",
+            "windows": {
+                "command": "cmake --build build --target installer --config Release"
+            },
+            "osx": {
+                "command": "cmake --build build-vcpkg --target dmg --config Release"
+            },
+            "linux": {
+                "command": "cmake --build build --target package --config Release"
+            },
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -15,12 +23,20 @@
                 "panel": "shared",
                 "showReuseMessage": false
             },
-            "detail": "Builds the game AND creates the DMG installer (always use this for testing!)"
+            "detail": "Builds the game AND creates platform-specific installer (always use this!)"
         },
         {
             "label": "⚠️ Build Binary Only (NO INSTALLER - USE WITH CAUTION)",
             "type": "shell",
-            "command": "cmake --build build-vcpkg --config Release",
+            "windows": {
+                "command": "cmake --build build --config Release"
+            },
+            "osx": {
+                "command": "cmake --build build-vcpkg --config Release"
+            },
+            "linux": {
+                "command": "cmake --build build --config Release"
+            },
             "group": "build",
             "problemMatcher": [],
             "presentation": {
@@ -28,23 +44,44 @@
                 "panel": "shared",
                 "showReuseMessage": false
             },
-            "detail": "Only builds the binary. DMG won't be updated! Use 'Build + Create DMG' instead."
+            "detail": "Only builds the binary. Installer won't be updated! Use 'Build + Create Installer' instead."
         },
         {
             "label": "🔧 Configure CMake (vcpkg)",
             "type": "shell",
-            "command": "cmake -B build-vcpkg -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/../vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=arm64-osx-dynamic",
+            "windows": {
+                "command": "cmake -B build -G \"Visual Studio 17 2022\" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+            },
+            "osx": {
+                "command": "cmake -B build-vcpkg -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/../vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=arm64-osx-dynamic"
+            },
+            "linux": {
+                "command": "cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake"
+            },
             "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared"
             },
-            "detail": "Run CMake configuration with vcpkg (run this first if build-vcpkg/ doesn't exist)"
+            "detail": "Run CMake configuration with vcpkg (run this first!)"
         },
         {
             "label": "🧹 Clean Build",
             "type": "shell",
-            "command": "rm -rf build-vcpkg && cmake -B build-vcpkg -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/../vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=arm64-osx-dynamic",
+            "windows": {
+                "command": "if (Test-Path build) { Remove-Item -Recurse -Force build }; cmake -B build -G \"Visual Studio 17 2022\" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake",
+                "options": {
+                    "shell": {
+                        "executable": "powershell.exe"
+                    }
+                }
+            },
+            "osx": {
+                "command": "rm -rf build-vcpkg && cmake -B build-vcpkg -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/../vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=arm64-osx-dynamic"
+            },
+            "linux": {
+                "command": "rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake"
+            },
             "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
@@ -53,20 +90,22 @@
             "detail": "Delete build directory and reconfigure from scratch"
         },
         {
-            "label": "📦 Install DMG to /Applications/",
+            "label": "▶️ Run Game",
             "type": "shell",
-            "command": "killall dunelegacy 2>/dev/null; cp -R build-vcpkg/bin/dunelegacy.app /Applications/ && echo '✅ Installed to /Applications/dunelegacy.app'",
-            "problemMatcher": [],
-            "presentation": {
-                "reveal": "always",
-                "panel": "shared"
+            "windows": {
+                "command": "Start-Process -FilePath '.\\build\\bin\\Release\\dunelegacy.exe'",
+                "options": {
+                    "shell": {
+                        "executable": "powershell.exe"
+                    }
+                }
             },
-            "detail": "Copy the built app to /Applications/ for system-wide installation"
-        },
-        {
-            "label": "▶️ Run Game (from build directory)",
-            "type": "shell",
-            "command": "open build-vcpkg/bin/dunelegacy.app",
+            "osx": {
+                "command": "open build-vcpkg/bin/dunelegacy.app"
+            },
+            "linux": {
+                "command": "./build/bin/dunelegacy"
+            },
             "problemMatcher": [],
             "presentation": {
                 "reveal": "never",
@@ -75,11 +114,10 @@
             "detail": "Launch the game from the build directory"
         },
         {
-            "label": "🎯 Full Rebuild + Install + Run",
+            "label": "🎯 Build and Run",
             "dependsOn": [
-                "🚀 Build + Create DMG Installer (RECOMMENDED)",
-                "📦 Install DMG to /Applications/",
-                "▶️ Run Game (from build directory)"
+                "🚀 Build + Create Installer (RECOMMENDED)",
+                "▶️ Run Game"
             ],
             "dependsOrder": "sequence",
             "problemMatcher": [],
@@ -87,7 +125,7 @@
                 "reveal": "always",
                 "panel": "shared"
             },
-            "detail": "Complete workflow: Build, create DMG, install, and run"
+            "detail": "Complete workflow: Build installer and run the game"
         }
     ]
 }
