@@ -35,8 +35,8 @@ endif()
 # Enable Win32 subsystem on Windows
 if(WIN32)
     if(MSVC)
-        # Add Windows icon for MSVC
-        target_sources(dunelegacy PRIVATE "${CMAKE_SOURCE_DIR}/dunelegacy.ico")
+        # Add Windows resource file with icon for MSVC
+        target_sources(dunelegacy PRIVATE "${CMAKE_SOURCE_DIR}/resource.rc")
         # Set application icon properties for MSVC
         set_target_properties(dunelegacy PROPERTIES
             VS_DPI_AWARE "PerMonitor"
