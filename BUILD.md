@@ -40,10 +40,22 @@ cmake --build build --target package --config Release
 - ✅ Includes game data files
 - ✅ Creates proper app bundles/installers
 - ✅ Is what users will actually run
+- ✅ **Automatically cleans CPack cache** to prevent stale files
 
 **VS Code/Cursor Users:** Press `Cmd+Shift+B` (Mac) or `Ctrl+Shift+B` (Windows/Linux) and select:
 - **"🚀 Build + Create DMG Installer (RECOMMENDED)"** - Use this!
 - ~~"⚠️ Build Binary Only"~~ - Avoid this, DMG won't update!
+
+### 🔧 How the Installer Targets Work
+
+The `dmg`, `installer`, and `package` targets automatically:
+1. **Clean CPack cache** (`_CPack_Packages/`, old installers)
+2. **Clean install directory** (staging area)
+3. **Build the binary**
+4. **Install to staging**
+5. **Create fresh installer** from staging
+
+This ensures you **never** get stale files in your installer!
 
 ---
 

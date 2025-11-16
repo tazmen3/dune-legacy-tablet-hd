@@ -20,12 +20,15 @@ if [ ! -d "build-vcpkg" ]; then
 fi
 
 echo "🚀 Building Dune Legacy + DMG installer..."
+echo "   (CPack cache will be cleaned automatically)"
 cmake --build build-vcpkg --target dmg --config Release
 
 echo ""
 echo "✅ Build complete!"
-echo "📦 DMG: $(ls -lh build-vcpkg/*.dmg | awk '{print $9, "(" $5 ")"}')"
+echo "📦 DMG: $(ls -lh build-vcpkg/*.dmg 2>/dev/null | awk '{print $9, "(" $5 ")"}')"
 echo ""
-echo "To install: cp -R build-vcpkg/bin/dunelegacy.app /Applications/"
-echo "To run:     open build-vcpkg/bin/dunelegacy.app"
+echo "💡 The DMG is guaranteed fresh (CPack cache cleaned during build)"
+echo ""
+echo "To install: cp -R build-vcpkg/install/dunelegacy.app /Applications/"
+echo "To run:     open build-vcpkg/install/dunelegacy.app"
 
