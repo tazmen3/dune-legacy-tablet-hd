@@ -18,6 +18,35 @@ This guide covers building Dune Legacy on all platforms using modern dependency 
 
 ---
 
+## ⚠️ IMPORTANT: Always Build with Installer Targets!
+
+**DO NOT** just run `cmake --build build` - this only builds the binary, not the installer!
+
+**ALWAYS** use the platform-specific installer target when testing or distributing:
+
+```bash
+# macOS: Build + Create DMG
+cmake --build build --target dmg --config Release
+
+# Windows: Build + Create Installer
+cmake --build build --target installer --config Release
+
+# Linux: Build + Create Packages
+cmake --build build --target package --config Release
+```
+
+**Why?** The installer build:
+- ✅ Packages all dependencies correctly
+- ✅ Includes game data files
+- ✅ Creates proper app bundles/installers
+- ✅ Is what users will actually run
+
+**VS Code/Cursor Users:** Press `Cmd+Shift+B` (Mac) or `Ctrl+Shift+B` (Windows/Linux) and select:
+- **"🚀 Build + Create DMG Installer (RECOMMENDED)"** - Use this!
+- ~~"⚠️ Build Binary Only"~~ - Avoid this, DMG won't update!
+
+---
+
 ## Recommended: Build with vcpkg
 
 vcpkg provides consistent, reproducible builds across all platforms. This is what our CI/CD uses.

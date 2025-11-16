@@ -78,6 +78,9 @@ scripts/sourceforge-config.sh
 documents/
 analysis/
 
-# VSCode settings (user-specific)
-.vscode/
+# VSCode settings (ignore user-specific, keep shared config)
+.vscode/*
+!.vscode/tasks.json
+!.vscode/settings.json
+!.vscode/extensions.json
 dist/

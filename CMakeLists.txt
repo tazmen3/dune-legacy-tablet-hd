@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 # Project name and version
-project(DuneLegacy VERSION 0.98.6.6 LANGUAGES C CXX)
+project(DuneLegacy VERSION 0.98.7.0 LANGUAGES C CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)

@@ -1,0 +1,94 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "🚀 Build + Create DMG Installer (RECOMMENDED)",
+            "type": "shell",
+            "command": "cmake --build build-vcpkg --target dmg --config Release",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "detail": "Builds the game AND creates the DMG installer (always use this for testing!)"
+        },
+        {
+            "label": "⚠️ Build Binary Only (NO INSTALLER - USE WITH CAUTION)",
+            "type": "shell",
+            "command": "cmake --build build-vcpkg --config Release",
+            "group": "build",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "detail": "Only builds the binary. DMG won't be updated! Use 'Build + Create DMG' instead."
+        },
+        {
+            "label": "🔧 Configure CMake (vcpkg)",
+            "type": "shell",
+            "command": "cmake -B build-vcpkg -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/../vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=arm64-osx-dynamic",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "detail": "Run CMake configuration with vcpkg (run this first if build-vcpkg/ doesn't exist)"
+        },
+        {
+            "label": "🧹 Clean Build",
+            "type": "shell",
+            "command": "rm -rf build-vcpkg && cmake -B build-vcpkg -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/../vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=arm64-osx-dynamic",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "detail": "Delete build directory and reconfigure from scratch"
+        },
+        {
+            "label": "📦 Install DMG to /Applications/",
+            "type": "shell",
+            "command": "killall dunelegacy 2>/dev/null; cp -R build-vcpkg/bin/dunelegacy.app /Applications/ && echo '✅ Installed to /Applications/dunelegacy.app'",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "detail": "Copy the built app to /Applications/ for system-wide installation"
+        },
+        {
+            "label": "▶️ Run Game (from build directory)",
+            "type": "shell",
+            "command": "open build-vcpkg/bin/dunelegacy.app",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "never",
+                "panel": "shared"
+            },
+            "detail": "Launch the game from the build directory"
+        },
+        {
+            "label": "🎯 Full Rebuild + Install + Run",
+            "dependsOn": [
+                "🚀 Build + Create DMG Installer (RECOMMENDED)",
+                "📦 Install DMG to /Applications/",
+                "▶️ Run Game (from build directory)"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "detail": "Complete workflow: Build, create DMG, install, and run"
+        }
+    ]
+}
+
