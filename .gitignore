@@ -72,3 +72,7 @@ DuneLegacy-*-Setup.nsi
 
 # SourceForge credentials (NEVER commit this!)
 scripts/sourceforge-config.sh
+
+# Documentation and analysis folders
+documents/
+analysis/
