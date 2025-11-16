@@ -121,14 +121,58 @@ open IDE/xCode/Dune\ Legacy.xcodeproj
 
 ### Windows: Visual Studio
 
-Generate a Visual Studio solution:
+**Step-by-step for Visual Studio developers:**
 
-```bash
-cmake -B build -G "Visual Studio 17 2022" \
-  -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+1. **Install vcpkg** (one-time setup):
+   ```powershell
+   # PowerShell or Command Prompt
+   cd C:\
+   git clone https://github.com/microsoft/vcpkg.git
+   cd vcpkg
+   .\bootstrap-vcpkg.bat
+   ```
 
-# Open build/DuneLegacy.sln in Visual Studio
-```
+2. **Clone Dune Legacy**:
+   ```powershell
+   cd C:\dev  # or your preferred location
+   git clone <repository-url> dunelegacy
+   cd dunelegacy
+   ```
+
+3. **Generate Visual Studio Solution**:
+   ```powershell
+   cmake -B build -G "Visual Studio 17 2022" -A x64 `
+     -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+   ```
+   
+   *Note: Use `-G "Visual Studio 16 2019"` for VS 2019*
+   
+   **First run takes 5-10 minutes** as vcpkg downloads and builds SDL2 libraries.
+
+4. **Open in Visual Studio**:
+   - Double-click `build/DuneLegacy.sln`
+   - Or: File → Open → Project/Solution → Select `build/DuneLegacy.sln`
+
+5. **Set Build Configuration**:
+   - Select **Release** or **Debug** from the toolbar dropdown
+   - Set **dunelegacy** as the startup project (right-click → Set as Startup Project)
+
+6. **Build**:
+   - Press **F7** or Build → Build Solution
+   - Or click the green **▶ Local Windows Debugger** button to build and run
+
+7. **Run the Game**:
+   - Press **F5** (with debugging) or **Ctrl+F5** (without debugging)
+   - Or manually run: `build\bin\Release\dunelegacy.exe`
+
+**Output Locations:**
+- Debug build: `build\bin\Debug\dunelegacy.exe`
+- Release build: `build\bin\Release\dunelegacy.exe`
+- SDL2 DLLs automatically copied alongside .exe
+
+**Rebuilding after code changes:**
+- Just press F7 in Visual Studio
+- No need to re-run CMake unless you modify `CMakeLists.txt`
 
 ### macOS: Performance Build
 
