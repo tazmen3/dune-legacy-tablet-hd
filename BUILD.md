@@ -191,36 +191,66 @@ cmake --build build --config Release
 
 ## Distribution Builds
 
-For creating distributable binaries:
+For creating distributable installers/packages:
 
-### Windows
+### macOS: DMG Installer
 
-vcpkg automatically bundles DLLs:
+**Quick method** (builds + packages):
 ```bash
-# DLLs are in build/bin/Release/ alongside .exe
+cmake --build build --target dmg
 ```
 
-### macOS
+**Output**: `build/DuneLegacy-0.98.6.6-macOS.dmg`
 
-Creates proper .app bundle:
-```bash
-# App is at: build/bin/dunelegacy.app
-# Can be distributed as-is or packaged in DMG
-```
-
-### Linux Packages
-
+**Manual method**:
 ```bash
 cd build
+cpack -G DragNDrop
+```
 
-# Debian/Ubuntu
-cpack -G DEB -D CPACK_DEBIAN_PACKAGE_MAINTAINER="Your Name <your@email.com>"
+**Legacy script** (still works):
+```bash
+./create_dmg.sh
+```
 
-# RedHat/Fedora
-cpack -G RPM
+### Windows: NSIS Installer
 
-# Tarball
-cpack -G TGZ
+**Quick method** (builds + packages):
+```bash
+cmake --build build --target installer
+```
+
+**Output**: 
+- `build/DuneLegacy-0.98.6.6-Windows-x64.exe` (installer)
+- `build/DuneLegacy-0.98.6.6-Windows-x64.zip` (portable)
+
+**Manual method**:
+```bash
+cd build
+cpack -G NSIS  # For installer
+cpack -G ZIP   # For portable zip
+```
+
+**Requirements**: NSIS must be installed for the installer target.
+
+### Linux: DEB/RPM/TGZ Packages
+
+**Quick method** (builds + packages all formats):
+```bash
+cmake --build build --target package
+```
+
+**Output**:
+- `build/DuneLegacy-0.98.6.6-Linux-x64.deb` (Debian/Ubuntu)
+- `build/DuneLegacy-0.98.6.6-Linux-x64.rpm` (RedHat/Fedora)
+- `build/DuneLegacy-0.98.6.6-Linux-x64.tar.gz` (Generic)
+
+**Manual method** (individual formats):
+```bash
+cd build
+cpack -G DEB  # Debian/Ubuntu package
+cpack -G RPM  # RedHat/Fedora package
+cpack -G TGZ  # Tarball
 ```
 
 ---

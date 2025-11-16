@@ -23,13 +23,17 @@ jobs:
       - name: Build
         run: cmake --build build --config Release
       
-      - name: Upload Artifact
+      - name: Create Installer Package
+        run: |
+          cd build
+          cmake --install . --prefix install --config Release
+          cpack -G ZIP -C Release
+      
+      - name: Upload Installer
         uses: actions/upload-artifact@v4
         with:
-          name: DuneLegacy-Windows
-          path: |
-            build/bin/Release/dunelegacy.exe
-            build/bin/Release/*.dll
+          name: DuneLegacy-Windows-Installer
+          path: build/*.zip
 
   build-macos:
     runs-on: macos-latest
@@ -42,16 +46,22 @@ jobs:
           vcpkgJsonGlob: 'vcpkg.json'
       
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+        run: cmake -B build -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=arm64-osx-dynamic
       
       - name: Build
         run: cmake --build build --config Release
       
-      - name: Upload Artifact
+      - name: Create DMG Installer
+        run: |
+          cd build
+          cmake --install . --prefix install --config Release
+          cpack -G DragNDrop -C Release
+      
+      - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
-          name: DuneLegacy-macOS
-          path: build/bin/dunelegacy
+          name: DuneLegacy-macOS-DMG
+          path: build/*.dmg
 
   build-linux:
     runs-on: ubuntu-latest
@@ -69,9 +79,18 @@ jobs:
       - name: Build
         run: cmake --build build --config Release
       
-      - name: Upload Artifact
+      - name: Create Linux Packages
+        run: |
+          cd build
+          cmake --install . --prefix install --config Release
+          cpack -G "DEB;RPM;TGZ" -C Release
+      
+      - name: Upload Packages
         uses: actions/upload-artifact@v4
         with:
-          name: DuneLegacy-Linux
-          path: build/bin/dunelegacy
+          name: DuneLegacy-Linux-Packages
+          path: |
+            build/*.deb
+            build/*.rpm
+            build/*.tar.gz
 

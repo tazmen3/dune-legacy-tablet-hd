@@ -185,22 +185,64 @@ set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README")
 
 if(WIN32)
-    set(CPACK_GENERATOR "NSIS")
+    set(CPACK_GENERATOR "NSIS;ZIP")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
     set(CPACK_NSIS_MODIFY_PATH ON)
     set(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}/dunelegacy.ico")
     set(CPACK_NSIS_MUI_UNIICON "${CMAKE_CURRENT_SOURCE_DIR}/dunelegacy.ico")
     set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\${PROJECT_NAME}.exe")
+    set(CPACK_NSIS_DISPLAY_NAME "Dune Legacy ${PROJECT_VERSION}")
+    set(CPACK_NSIS_PACKAGE_NAME "Dune Legacy")
+    set(CPACK_PACKAGE_FILE_NAME "DuneLegacy-${PROJECT_VERSION}-Windows-x64")
+    
+    # Add custom target for Windows installer
+    add_custom_target(installer
+        COMMAND ${CMAKE_COMMAND} --build . --config Release
+        COMMAND ${CMAKE_COMMAND} --install . --prefix install --config Release
+        COMMAND ${CMAKE_CPACK_COMMAND} -G NSIS -C Release
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Building Windows NSIS installer..."
+    )
 elseif(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
-    set(CPACK_DMG_VOLUME_NAME "${PROJECT_NAME}")
+    set(CPACK_DMG_VOLUME_NAME "Dune Legacy ${PROJECT_VERSION}")
+    set(CPACK_DMG_FORMAT "UDZO")  # Compressed
+    set(CPACK_PACKAGE_FILE_NAME "DuneLegacy-${PROJECT_VERSION}-macOS")
     set(MACOSX_BUNDLE_ICON_FILE "dunelegacy.icns")
+    
+    # Optional: Add custom DMG background and layout if files exist
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/dmg_background.png")
+        set(CPACK_DMG_BACKGROUND_IMAGE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/dmg_background.png")
+    endif()
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/DMGSetup.scpt")
+        set(CPACK_DMG_DS_STORE_SETUP_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/packaging/DMGSetup.scpt")
+    endif()
+    
+    # Add custom target for quick DMG creation
+    add_custom_target(dmg
+        COMMAND ${CMAKE_COMMAND} --build . --config Release
+        COMMAND ${CMAKE_COMMAND} --install . --prefix install --config Release
+        COMMAND ${CMAKE_CPACK_COMMAND} -G DragNDrop -C Release
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Building macOS DMG installer..."
+    )
 else()
-    set(CPACK_GENERATOR "DEB;RPM")
+    set(CPACK_GENERATOR "DEB;RPM;TGZ")
     set(CPACK_DEBIAN_PACKAGE_SECTION "games")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "libsdl2-2.0-0, libsdl2-mixer-2.0-0, libsdl2-ttf-2.0-0")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Dune Legacy Team")
     set(CPACK_RPM_PACKAGE_LICENSE "GPL-2.0+")
     set(CPACK_RPM_PACKAGE_GROUP "Amusements/Games")
+    set(CPACK_PACKAGE_FILE_NAME "DuneLegacy-${PROJECT_VERSION}-Linux-x64")
+    
+    # Add custom target for Linux packages
+    add_custom_target(package
+        COMMAND ${CMAKE_COMMAND} --build . --config Release
+        COMMAND ${CMAKE_COMMAND} --install . --prefix install --config Release
+        COMMAND ${CMAKE_CPACK_COMMAND} -G "DEB;RPM;TGZ" -C Release
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Building Linux packages (DEB, RPM, TGZ)..."
+    )
 endif()
 
 include(CPack) 
