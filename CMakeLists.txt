@@ -140,13 +140,16 @@ endif()
 
 # Install data files
 # Install configuration template files to config subdirectory
-install(FILES 
-    config/ObjectData.bak
-    "config/QuantBot Config.bak"
-    "config/Dune Legacy.ini"
-    config/README.md
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/config
-)
+# For macOS bundles, these are already inside the .app via POST_BUILD commands
+if(NOT APPLE)
+    install(FILES 
+        config/ObjectData.bak
+        "config/QuantBot Config.bak"
+        "config/Dune Legacy.ini"
+        config/README.md
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/config
+    )
+endif()
 
 # install(DIRECTORY data/
 #     DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
@@ -171,9 +174,12 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # Install documentation
-install(FILES AUTHORS COPYING NEWS README
-    DESTINATION ${CMAKE_INSTALL_DOCDIR}
-)
+# For macOS bundles, documentation can optionally be added to Resources if needed
+if(NOT APPLE)
+    install(FILES AUTHORS COPYING NEWS README
+        DESTINATION ${CMAKE_INSTALL_DOCDIR}
+    )
+endif()
 
 # CPack configuration for packaging
 set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
