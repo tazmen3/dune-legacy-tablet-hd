@@ -178,10 +178,31 @@ void MultiPlayerMenu::onJoin() {
     int selectedEntry = gameList.getSelectedIndex();
     if(selectedEntry >= 0) {
         GameServerInfo* pGameServerInfo = static_cast<GameServerInfo*>(gameList.getEntryPtrData(selectedEntry));
+        
+        // Smart NAT detection: If connecting to an Internet game, check if the same game
+        // is also available on LAN. This handles NAT hairpinning issues when both computers
+        // are behind the same router.
+        ENetAddress connectAddress = pGameServerInfo->serverAddress;
+        
+        if(internetGamesButton.getToggleState()) {
+            // We're in Internet Games mode - check if this game is also on LAN
+            for(const GameServerInfo& lanGame : LANGameList) {
+                // Match by server name, port, and map (same game on LAN)
+                if(lanGame.serverName == pGameServerInfo->serverName &&
+                   lanGame.serverAddress.port == pGameServerInfo->serverAddress.port &&
+                   lanGame.mapName == pGameServerInfo->mapName) {
+                    // Found same game on LAN! Use LAN address instead
+                    SDL_Log("Smart NAT: Game found on LAN, using %s:%d instead of internet address",
+                            Address2String(lanGame.serverAddress).c_str(), lanGame.serverAddress.port);
+                    connectAddress = lanGame.serverAddress;
+                    break;
+                }
+            }
+        }
 
         pNetworkManager->setOnReceiveGameInfo(std::bind(&MultiPlayerMenu::onReceiveGameInfo, this, std::placeholders::_1, std::placeholders::_2));
         pNetworkManager->setOnPeerDisconnected(std::bind(&MultiPlayerMenu::onPeerDisconnected, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-        pNetworkManager->connect(pGameServerInfo->serverAddress, settings.general.playerName);
+        pNetworkManager->connect(connectAddress, settings.general.playerName);
 
         openWindow(MsgBox::create(_("Connecting...")));
     }
