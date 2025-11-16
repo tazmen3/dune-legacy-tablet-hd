@@ -32,31 +32,36 @@
 
 // Helper function to get local IP address
 static std::string getLocalIPAddress() {
-    // Try to get local IP by creating a UDP socket and connecting to a public DNS
-    // This doesn't actually send data, but triggers the OS to select the right interface
+    // Get local IP by checking which interface would be used to reach the internet
+    // We create a UDP socket and "connect" to a public IP (doesn't send data)
     ENetSocket socket = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
     if (socket == ENET_SOCKET_NULL) {
+        SDL_Log("getLocalIPAddress: Failed to create socket");
         return "";
     }
     
-    // Connect to Google's DNS (8.8.8.8) - this is just to determine routing
-    ENetAddress testAddress;
-    enet_address_set_host(&testAddress, "8.8.8.8");
-    testAddress.port = 53;
+    // "Connect" to Google's DNS (8.8.8.8) - this doesn't send data but tells
+    // the OS to select the appropriate network interface for routing
+    ENetAddress remoteAddress;
+    enet_address_set_host(&remoteAddress, "8.8.8.8");
+    remoteAddress.port = 53;
     
-    // Bind to any address to let OS choose
-    ENetAddress localAddress;
-    localAddress.host = ENET_HOST_ANY;
-    localAddress.port = 0;
-    
-    if (enet_socket_bind(socket, &localAddress) == 0) {
-        // Try to get the socket name (local address)
-        if (enet_socket_get_address(socket, &localAddress) == 0) {
-            enet_socket_destroy(socket);
-            return Address2String(localAddress);
-        }
+    if (enet_socket_connect(socket, &remoteAddress) < 0) {
+        SDL_Log("getLocalIPAddress: Failed to connect socket for routing check");
+        enet_socket_destroy(socket);
+        return "";
     }
     
+    // Get the local address that was selected for this connection
+    ENetAddress localAddress;
+    if (enet_socket_get_address(socket, &localAddress) == 0) {
+        std::string localIP = Address2String(localAddress);
+        enet_socket_destroy(socket);
+        SDL_Log("getLocalIPAddress: Detected local IP: %s", localIP.c_str());
+        return localIP;
+    }
+    
+    SDL_Log("getLocalIPAddress: Failed to get local address from socket");
     enet_socket_destroy(socket);
     return "";
 }
