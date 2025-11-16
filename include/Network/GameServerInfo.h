@@ -25,6 +25,7 @@
 class GameServerInfo {
 public:
     ENetAddress serverAddress;
+    ENetAddress localAddress;     // Local/LAN IP address (for NAT traversal)
     std::string serverName;
     std::string serverVersion;
     std::string mapName;
@@ -32,6 +33,7 @@ public:
     int maxPlayers;
     bool bPasswordProtected;
     Uint32 lastUpdate;
+    std::string localIP;          // Local IP as string (from metaserver)
 
     /**
         Do not compare numPlayers, bPasswordProtected and lastUpdate

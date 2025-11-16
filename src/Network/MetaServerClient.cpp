@@ -18,6 +18,7 @@
 #include <Network/MetaServerClient.h>
 
 #include <Network/ENetHttp.h>
+#include <Network/ENetHelper.h>
 
 #include <misc/string_util.h>
 #include <misc/exceptions.h>
@@ -28,6 +29,37 @@
 #include <sstream>
 #include <iostream>
 #include <map>
+
+// Helper function to get local IP address
+static std::string getLocalIPAddress() {
+    // Try to get local IP by creating a UDP socket and connecting to a public DNS
+    // This doesn't actually send data, but triggers the OS to select the right interface
+    ENetSocket socket = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
+    if (socket == ENET_SOCKET_NULL) {
+        return "";
+    }
+    
+    // Connect to Google's DNS (8.8.8.8) - this is just to determine routing
+    ENetAddress testAddress;
+    enet_address_set_host(&testAddress, "8.8.8.8");
+    testAddress.port = 53;
+    
+    // Bind to any address to let OS choose
+    ENetAddress localAddress;
+    localAddress.host = ENET_HOST_ANY;
+    localAddress.port = 0;
+    
+    if (enet_socket_bind(socket, &localAddress) == 0) {
+        // Try to get the socket name (local address)
+        if (enet_socket_get_address(socket, &localAddress) == 0) {
+            enet_socket_destroy(socket);
+            return Address2String(localAddress);
+        }
+    }
+    
+    enet_socket_destroy(socket);
+    return "";
+}
 
 
 MetaServerClient::MetaServerClient(const std::string& metaServerURL)
@@ -247,6 +279,13 @@ int MetaServerClient::connectionThreadMain(void* data) {
                     parameters["numplayers"] = std::to_string(pMetaServerAdd->numPlayers);
                     parameters["maxplayers"] = std::to_string(pMetaServerAdd->maxPlayers);
                     parameters["pwdprotected"] = "false";
+                    
+                    // Add local IP for NAT traversal (allows clients on same LAN to connect directly)
+                    std::string localIP = getLocalIPAddress();
+                    if (!localIP.empty()) {
+                        parameters["localip"] = localIP;
+                        SDL_Log("Announcing game with local IP: %s", localIP.c_str());
+                    }
 
                     std::string result;
 
@@ -379,7 +418,8 @@ int MetaServerClient::connectionThreadMain(void* data) {
 
                             std::vector<std::string> parts = splitStringToStringVector(completeLine, "\\t");
 
-                            if(parts.size() != 9) {
+                            // Support both old format (9 fields) and new format (10 fields with localIP)
+                            if(parts.size() != 9 && parts.size() != 10) {
                                 break;
                             }
 
@@ -409,6 +449,18 @@ int MetaServerClient::connectionThreadMain(void* data) {
 
                             if(!parseString(parts[8], gameServerInfo.lastUpdate)) {
                                 continue;
+                            }
+                            
+                            // Parse local IP if available (10th field)
+                            if(parts.size() == 10 && !parts[9].empty()) {
+                                gameServerInfo.localIP = parts[9];
+                                enet_address_set_host(&gameServerInfo.localAddress, parts[9].c_str());
+                                gameServerInfo.localAddress.port = static_cast<Uint16>(port);
+                                SDL_Log("Server '%s' has local IP: %s", gameServerInfo.serverName.c_str(), gameServerInfo.localIP.c_str());
+                            } else {
+                                gameServerInfo.localIP = "";
+                                gameServerInfo.localAddress.host = 0;
+                                gameServerInfo.localAddress.port = 0;
                             }
 
                             if(resultstream.good() == false) {

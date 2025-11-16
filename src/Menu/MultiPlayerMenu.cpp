@@ -179,24 +179,33 @@ void MultiPlayerMenu::onJoin() {
     if(selectedEntry >= 0) {
         GameServerInfo* pGameServerInfo = static_cast<GameServerInfo*>(gameList.getEntryPtrData(selectedEntry));
         
-        // Smart NAT detection: If connecting to an Internet game, check if the same game
-        // is also available on LAN. This handles NAT hairpinning issues when both computers
-        // are behind the same router.
+        // Smart NAT detection: Use local IP if available (for NAT hairpinning/same LAN)
+        // This allows players behind the same router to connect directly via LAN IP
         ENetAddress connectAddress = pGameServerInfo->serverAddress;
         
-        if(internetGamesButton.getToggleState()) {
-            // We're in Internet Games mode - check if this game is also on LAN
+        if(internetGamesButton.getToggleState() && !pGameServerInfo->localIP.empty()) {
+            // We're in Internet Games mode and server provided a local IP
+            // Check if this game is also on LAN (UDP broadcast discovery)
+            bool foundOnLAN = false;
             for(const GameServerInfo& lanGame : LANGameList) {
-                // Match by server name, port, and map (same game on LAN)
                 if(lanGame.serverName == pGameServerInfo->serverName &&
                    lanGame.serverAddress.port == pGameServerInfo->serverAddress.port &&
                    lanGame.mapName == pGameServerInfo->mapName) {
-                    // Found same game on LAN! Use LAN address instead
-                    SDL_Log("Smart NAT: Game found on LAN, using %s:%d instead of internet address",
+                    // Found via LAN broadcast - use that address (most reliable)
+                    SDL_Log("Smart NAT: Game found via LAN broadcast, using %s:%d",
                             Address2String(lanGame.serverAddress).c_str(), lanGame.serverAddress.port);
                     connectAddress = lanGame.serverAddress;
+                    foundOnLAN = true;
                     break;
                 }
+            }
+            
+            if(!foundOnLAN) {
+                // Not found via LAN broadcast, but metaserver provided local IP
+                // Try local IP first (handles NAT hairpinning when on same network)
+                SDL_Log("Smart NAT: Trying local IP from metaserver: %s:%d",
+                        pGameServerInfo->localIP.c_str(), pGameServerInfo->localAddress.port);
+                connectAddress = pGameServerInfo->localAddress;
             }
         }
 
