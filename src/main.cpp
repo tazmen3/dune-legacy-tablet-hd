@@ -851,6 +851,17 @@ int main(int argc, char *argv[]) {
 
             settings.network.serverPort = myINIFile.getIntValue("Network","ServerPort",DEFAULT_PORT);
             settings.network.metaServer = myINIFile.getStringValue("Network","MetaServer",DEFAULT_METASERVER);
+            
+            // Migrate old SourceForge metaserver URL to new dunelegacy.com URL
+            if(settings.network.metaServer.find("dunelegacy.sourceforge.net") != std::string::npos) {
+                SDL_Log("Migrating old SourceForge metaserver URL to dunelegacy.com...");
+                size_t pos = settings.network.metaServer.find("dunelegacy.sourceforge.net");
+                settings.network.metaServer.replace(pos, strlen("dunelegacy.sourceforge.net"), "dunelegacy.com");
+                myINIFile.setStringValue("Network","MetaServer",settings.network.metaServer);
+                myINIFile.saveChangesTo(configfilepath);
+                SDL_Log("Metaserver URL updated to: %s", settings.network.metaServer.c_str());
+            }
+            
             settings.network.debugNetwork = myINIFile.getBoolValue("Network","Debug Network",false);
 
             settings.ai.campaignAI = myINIFile.getStringValue("AI","Campaign AI",DEFAULTAIPLAYERCLASS);
