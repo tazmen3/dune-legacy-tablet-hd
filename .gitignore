@@ -69,3 +69,6 @@ DuneLegacy-*-Setup.nsi
 /data/VOC.PAK
 *.exe
 *.dmg
+
+# SourceForge credentials (NEVER commit this!)
+scripts/sourceforge-config.sh

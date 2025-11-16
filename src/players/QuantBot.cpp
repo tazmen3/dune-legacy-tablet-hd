@@ -867,12 +867,12 @@ Coord QuantBot::findPlaceLocation(Uint32 itemID) {
 				int placeLocationEndX = placeLocationX + newSizeX;
 				int placeLocationEndY = placeLocationY + newSizeY;
 
-				// Big bonus if building is directly at the map edge
-				bool atMapEdge = (placeLocationX == 0 || placeLocationX + newSizeX >= getMap().getSizeX() ||
-				                  placeLocationY == 0 || placeLocationY + newSizeY >= getMap().getSizeY());
-				if (atMapEdge) {
-					locationScore += 50;  // Strong bonus for edge placement
-				}
+			// Big bonus if building is directly at the map edge
+			bool atMapEdge = (placeLocationX == 0 || placeLocationX + newSizeX >= getMap().getSizeX() ||
+			                  placeLocationY == 0 || placeLocationY + newSizeY >= getMap().getSizeY());
+			if (atMapEdge) {
+				locationScore += 6;  // Bonus for edge placement
+			}
 
 				// Evaluate surrounding tiles
 				for (int i = placeLocationX - 1; i <= placeLocationEndX; i++) {
@@ -887,30 +887,39 @@ Coord QuantBot::findPlaceLocation(Uint32 itemID) {
 									locationScore -= 10;
 								}
 							}
-							else if (!getMap().getTile(i, j)->isRock()) {
-								// Favor non-rock tiles (easier building)
-								locationScore += 5;
-							}
-							else if (getMap().getTile(i, j)->hasAGroundObject()) {
-								if (getMap().getTile(i, j)->getOwner() != getHouse()->getHouseID()) {
-									// Avoid building next to enemy units
-									locationScore -= 100;
-								}
-								else if (itemID != Structure_RocketTurret) {
-									locationScore -= 20;
-								}
-							}
+						else if (!getMap().getTile(i, j)->isRock()) {
+							// Favor non-rock tiles (easier building)
+							locationScore += 4;
 						}
-						// Don't penalize tiles outside map - edge placement should be encouraged
+						else if (getMap().getTile(i, j)->hasAGroundObject()) {
+							if (getMap().getTile(i, j)->getOwner() != getHouse()->getHouseID()) {
+								// Avoid building next to enemy units
+								locationScore -= 100;
+							}
+							// No penalty for own units
+						}
+						}
+			// Don't penalize tiles outside map - edge placement should be encouraged
+				}
+			}
+
+			// Bonus for building on concrete tiles
+			for (int i = placeLocationX; i < placeLocationEndX; i++) {
+				for (int j = placeLocationY; j < placeLocationEndY; j++) {
+					if (getMap().tileExists(i, j) && getMap().getTile(i, j)->isConcrete()) {
+						locationScore += 2;  // Small favor for concrete tiles
 					}
 				}
+			}
 
-				// Building-specific positioning - reduce distance penalty to not overwhelm edge bonus
-				if (itemIsBuilder || itemID == Structure_GunTurret || itemID == Structure_RocketTurret) {
-					// Lighter penalty for distance - don't want to completely negate edge bonus
-					locationScore -= lround(blockDistance(squadRallyLocation, Coord(placeLocationX, placeLocationY)) / 4);
-					locationScore -= lround(blockDistance(baseCenter, Coord(placeLocationX, placeLocationY)) / 2);
-				}
+		// Building-specific positioning
+		if (itemIsBuilder || itemID == Structure_GunTurret || itemID == Structure_RocketTurret) {
+			locationScore -= lround(blockDistance(squadRallyLocation, Coord(placeLocationX, placeLocationY)));
+			locationScore -= lround(blockDistance(baseCenter, Coord(placeLocationX, placeLocationY)));
+		} else {
+			// For other buildings, apply base center distance penalty
+			locationScore -= lround(blockDistance(baseCenter, Coord(placeLocationX, placeLocationY)));
+		}
 
 				// Pick this location if it has the best score
 				if (locationScore > bestLocationScore) {
@@ -930,6 +939,7 @@ Coord QuantBot::findSlabPlaceLocation(Uint32 itemID) {
 	
 	int bestLocationScore = -10000;
 	Coord bestLocation = Coord::Invalid();
+	Coord baseCenter = findBaseCentre(getHouse()->getHouseID());
 
 	// Check all map tiles for valid slab placement
 	for (int x = 0; x <= getMap().getSizeX() - slabSizeX; x++) {
@@ -956,45 +966,58 @@ Coord QuantBot::findSlabPlaceLocation(Uint32 itemID) {
 					continue;
 				}
 				
-				// Count adjacent tiles that would benefit from slab extension
-				int adjacentOwnedTiles = 0;
-				int adjacentRockTiles = 0;
-				int nearbyStructures = 0;
-				
-				for (int i = x - 1; i <= x + slabSizeX; i++) {
-					for (int j = y - 1; j <= y + slabSizeY; j++) {
-						if (getMap().tileExists(i, j)) {
-							const Tile* pTile = getMap().getTile(i, j);
+			// Count adjacent tiles that would benefit from slab extension
+			int adjacentOwnedTiles = 0;
+			int adjacentRockTiles = 0;
+			int nearbyStructures = 0;
+			int adjacentConcreteTiles = 0;
+			
+			for (int i = x - 1; i <= x + slabSizeX; i++) {
+				for (int j = y - 1; j <= y + slabSizeY; j++) {
+					if (getMap().tileExists(i, j)) {
+						const Tile* pTile = getMap().getTile(i, j);
+						
+						// Check if this is directly adjacent (edge-touching, not diagonal)
+						bool isDirectlyAdjacent = ((i == x - 1 || i == x + slabSizeX) && j >= y && j < y + slabSizeY) ||
+						                          ((j == y - 1 || j == y + slabSizeY) && i >= x && i < x + slabSizeX);
+						
+						// Count concrete tiles that are directly adjacent
+						if (isDirectlyAdjacent && pTile->isConcrete()) {
+							adjacentConcreteTiles++;
+						}
+						
+						// Count owned tiles (structures or concrete)
+						if (pTile->getOwner() == getHouse()->getHouseID()) {
+							adjacentOwnedTiles++;
 							
-							// Count owned tiles (structures or concrete)
-							if (pTile->getOwner() == getHouse()->getHouseID()) {
-								adjacentOwnedTiles++;
-								
-								if (pTile->hasAStructure()) {
-									nearbyStructures++;
-								}
+							if (pTile->hasAStructure()) {
+								nearbyStructures++;
 							}
-							
-							// Count rock tiles that could become buildable
-							if (pTile->isRock() && !pTile->isConcrete()) {
-								adjacentRockTiles++;
-							}
+						}
+						
+						// Count rock tiles that could become buildable
+						if (pTile->isRock() && !pTile->isConcrete()) {
+							adjacentRockTiles++;
 						}
 					}
 				}
+			}
 				
-				// SCORING: Favor extending base perimeter
-				// 1. Must be near owned territory
-				locationScore += adjacentOwnedTiles * 5;
-				
-				// 2. Bonus for being near structures (indicates active base area)
-				locationScore += nearbyStructures * 10;
-				
-				// 3. Big bonus for opening up rock areas (going through passes)
-				// The more rock around, the more valuable to place slab here
-				locationScore += adjacentRockTiles * 8;
-				
-				// 4. Bonus for being at perimeter (near edges of owned area)
+		// SCORING: Favor extending base perimeter
+		// 1. Must be near owned territory
+		locationScore += adjacentOwnedTiles * 5;
+		
+		// 2. Bonus for being near structures (indicates active base area)
+		locationScore += nearbyStructures * 10;
+		
+		// 3. Big bonus for opening up rock areas (going through passes)
+		// The more rock around, the more valuable to place slab here
+		locationScore += adjacentRockTiles * 8;
+		
+		// 4. Bonus for being directly adjacent to existing concrete (avoid gaps)
+		locationScore += adjacentConcreteTiles * 5;
+		
+		// 5. Bonus for being at perimeter (near edges of owned area)
 				// Check if this is at the edge of buildable area
 				bool atPerimeter = false;
 				for (int i = x - 3; i <= x + slabSizeX + 2; i++) {
@@ -1011,15 +1034,21 @@ Coord QuantBot::findSlabPlaceLocation(Uint32 itemID) {
 					if (atPerimeter) break;
 				}
 				
-				if (atPerimeter) {
-					locationScore += 30;  // Strong bonus for perimeter expansion
-				}
-				
-				// Pick this location if it has the best score
-				if (locationScore > bestLocationScore) {
-					bestLocationScore = locationScore;
-					bestLocation = Coord(x, y);
-				}
+		if (atPerimeter) {
+			locationScore += 5;  // Bonus for perimeter expansion
+		}
+		
+		// 6. Bonus for being closer to base center (integrated base building)
+		if (baseCenter.isValid()) {
+			int distanceFromBase = lround(blockDistance(Coord(x, y), baseCenter));
+			locationScore -= distanceFromBase / 2;  // Penalty for being far from center
+		}
+			
+			// Pick this location if it has the best score
+			if (locationScore > bestLocationScore) {
+				bestLocationScore = locationScore;
+				bestLocation = Coord(x, y);
+			}
 			}
 		}
 	}
@@ -1068,24 +1097,41 @@ Coord QuantBot::findTurretPlaceLocation(Uint32 itemID) {
 				FixPoint distanceFromBase = blockDistance(candidatePos, baseCenter);
 				score -= distanceFromBase * 2; // Penalty for being far from center
 				
-				// 2. Strong bonus for adjacency to own buildings
-				int adjacentOwnBuildings = 0;
-				for (int dx = -1; dx <= newSizeX; dx++) {
-					for (int dy = -1; dy <= newSizeY; dy++) {
-						// Check tiles around the structure
-						if ((dx == -1 || dx == newSizeX || dy == -1 || dy == newSizeY) && 
-							getMap().tileExists(x + dx, y + dy)) {
-							const Tile* pTile = getMap().getTile(x + dx, y + dy);
-							if (pTile->hasAStructure()) {
-								const StructureBase* pStructure = dynamic_cast<const StructureBase*>(pTile->getObject());
-								if (pStructure && pStructure->getOwner() == getHouse()) {
-									adjacentOwnBuildings++;
+			// 2. Strong bonus for adjacency to own buildings
+			int adjacentOwnBuildings = 0;
+			int adjacentBuilders = 0;
+			for (int dx = -1; dx <= newSizeX; dx++) {
+				for (int dy = -1; dy <= newSizeY; dy++) {
+					// Check tiles around the structure
+					if ((dx == -1 || dx == newSizeX || dy == -1 || dy == newSizeY) && 
+						getMap().tileExists(x + dx, y + dy)) {
+						const Tile* pTile = getMap().getTile(x + dx, y + dy);
+						if (pTile->hasAStructure()) {
+							const StructureBase* pStructure = dynamic_cast<const StructureBase*>(pTile->getObject());
+							if (pStructure && pStructure->getOwner() == getHouse()) {
+								adjacentOwnBuildings++;
+								
+								// Check if this is a builder structure
+								Uint32 structureID = pStructure->getItemID();
+								if (structureID == Structure_HeavyFactory || 
+									structureID == Structure_LightFactory ||
+									structureID == Structure_WOR ||
+									structureID == Structure_Barracks ||
+									structureID == Structure_RepairYard ||
+									structureID == Structure_StarPort) {
+									adjacentBuilders++;
 								}
 							}
 						}
 					}
 				}
-				score += adjacentOwnBuildings * 15; // Strong bonus for being next to own buildings
+			}
+			score += adjacentOwnBuildings * 15; // Strong bonus for being next to own buildings
+			
+			// Small bonus for turrets next to builder structures (protecting production)
+			if (itemID == Structure_RocketTurret) {
+				score += adjacentBuilders * 3; // Small bonus for defending builders
+			}
 				
 				// 3. Favor the side of the base closest to the enemy
 				// We want turrets between our base and the enemy
@@ -1912,12 +1958,12 @@ void QuantBot::build(int militaryValue) {
 									}
 								}
 
-						// CRITICAL: Counter enemy ornithopters with rocket turrets (HIGH PRIORITY)
-						// Aim for max(3×max single-house ornithopters, 1.5×total enemy ornithopters)
-						int maxHouseTarget = maxEnemyOrnithopters * 3;
-						int totalTarget = (totalEnemyOrnithopters * 3 + 1) / 2; // ceil(total * 1.5)
-						int requiredTurrets = std::max(maxHouseTarget, totalTarget);
-						if (!skipRemainingStructureLogic && maxEnemyOrnithopters > 0 && itemCount[Structure_RocketTurret] < requiredTurrets) {
+					// CRITICAL: Counter enemy ornithopters with rocket turrets (HIGH PRIORITY)
+					// Aim for max(4×max single-house ornithopters, 2×total enemy ornithopters)
+					int maxHouseTarget = maxEnemyOrnithopters * 4;
+					int totalTarget = totalEnemyOrnithopters * 2;
+					int requiredTurrets = std::max(maxHouseTarget, totalTarget);
+					if (!skipRemainingStructureLogic && maxEnemyOrnithopters > 0 && itemCount[Structure_RocketTurret] < requiredTurrets) {
 								// Check prerequisites for rocket turrets: Windtrap, Radar, CY level 2
 								bool hasWindtrap = itemCount[Structure_WindTrap] > 0;
 								bool hasRadar = itemCount[Structure_Radar] > 0;
@@ -2007,25 +2053,41 @@ void QuantBot::build(int militaryValue) {
 							}
 							// else: already upgrading, just wait
 						}
-						else if (!skipRemainingStructureLogic
-							&& itemCount[Structure_Radar] == 0 && pBuilder->isAvailableToBuild(Structure_Radar) && money > 500) {
-							itemID = Structure_Radar;
-						}
-								else if (!skipRemainingStructureLogic
-									&& pBuilder->isAvailableToBuild(Structure_LightFactory)
-									&& itemCount[Structure_LightFactory] == 0 && money > 500) {
-									itemID = Structure_LightFactory; // Essential for basic units
-								}
-								else if (!skipRemainingStructureLogic
-									&& pBuilder->isAvailableToBuild(Structure_HeavyFactory)
-									&& itemCount[Structure_HeavyFactory] == 0 && money > 1000) {
-									itemID = Structure_HeavyFactory; // First heavy factory
-									logDebug("Build first Heavy Factory... money: %d", money);
-								}							
-								else if (!skipRemainingStructureLogic
-									&& itemCount[Structure_RepairYard] == 0 && pBuilder->isAvailableToBuild(Structure_RepairYard) && money > 1000) {
-									itemID = Structure_RepairYard; // Essential for unit maintenance
-								}
+					else if (!skipRemainingStructureLogic
+						&& itemCount[Structure_Radar] == 0 && pBuilder->isAvailableToBuild(Structure_Radar) && money > 500) {
+						itemID = Structure_Radar;
+					}
+							else if (!skipRemainingStructureLogic
+								&& pBuilder->isAvailableToBuild(Structure_LightFactory)
+								&& itemCount[Structure_LightFactory] == 0 && money > 500) {
+								itemID = Structure_LightFactory; // Essential for basic units
+							}
+							else if (!skipRemainingStructureLogic
+								&& pBuilder->isAvailableToBuild(Structure_Barracks)
+								&& itemCount[Structure_Barracks] == 0 
+								&& itemCount[Structure_LightFactory] > 0
+								&& money > 500) {
+								itemID = Structure_Barracks; // Infantry production
+								logDebug("Build Barracks for infantry production... money: %d", money);
+							}
+							else if (!skipRemainingStructureLogic
+								&& pBuilder->isAvailableToBuild(Structure_HeavyFactory)
+								&& itemCount[Structure_HeavyFactory] == 0 && money > 1000) {
+								itemID = Structure_HeavyFactory; // First heavy factory
+								logDebug("Build first Heavy Factory... money: %d", money);
+							}							
+							else if (!skipRemainingStructureLogic
+								&& itemCount[Structure_RepairYard] == 0 && pBuilder->isAvailableToBuild(Structure_RepairYard) && money > 1000) {
+								itemID = Structure_RepairYard; // Essential for unit maintenance
+							}
+							else if (!skipRemainingStructureLogic
+								&& pBuilder->isAvailableToBuild(Structure_WOR)
+								&& itemCount[Structure_WOR] == 0
+								&& itemCount[Structure_HeavyFactory] > 0
+								&& money > 800) {
+								itemID = Structure_WOR; // Trooper production
+								logDebug("Build WOR for trooper production... money: %d", money);
+							}
 								else if (!skipRemainingStructureLogic
 									&& pBuilder->isAvailableToBuild(Structure_Refinery)
 									&& money < 4000
@@ -2123,28 +2185,59 @@ void QuantBot::build(int militaryValue) {
 								itemID = Structure_Palace;
 							}
 
-					if (pBuilder->isAvailableToBuild(itemID) && findPlaceLocation(itemID).isValid() && itemID != NONE_ID) {
-						doProduceItem(pBuilder, itemID);
-						itemCount[itemID]++;
+			if (pBuilder->isAvailableToBuild(itemID) && findPlaceLocation(itemID).isValid() && itemID != NONE_ID) {
+				doProduceItem(pBuilder, itemID);
+				itemCount[itemID]++;
+			}
+			else if (itemID != NONE_ID && pBuilder->isAvailableToBuild(itemID) && !findPlaceLocation(itemID).isValid()) {
+				// ONLY build concrete slabs if:
+				// 1. We have a valid building selected (itemID != NONE_ID)
+				// 2. The building IS available to build (isAvailableToBuild)
+				// 3. BUT we can't find a place for it (!findPlaceLocation().isValid())
+				// This prevents wasting resources on concrete when prerequisites aren't met
+				Uint32 slabType = NONE_ID;
+				if (pBuilder->isAvailableToBuild(Structure_Slab4)) {
+					slabType = Structure_Slab4;
+				} else if (pBuilder->isAvailableToBuild(Structure_Slab1)) {
+					slabType = Structure_Slab1;
+				}
+				
+				if (slabType != NONE_ID) {
+					Coord slabLocation = findSlabPlaceLocation(slabType);
+					if (slabLocation.isValid()) {
+						doProduceItem(pBuilder, slabType);
+						logDebug("Building concrete slab to expand buildable area for itemID %d at (%d,%d)", itemID, slabLocation.x, slabLocation.y);
+					} else {
+						logDebug("Cannot place slab for itemID %d (no valid slab location)", itemID);
 					}
-					else {
-						// If we can't build the desired structure, try to expand buildable area with concrete slabs
-						// Prefer 4-slab if available, otherwise use 1-slab
-						Uint32 slabType = NONE_ID;
-						if (pBuilder->isAvailableToBuild(Structure_Slab4)) {
-							slabType = Structure_Slab4;
-						} else if (pBuilder->isAvailableToBuild(Structure_Slab1)) {
-							slabType = Structure_Slab1;
-						}
-						
-						if (slabType != NONE_ID) {
-							Coord slabLocation = findSlabPlaceLocation(slabType);
-							if (slabLocation.isValid()) {
-								doProduceItem(pBuilder, slabType);
-								logDebug("Building concrete slab to expand buildable area at (%d,%d)", slabLocation.x, slabLocation.y);
-							}
-						}
-					}
+				} else {
+					logDebug("Cannot build itemID %d: no place to build and slabs not available", itemID);
+				}
+			}
+		else if (itemID != NONE_ID && !pBuilder->isAvailableToBuild(itemID)) {
+			logDebug("Cannot build itemID %d: not available (prerequisites not met)", itemID);
+		}
+		else if (itemID == NONE_ID && !skipRemainingStructureLogic) {
+			logDebug("No structure selected to build (money: %d, skipRemaining: %d)", money, skipRemainingStructureLogic);
+		}
+		
+		// Proactive concrete building: Build slabs when idle and have spare money
+		if (money > 200 && pBuilder->getProductionQueueSize() < 1 && itemID == NONE_ID) {
+			Uint32 slabType = NONE_ID;
+			if (pBuilder->isAvailableToBuild(Structure_Slab4)) {
+				slabType = Structure_Slab4;
+			} else if (pBuilder->isAvailableToBuild(Structure_Slab1)) {
+				slabType = Structure_Slab1;
+			}
+			
+			if (slabType != NONE_ID) {
+				Coord slabLocation = findSlabPlaceLocation(slabType);
+				if (slabLocation.isValid()) {
+					doProduceItem(pBuilder, slabType);
+					logDebug("PROACTIVE: Building concrete slab while idle (money: %d) at (%d,%d)", money, slabLocation.x, slabLocation.y);
+				}
+			}
+		}
 
 						}
 					}
