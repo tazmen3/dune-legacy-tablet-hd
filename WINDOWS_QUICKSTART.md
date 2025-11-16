@@ -62,11 +62,14 @@ cmake -B build -G "Visual Studio 17 2022" -A x64 `
   -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
 ```
 
-**⏱️ First run takes 5-10 minutes** as vcpkg downloads and builds SDL2, libcurl, etc.
+**⏱️ First run takes 5-10 minutes** as vcpkg downloads and builds SDL2, SDL2_mixer, SDL2_ttf, libcurl, etc.
+
+> **📦 Note:** CPack will automatically generate a Windows installer using NSIS.
+> CMake will install NSIS if needed (no manual installation required!).
 
 ---
 
-## Step 5: Build the Game
+## Step 5: Build the Game + Create Installer
 
 **Option A: Using VS Code (Easiest)**
 1. Press **`Ctrl+Shift+B`** (or **Cmd+Shift+B**)
@@ -78,6 +81,15 @@ cmake --build build --target installer --config Release
 ```
 
 **⏱️ Build takes 2-3 minutes**
+
+**What This Does:**
+- ✅ Compiles the game with Visual Studio
+- ✅ Copies all data files and DLLs
+- ✅ Creates staging directory with `cmake --install`
+- ✅ Generates **NSIS installer** via CPack: `DuneLegacy-0.98.7.0-Windows-x64.exe`
+- ✅ Also creates **ZIP archive**: `DuneLegacy-0.98.7.0-Windows-x64.zip`
+
+Both packages are found in `build/` folder!
 
 ---
 
@@ -101,6 +113,25 @@ Then press **F5** to build and run with debugger.
 
 ---
 
+## Installer Technology (CPack + NSIS)
+
+The build system uses **CMake's CPack** to automatically generate Windows installers.
+
+**Old Approach (Deprecated):**
+- Custom `.nsi` scripts in `nsis/` folder
+- Manual `makensis` commands
+- Hardcoded file paths
+
+**New Approach (Current):**
+- CPack automatically generates NSIS installer
+- File paths managed by CMake's `install()` commands
+- Automatic DLL bundling via vcpkg
+- Generates both `.exe` installer and `.zip` archive
+
+> **Note:** The old NSI files in `nsis/` are kept for reference only and are NOT used by the build system.
+
+---
+
 ## Troubleshooting
 
 ### "vcpkg not found"
@@ -115,6 +146,16 @@ Then press **F5** to build and run with debugger.
 - Open **Visual Studio Installer**
 - Modify your installation
 - Ensure **"Desktop development with C++"** is checked
+
+### "CPack: Create package" error
+- NSIS installer will be downloaded automatically by CPack
+- If it fails, install NSIS manually: https://nsis.sourceforge.io/Download
+- Then run configure again
+
+### Installer is missing DLLs
+- vcpkg automatically copies DLLs to `build/bin/Release/`
+- The installer packages everything from `cmake --install`
+- Check `build/install/` folder to verify files
 
 ### Build is slow
 - **First build**: 5-10 minutes (vcpkg downloads SDL2, libcurl, etc.)
@@ -144,10 +185,12 @@ If things break:
 
 | Item | Location |
 |------|----------|
-| **Source Code** | `C:\dev\dunelegacy\` |
+| **Source Code** | `C:\dev\dunelegacy\` (or `C:\source\dune\dunelegacy-code\`) |
 | **Build Output** | `C:\dev\dunelegacy\build\` |
 | **Executable** | `C:\dev\dunelegacy\build\bin\Release\dunelegacy.exe` |
-| **Installer** | `C:\dev\dunelegacy\build\DuneLegacy-0.98.7.0-Windows-x64.exe` |
+| **NSIS Installer** | `C:\dev\dunelegacy\build\DuneLegacy-0.98.7.0-Windows-x64.exe` |
+| **ZIP Archive** | `C:\dev\dunelegacy\build\DuneLegacy-0.98.7.0-Windows-x64.zip` |
+| **Install Staging** | `C:\dev\dunelegacy\build\install\` (temporary) |
 | **vcpkg** | `C:\vcpkg\` |
 
 ---

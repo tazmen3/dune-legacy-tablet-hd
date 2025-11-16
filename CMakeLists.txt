@@ -94,10 +94,23 @@ endif()
 # Global compile options
 if(MSVC)
     add_compile_options(/W4)
+    # Prevent Windows.h from defining min/max macros that conflict with std::min/std::max
+    add_compile_definitions(NOMINMAX)
+    add_compile_definitions(WIN32_LEAN_AND_MEAN)
 else()
     add_compile_options(-Wall -Wextra -pedantic)
     add_compile_options(-Wno-unused-parameter -Wno-unused-but-set-variable -Wno-unknown-pragmas) # FIXME These should be cleaned up.
     add_compile_options(-Wno-expansion-to-defined)  # Silences "define FMT_HAS_FEATURE(x) __has_feature(x) may not be portable" warnings.
+endif()
+
+# Windows-specific file operations (before adding subdirectories)
+if(WIN32)
+    # Copy all .PAK files
+    file(GLOB PAK_FILES "${CMAKE_SOURCE_DIR}/data/*.PAK")
+    foreach(PAK_FILE ${PAK_FILES})
+        get_filename_component(PAK_FILENAME ${PAK_FILE} NAME)
+        file(COPY "${PAK_FILE}" DESTINATION "${CMAKE_BINARY_DIR}/bin/")
+    endforeach()
 endif()
 
 # Add subdirectories
@@ -121,22 +134,26 @@ if(NOT APPLE)
     add_dependencies(copy_data dunelegacy)
 endif()
 
-# Windows-specific file operations
+
+# Platform-specific install configuration
 if(WIN32)
-    # Copy all .PAK files
-    file(GLOB PAK_FILES "${CMAKE_SOURCE_DIR}/data/*.PAK")
-    foreach(PAK_FILE ${PAK_FILES})
-        get_filename_component(PAK_FILENAME ${PAK_FILE} NAME)
-        file(COPY "${PAK_FILE}" DESTINATION "${CMAKE_BINARY_DIR}/bin/")
-    endforeach()
-    
-    # When using vcpkg, CMake will automatically handle DLL copying via vcpkg_copy_pdbs
-    # and vcpkg's automatic DLL copying for dependencies
-    # However, we add a custom command to ensure DLLs are in the right place
-    add_custom_command(TARGET dunelegacy POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E echo "Checking for SDL2 DLLs..."
-        COMMENT "vcpkg will automatically copy required DLLs to output directory"
-    )
+    # Windows: use share/DuneLegacy structure to match hardcoded paths in game
+    set(DUNELEGACY_INSTALL_ROOT ".")
+    set(DUNELEGACY_DATA_DIR "share/${PROJECT_NAME}")
+    set(DUNELEGACY_CONFIG_DIR "share/${PROJECT_NAME}/config")
+    set(DUNELEGACY_DOC_DIR ".")
+elseif(APPLE)
+    # macOS already handled via bundle
+    set(DUNELEGACY_INSTALL_ROOT ".")
+    set(DUNELEGACY_DATA_DIR "${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}")
+    set(DUNELEGACY_CONFIG_DIR "${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/config")
+    set(DUNELEGACY_DOC_DIR "${CMAKE_INSTALL_DOCDIR}")
+else()
+    # Unix/Linux FHS structure
+    set(DUNELEGACY_INSTALL_ROOT "${CMAKE_INSTALL_BINDIR}")
+    set(DUNELEGACY_DATA_DIR "${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}")
+    set(DUNELEGACY_CONFIG_DIR "${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/config")
+    set(DUNELEGACY_DOC_DIR "${CMAKE_INSTALL_DOCDIR}")
 endif()
 
 # Install data files
@@ -148,14 +165,9 @@ if(NOT APPLE)
         "config/QuantBot Config.bak"
         "config/Dune Legacy.ini"
         config/README.md
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/config
+        DESTINATION ${DUNELEGACY_CONFIG_DIR}
     )
 endif()
-
-# install(DIRECTORY data/
-#     DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
-#     PATTERN "*.svn" EXCLUDE
-# )
 
 # Install desktop file and icons on Linux
 if(UNIX AND NOT APPLE)
@@ -175,10 +187,15 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # Install documentation
-# For macOS bundles, documentation can optionally be added to Resources if needed
-if(NOT APPLE)
+if(WIN32)
+    # Windows: install docs to root with .txt extension
     install(FILES AUTHORS COPYING NEWS README
-        DESTINATION ${CMAKE_INSTALL_DOCDIR}
+        DESTINATION ${DUNELEGACY_DOC_DIR}
+    )
+elseif(NOT APPLE)
+    # Linux: use standard doc directory
+    install(FILES AUTHORS COPYING NEWS README
+        DESTINATION ${DUNELEGACY_DOC_DIR}
     )
 endif()
 
@@ -194,13 +211,26 @@ set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README")
 if(WIN32)
     set(CPACK_GENERATOR "NSIS;ZIP")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-    set(CPACK_NSIS_MODIFY_PATH ON)
+    set(CPACK_NSIS_MODIFY_PATH OFF)
     set(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}/dunelegacy.ico")
     set(CPACK_NSIS_MUI_UNIICON "${CMAKE_CURRENT_SOURCE_DIR}/dunelegacy.ico")
-    set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\${PROJECT_NAME}.exe")
-    set(CPACK_NSIS_DISPLAY_NAME "Dune Legacy ${PROJECT_VERSION}")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "dunelegacy.exe")
+    set(CPACK_NSIS_DISPLAY_NAME "Dune Legacy")
     set(CPACK_NSIS_PACKAGE_NAME "Dune Legacy")
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "DuneLegacy")
     set(CPACK_PACKAGE_FILE_NAME "DuneLegacy-${PROJECT_VERSION}-Windows-x64")
+    set(CPACK_NSIS_EXECUTABLES_DIRECTORY ".")
+    set(CPACK_NSIS_MUI_FINISHPAGE_RUN "dunelegacy.exe")
+    
+    # Create Start Menu shortcuts
+    set(CPACK_NSIS_CREATE_ICONS_EXTRA "
+        CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Dune Legacy.lnk\\\" \\\"$INSTDIR\\\\dunelegacy.exe\\\"
+        CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Readme.lnk\\\" \\\"$INSTDIR\\\\README\\\"
+    ")
+    set(CPACK_NSIS_DELETE_ICONS_EXTRA "
+        Delete \\\"$SMPROGRAMS\\\\$MUI_TEMP\\\\Dune Legacy.lnk\\\"
+        Delete \\\"$SMPROGRAMS\\\\$MUI_TEMP\\\\Readme.lnk\\\"
+    ")
     
     # Add custom target for Windows installer
     add_custom_target(installer

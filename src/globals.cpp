@@ -15,9 +15,10 @@
  *  along with Dune Legacy.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <globals.h>
+
 #include <SoundPlayer.h>
 #include <FileClasses/music/MusicPlayer.h>
-
 #include <FileClasses/FileManager.h>
 #include <FileClasses/GFXManager.h>
 #include <FileClasses/SFXManager.h>
@@ -25,6 +26,37 @@
 #include <FileClasses/TextManager.h>
 #include <Network/NetworkManager.h>
 
-#define SKIP_EXTERN_DEFINITION
- #include <globals.h>
-#undef SKIP_EXTERN_DEFINITION
+// Explicit definitions of global variables (instead of relying on EXTERN macro)
+// SDL stuff
+SDL_Window*          window = nullptr;
+SDL_Renderer*        renderer = nullptr;
+SDL_Texture*         screenTexture = nullptr;
+Palette              palette;
+int                  drawnMouseX = 0;
+int                  drawnMouseY = 0;
+int                  currentZoomlevel = 0;
+
+// abstraction layers
+std::unique_ptr<SoundPlayer>         soundPlayer;
+std::unique_ptr<MusicPlayer>         musicPlayer;
+std::unique_ptr<FileManager>         pFileManager;
+std::unique_ptr<GFXManager>          pGFXManager;
+std::unique_ptr<SFXManager>          pSFXManager;
+std::unique_ptr<FontManager>         pFontManager;
+std::unique_ptr<TextManager>         pTextManager;
+std::unique_ptr<NetworkManager>      pNetworkManager;
+
+// game stuff
+Game*                currentGame = nullptr;
+ScreenBorder*        screenborder = nullptr;
+Map*                 currentGameMap = nullptr;
+House*               pLocalHouse = nullptr;
+HumanPlayer*         pLocalPlayer = nullptr;
+
+RobustList<UnitBase*>       unitList;
+RobustList<StructureBase*>  structureList;
+RobustList<Bullet*>         bulletList;
+
+// misc
+SettingsClass    settings;
+bool debug = false;
