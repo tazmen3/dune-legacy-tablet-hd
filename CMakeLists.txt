@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 # Project name and version
-project(DuneLegacy VERSION 0.98.7.0 LANGUAGES C CXX)
+project(DuneLegacy VERSION 0.98.7.1 LANGUAGES C CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -275,10 +275,11 @@ elseif(APPLE)
         COMMAND ${CMAKE_COMMAND} -E echo "Cleaning CPack cache..."
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/_CPack_Packages
         COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/*.dmg
-        COMMAND ${CMAKE_COMMAND} -E echo "Building binary..."
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/install
+        COMMAND ${CMAKE_COMMAND} -E echo "Force rebuilding binary..."
+        COMMAND ${CMAKE_COMMAND} --build . --target clean
         COMMAND ${CMAKE_COMMAND} --build . --config Release
         COMMAND ${CMAKE_COMMAND} -E echo "Installing to staging directory..."
-        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/install
         COMMAND ${CMAKE_COMMAND} --install . --prefix install --config Release
         COMMAND ${CMAKE_COMMAND} -E echo "Creating DMG..."
         COMMAND ${CMAKE_CPACK_COMMAND} -G DragNDrop -C Release
