@@ -125,6 +125,12 @@ public:
         \return the current game cycle
     */
     Uint32 getGameCycleCount() const { return gameCycleCount; };
+    
+    /**
+        Returns the loaded savegame version (for backward compatibility)
+        \return the version of the savegame being loaded, or 0 if not loading
+    */
+    Uint32 getLoadedSavegameVersion() const { return loadedSavegameVersion; };
 
     /**
         Return the game time in milliseconds.
@@ -744,6 +750,8 @@ private:
     Uint32      gameCycleCount = 0;
 
     Uint32      skipToGameCycle = 0;            ///< skip to this game cycle
+    
+    Uint32      loadedSavegameVersion = 0;      ///< Version of loaded savegame (for backward compatibility)
 
     bool        takePeriodicalScreenshots = false;      ///< take a screenshot every 10 seconds
 

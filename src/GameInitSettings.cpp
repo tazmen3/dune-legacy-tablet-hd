@@ -188,7 +188,10 @@ void GameInitSettings::checkSaveGame(InputStream& stream) {
         THROW(std::runtime_error, "Cannot load this savegame,\n because it has a wrong magic number!");
     }
 
-    if(savegameVersion < SAVEGAMEVERSION) {
+    // Support backward compatibility: Accept version 9705 (pre-Original AI) and newer
+    constexpr Uint32 MINIMUM_SUPPORTED_VERSION = 9705;
+    
+    if(savegameVersion < MINIMUM_SUPPORTED_VERSION) {
         THROW(std::runtime_error, "Cannot load this savegame,\n because it was created with an older version:\n" + duneVersion);
     }
 

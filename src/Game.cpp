@@ -2583,10 +2583,17 @@ bool Game::loadSaveGame(InputStream& stream) {
     }
 
     Uint32 savegameVersion = stream.readUint32();
-    if (savegameVersion != SAVEGAMEVERSION) {
-        SDL_Log("Game::loadSaveGame(): No valid savegame! Expected savegame version %d, but got %d!", SAVEGAMEVERSION, savegameVersion);
+    
+    // Support backward compatibility with version 9705 (pre-Original AI)
+    constexpr Uint32 MINIMUM_SUPPORTED_VERSION = 9705;
+    if (savegameVersion < MINIMUM_SUPPORTED_VERSION || savegameVersion > SAVEGAMEVERSION) {
+        SDL_Log("Game::loadSaveGame(): No valid savegame! Expected savegame version %d-%d, but got %d!", 
+                MINIMUM_SUPPORTED_VERSION, SAVEGAMEVERSION, savegameVersion);
         return false;
     }
+    
+    // Store version for backward-compatible loading
+    this->loadedSavegameVersion = savegameVersion;
 
     std::string duneVersion = stream.readString();
 
