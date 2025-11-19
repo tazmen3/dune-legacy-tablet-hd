@@ -30,7 +30,7 @@
 #define DEFAULT_METASERVER  "https://dunelegacy.com/metaserver/metaserver.php"
 
 #define SAVEMAGIC           8675309
-#define SAVEGAMEVERSION     9704
+#define SAVEGAMEVERSION     9804  // Incremented for CampaignAIPlayer attackTriggered flag
 
 #define MAX_PLAYERNAMELENGHT    24
 
@@ -51,8 +51,8 @@
 #define WINLOSEFLAGS_QUOTA                  0x04
 #define WINLOSEFLAGS_TIMEOUT                0x08
 
-#define MAX_XSIZE 256
-#define MAX_YSIZE 256
+#define MAX_XSIZE 512
+#define MAX_YSIZE 512
 
 #define BUILDRANGE 2
 #define MIN_CARRYALL_LIFT_DISTANCE 6
