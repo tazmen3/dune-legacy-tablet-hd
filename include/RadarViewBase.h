@@ -25,6 +25,8 @@
 #include <misc/SDL2pp.h>
 
 #include <functional>
+#include <algorithm>
+#include <cmath>
 
 
 #define NUM_STATIC_FRAMES 21
@@ -33,6 +35,14 @@
 #define RADARVIEW_BORDERTHICKNESS 2
 #define RADARWIDTH 128
 #define RADARHEIGHT 128
+
+struct RadarScaleInfo {
+    float scale;        ///< pixels per tile on the radar
+    int offsetX;        ///< horizontal offset inside the 128x128 radar viewport
+    int offsetY;        ///< vertical offset inside the 128x128 radar viewport
+    int scaledWidth;    ///< width of the scaled map area inside the radar viewport
+    int scaledHeight;   ///< height of the scaled map area inside the radar viewport
+};
 
 
 /// This class manages the mini map at the top right corner of the screen
@@ -78,19 +88,14 @@ public:
         \return true, if inside the radar view; false otherwise
     */
     bool isOnRadar(int mouseX, int mouseY) const {
-        int scale = 1;
-        int offsetX = 0;
-        int offsetY = 0;
+        RadarScaleInfo scaleInfo = calculateScaleAndOffsets(getMapSizeX(), getMapSizeY());
 
-        calculateScaleAndOffsets(getMapSizeX(), getMapSizeY(), scale, offsetX, offsetY);
+        const int left = scaleInfo.offsetX + RADARVIEW_BORDERTHICKNESS;
+        const int right = left + scaleInfo.scaledWidth;
+        const int top = scaleInfo.offsetY + RADARVIEW_BORDERTHICKNESS;
+        const int bottom = top + scaleInfo.scaledHeight;
 
-        int offsetFromRightX = 128 - getMapSizeX()*scale - offsetX;
-        int offsetFromBottomY = 128 - getMapSizeY()*scale - offsetY;
-
-        return ((mouseX >= offsetX + RADARVIEW_BORDERTHICKNESS)
-                && (mouseX < RADARWIDTH - offsetFromRightX + RADARVIEW_BORDERTHICKNESS)
-                && (mouseY >= offsetY + RADARVIEW_BORDERTHICKNESS)
-                && (mouseY < RADARHEIGHT - offsetFromBottomY + RADARVIEW_BORDERTHICKNESS) );
+        return ((mouseX >= left) && (mouseX < right) && (mouseY >= top) && (mouseY < bottom));
     }
 
     /**
@@ -102,14 +107,15 @@ public:
     Coord getWorldCoords(int mouseX, int mouseY) const {
         Coord positionOnRadar(mouseX - RADARVIEW_BORDERTHICKNESS, mouseY - RADARVIEW_BORDERTHICKNESS);
 
-        int scale = 1;
-        int offsetX = 0;
-        int offsetY = 0;
+        RadarScaleInfo scaleInfo = calculateScaleAndOffsets(getMapSizeX(), getMapSizeY());
 
-        calculateScaleAndOffsets(getMapSizeX(), getMapSizeY(), scale, offsetX, offsetY);
+        const float tileX = (positionOnRadar.x - scaleInfo.offsetX) / scaleInfo.scale;
+        const float tileY = (positionOnRadar.y - scaleInfo.offsetY) / scaleInfo.scale;
 
-        return Coord( ((positionOnRadar.x - offsetX) * getMapSizeX() * TILESIZE) / (getMapSizeX() * scale),
-                      ((positionOnRadar.y - offsetY) * getMapSizeY() * TILESIZE) / (getMapSizeY() * scale));
+        const int clampedTileX = std::clamp(static_cast<int>(std::floor(tileX)), 0, std::max(0, getMapSizeX() - 1));
+        const int clampedTileY = std::clamp(static_cast<int>(std::floor(tileY)), 0, std::max(0, getMapSizeY() - 1));
+
+        return Coord(clampedTileX * TILESIZE, clampedTileY * TILESIZE);
     }
 
 
@@ -121,25 +127,27 @@ public:
         \param  offsetX     The offset in x direction is saved here
         \param  offsetY     The offset in y direction is saved here
     */
-    static void calculateScaleAndOffsets(int MapSizeX, int MapSizeY, int& scale, int& offsetX, int& offsetY) {
-        scale = 1;
-        offsetX = 0;
-        offsetY = 0;
+    static RadarScaleInfo calculateScaleAndOffsets(int MapSizeX, int MapSizeY) {
+        RadarScaleInfo info{};
 
-        if(MapSizeX <= 32 && MapSizeY <= 32) {
-            scale*=2;
+        if(MapSizeX <= 0 || MapSizeY <= 0) {
+            info.scale = 1.0f;
+            info.offsetX = info.offsetY = 0;
+            info.scaledWidth = info.scaledHeight = 0;
+            return info;
         }
 
-        if(MapSizeX <= 64 && MapSizeY <= 64) {
-            scale*=2;
-        }
+        constexpr float maxScale = 5.0f;
+        const int maxMapSize = std::max(MapSizeX, MapSizeY);
 
-        if(MapSizeX <= 21 && MapSizeY <= 21) {
-            scale++;
-        }
+        info.scale = std::min(maxScale, RADARWIDTH / static_cast<float>(maxMapSize));
+        info.scaledWidth = std::max(1, static_cast<int>(std::lround(MapSizeX * info.scale)));
+        info.scaledHeight = std::max(1, static_cast<int>(std::lround(MapSizeY * info.scale)));
 
-        offsetX = (128 - (MapSizeX*scale))/2;
-        offsetY = (128 - (MapSizeY*scale))/2;
+        info.offsetX = (RADARWIDTH - info.scaledWidth)/2;
+        info.offsetY = (RADARHEIGHT - info.scaledHeight)/2;
+
+        return info;
     }
 
 
