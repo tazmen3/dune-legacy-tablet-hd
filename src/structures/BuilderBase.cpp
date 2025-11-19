@@ -394,6 +394,16 @@ bool BuilderBase::update() {
                     Coord spot = newUnit->isAFlyingUnit() ? location + Coord(1,1) : currentGameMap->findDeploySpot(newUnit, location, currentGame->randomGen, unitDestination, structureSize);
                     newUnit->deploy(spot);
 
+                    // Set AI unit default mode
+                    if(getOwner()->isAI()) {
+                        int unitType = newUnit->getItemID();
+                        // Harvesters should start harvesting automatically
+                        if(unitType == Unit_Harvester) {
+                            newUnit->doSetAttackMode(HARVEST);
+                        }
+                        // All other units keep their default GUARD/STOP until AI orders them
+                    }
+
                     if(unitDestination.isValid()) {
                         newUnit->setGuardPoint(unitDestination);
                         newUnit->setDestination(unitDestination);
@@ -552,5 +562,3 @@ void BuilderBase::doCancelItem(Uint32 itemID, bool multipleMode) {
         }
     }
 }
-
-
