@@ -104,6 +104,12 @@ public:
     inline bool hadContactWithEnemy() const { return bHadContactWithEnemy; };
     inline void informDirectContactWithEnemy() { bHadDirectContactWithEnemy = true; };
     inline bool hadDirectContactWithEnemy() const { return bHadDirectContactWithEnemy; };
+    
+    // Original AI activation control (from Dune Dynasty)
+    inline void activateAI() { isAIActive = true; };
+    inline bool isAIActivated() const { return isAIActive; };
+    inline void triggerFullScaleAttack() { doneFullScaleAttack = true; };
+    inline bool hasTriggeredFullScaleAttack() const { return doneFullScaleAttack; };
 
     inline void informVisibleEnemyUnit() {
         numVisibleEnemyUnits++;
@@ -233,6 +239,12 @@ protected:
 
     bool bHadContactWithEnemy;      ///< did this house already have contact with an enemy (= tiles with enemy units were explored by this house or allied houses)
     bool bHadDirectContactWithEnemy;///< did this house already have direct contact with an enemy (= tiles with enemy units were explored by this house)
+    
+        // Original AI activation flags (from Dune Dynasty)
+        // SAVE COMPATIBILITY NOTE: Adding these flags requires SAVEGAMEVERSION bump (9803).
+        // Old saves will fail to load with clear error message. This is intentional for major AI replacement.
+        bool isAIActive;                ///< AI is "awake" - activated when ground units make contact (mutual activation)
+        bool doneFullScaleAttack;       ///< One-time all-in assault flag - prevents repeated full-scale attacks
 
     int numVisibleEnemyUnits;   ///< the number of enemy units visible; will be reset to 0 each cycle
     int numVisibleFriendlyUnits;///< the number of visible units from the same team; will be reset to 0 each cycle

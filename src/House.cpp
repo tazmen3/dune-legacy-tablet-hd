@@ -64,6 +64,8 @@ House::House(int newHouse, int newCredits, int maxUnits, Uint8 teamID, int quota
 
     bHadContactWithEnemy = false;
     bHadDirectContactWithEnemy = false;
+    isAIActive = false;
+    doneFullScaleAttack = false;
 
     unitBuiltValue = 0;
     structureBuiltValue = 0;
@@ -95,7 +97,17 @@ House::House(InputStream& stream) : choam(this) {
     maxUnits = stream.readSint32();
     quota = stream.readSint32();
 
-    stream.readBools(&bHadContactWithEnemy, &bHadDirectContactWithEnemy);
+    // Backward compatibility: Old saves (< 9803) only have 2 bools, new saves have 4
+    // NOTE: Requires currentGame to be set (it is during load)
+    if (currentGame && currentGame->getLoadedSavegameVersion() < 9803) {
+        // Old save: only read original 2 flags, default new AI flags to false
+        stream.readBools(&bHadContactWithEnemy, &bHadDirectContactWithEnemy);
+        isAIActive = false;
+        doneFullScaleAttack = false;
+    } else {
+        // New save: read all 4 flags
+        stream.readBools(&bHadContactWithEnemy, &bHadDirectContactWithEnemy, &isAIActive, &doneFullScaleAttack);
+    }
 
     unitBuiltValue = stream.readUint32();
     structureBuiltValue = stream.readUint32();
@@ -170,7 +182,7 @@ void House::save(OutputStream& stream) const {
     stream.writeSint32(maxUnits);
     stream.writeSint32(quota);
 
-    stream.writeBools(bHadContactWithEnemy, bHadDirectContactWithEnemy);
+    stream.writeBools(bHadContactWithEnemy, bHadDirectContactWithEnemy, isAIActive, doneFullScaleAttack);
 
     stream.writeUint32(unitBuiltValue);
     stream.writeUint32(structureBuiltValue);
