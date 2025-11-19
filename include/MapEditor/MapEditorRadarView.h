@@ -60,7 +60,7 @@ public:
     void draw(Point position) override;
 
 private:
-    void updateRadarSurface(const MapData& map, int scale, int offsetX, int offsetY);
+    void updateRadarSurface(const MapData& map, const RadarScaleInfo& scaleInfo);
 
     MapEditor* pMapEditor;
 
