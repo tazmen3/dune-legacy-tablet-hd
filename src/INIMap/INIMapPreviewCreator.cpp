@@ -14,6 +14,7 @@
 #include <globals.h>
 
 #include <algorithm>
+#include <cmath>
 
 INIMapPreviewCreator::INIMapPreviewCreator(INIMap::inifile_ptr pINIFile)
  : INIMap(std::move(pINIFile))
@@ -52,6 +53,7 @@ sdl2::surface_ptr INIMapPreviewCreator::createMinimapImageOfMap(int borderWidth,
     int logicalSizeY = 64;
     int logicalOffsetX = 0;
     int logicalOffsetY = 0;
+    RadarScaleInfo scaleInfo{};
 
     if(version < 2) {
         // old map format with seed value
@@ -231,6 +233,12 @@ sdl2::surface_ptr INIMapPreviewCreator::createMinimapImageOfMap(int borderWidth,
             }
         }
 
+        scaleInfo.scale = static_cast<float>(scale);
+        scaleInfo.offsetX = offsetX;
+        scaleInfo.offsetY = offsetY;
+        scaleInfo.scaledWidth = sizeX * scale;
+        scaleInfo.scaledHeight = sizeY * scale;
+
 
     } else {
         // new map format with saved map
@@ -245,20 +253,31 @@ sdl2::surface_ptr INIMapPreviewCreator::createMinimapImageOfMap(int borderWidth,
         logicalSizeX = sizeX;
         logicalSizeY = sizeY;
 
-        RadarView::calculateScaleAndOffsets(sizeX, sizeY, scale, offsetX, offsetY);
+        scaleInfo = RadarView::calculateScaleAndOffsets(sizeX, sizeY);
+        scaleInfo.offsetX += borderWidth;
+        scaleInfo.offsetY += borderWidth;
 
-        offsetX += borderWidth;
-        offsetY += borderWidth;
+        std::vector<Uint32> tileColors(sizeX * sizeY, MapRGBA(pMinimap->format, COLOR_BLACK));
 
         for(int y=0;y<sizeY;y++) {
             std::string rowKey = fmt::sprintf("%.3d", y);
 
             if(inifile->hasKey("MAP", rowKey) == false) {
                 logError(inifile->getSection("MAP").getLineNumber(), "Map row " + std::to_string(y) + " does not exist!");
+                continue;
             }
 
             std::string rowString = inifile->getStringValue("MAP",rowKey);
-            for(int x=0;x<sizeX;x++) {
+            int rowLength = rowString.size();
+
+            if(rowLength < sizeX) {
+                logWarning(inifile->getKey("MAP", rowKey)->getLineNumber(), "Map row " + std::to_string(y) + " is not long enough!");
+            } else if(rowLength > sizeX) {
+                logWarning(inifile->getKey("MAP", rowKey)->getLineNumber(), "Map row " + std::to_string(y) + " is too long!");
+                rowLength = sizeX;
+            }
+
+            for(int x=0;x<rowLength;x++) {
                 Uint32 color = COLOR_BLACK;
                 switch(rowString.at(x)) {
                     case '-': {
@@ -302,14 +321,71 @@ sdl2::surface_ptr INIMapPreviewCreator::createMinimapImageOfMap(int borderWidth,
                     } break;
                 }
 
-                for(int i=0;i<scale;i++) {
-                    for(int j=0;j<scale;j++) {
-                        putPixel(pMinimap.get(), x*scale + i + offsetX, y*scale + j + offsetY, color);
-                    }
-                }
+                tileColors[y * sizeX + x] = MapRGBA(pMinimap->format, color);
+            }
+
+            for(int x=rowLength; x < sizeX; x++) {
+                tileColors[y * sizeX + x] = MapRGBA(pMinimap->format, COLOR_DESERTSAND);
+            }
+        }
+
+        sdl2::surface_lock lock{pMinimap.get()};
+        for(int pixelY = 0; pixelY < scaleInfo.scaledHeight; ++pixelY) {
+            const int tileY = std::clamp(static_cast<int>(pixelY / scaleInfo.scale), 0, sizeY - 1);
+            Uint32* row = reinterpret_cast<Uint32*>(reinterpret_cast<Uint8*>(pMinimap->pixels)
+                            + (scaleInfo.offsetY + pixelY) * pMinimap->pitch) + scaleInfo.offsetX;
+
+            for(int pixelX = 0; pixelX < scaleInfo.scaledWidth; ++pixelX) {
+                const int tileX = std::clamp(static_cast<int>(pixelX / scaleInfo.scale), 0, sizeX - 1);
+                row[pixelX] = tileColors[tileY * sizeX + tileX];
             }
         }
     }
+
+    auto paintTileRect = [&](int tileX, int tileY, int width, int height, Uint32 surfaceColor) {
+        if(scaleInfo.scaledWidth == 0 || scaleInfo.scaledHeight == 0) {
+            return;
+        }
+
+        if(width <= 0 || height <= 0) {
+            return;
+        }
+
+        const int startTileX = std::max(0, tileX);
+        const int startTileY = std::max(0, tileY);
+        const int endTileX = std::min(sizeX, tileX + width);
+        const int endTileY = std::min(sizeY, tileY + height);
+
+        if(startTileX >= endTileX || startTileY >= endTileY) {
+            return;
+        }
+
+        const int pixelStartX = scaleInfo.offsetX + static_cast<int>(std::floor(startTileX * scaleInfo.scale));
+        const int pixelStartY = scaleInfo.offsetY + static_cast<int>(std::floor(startTileY * scaleInfo.scale));
+        const int pixelWidth = std::max(1, static_cast<int>(std::round((endTileX - startTileX) * scaleInfo.scale)));
+        const int pixelHeight = std::max(1, static_cast<int>(std::round((endTileY - startTileY) * scaleInfo.scale)));
+
+        const int maxPixelX = scaleInfo.offsetX + scaleInfo.scaledWidth;
+        const int maxPixelY = scaleInfo.offsetY + scaleInfo.scaledHeight;
+
+        for(int py = 0; py < pixelHeight; ++py) {
+            const int drawY = pixelStartY + py;
+            if(drawY < scaleInfo.offsetY || drawY >= maxPixelY) {
+                continue;
+            }
+
+            auto* row = reinterpret_cast<Uint32*>(reinterpret_cast<Uint8*>(pMinimap->pixels) + drawY * pMinimap->pitch);
+
+            for(int px = 0; px < pixelWidth; ++px) {
+                const int drawX = pixelStartX + px;
+                if(drawX < scaleInfo.offsetX || drawX >= maxPixelX) {
+                    continue;
+                }
+
+                row[drawX] = surfaceColor;
+            }
+        }
+    };
 
     // draw structures
     if(inifile->hasSection("STRUCTURES")) {
@@ -354,11 +430,8 @@ sdl2::surface_ptr INIMapPreviewCreator::createMinimapImageOfMap(int borderWidth,
                     int y = pos / logicalSizeX - logicalOffsetY;
 
                     if(x >= 0 && x < sizeX && y >= 0 && y < sizeY) {
-                        for(int i=0;i<scale;i++) {
-                            for(int j=0;j<scale;j++) {
-                                putPixel(pMinimap.get(), x*scale + i + offsetX, y*scale + j + offsetY, color);
-                            }
-                        }
+                        const Uint32 surfaceColor = MapRGBA(pMinimap->format, color);
+                        paintTileRect(x, y, 1, 1, surfaceColor);
                     }
                 }
             } else if(key.getKeyName().find("ID") == 0) {
@@ -393,17 +466,8 @@ sdl2::surface_ptr INIMapPreviewCreator::createMinimapImageOfMap(int borderWidth,
 
                 int posX = pos % logicalSizeX - logicalOffsetX;
                 int posY = pos / logicalSizeX - logicalOffsetY;
-                for(int x = posX; x < posX + size.x; x++) {
-                    for(int y = posY; y < posY + size.y; y++) {
-                        if(x >= 0 && x < sizeX && y >= 0 && y < sizeY) {
-                            for(int i=0;i<scale;i++) {
-                                for(int j=0;j<scale;j++) {
-                                    putPixel(pMinimap.get(), x*scale + i + offsetX, y*scale + j + offsetY, color);
-                                }
-                            }
-                        }
-                    }
-                }
+                const Uint32 surfaceColor = MapRGBA(pMinimap->format, color);
+                paintTileRect(posX, posY, size.x, size.y, surfaceColor);
             }
         }
     }
