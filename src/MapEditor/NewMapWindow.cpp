@@ -35,6 +35,7 @@
 
 #include <FileClasses/GFXManager.h>
 #include <FileClasses/TextManager.h>
+#include <algorithm>
 
 NewMapWindow::NewMapWindow(HOUSETYPE currentHouse) : Window(0,0,0,0), house(currentHouse), mapSeed(INVALID), loadMapSingleplayer(false) {
 
@@ -89,18 +90,28 @@ NewMapWindow::NewMapWindow(HOUSETYPE currentHouse) : Window(0,0,0,0), house(curr
     mapSizeXLabel.setText(_("Map Width:"));
     mapSizeXLabel.setTextColor(color);
     mapSizeXDropDownBox.setColor(color);
-    mapSizeXDropDownBox.addEntry("32",32);
     mapSizeXDropDownBox.addEntry("64",64);
     mapSizeXDropDownBox.addEntry("128",128);
-    mapSizeXDropDownBox.setSelectedItem(2);
+    mapSizeXDropDownBox.addEntry("192",192);
+    mapSizeXDropDownBox.addEntry("256",256);
+    mapSizeXDropDownBox.addEntry("320",320);
+    mapSizeXDropDownBox.addEntry("384",384);
+    mapSizeXDropDownBox.addEntry("448",448);
+    mapSizeXDropDownBox.addEntry("512",512);
+    mapSizeXDropDownBox.setSelectedItem(1);
     mapSizeXDropDownBox.setOnSelectionChange(std::bind(&NewMapWindow::onMapPropertiesChanged,this));
     mapSizeYLabel.setText(_("Map Height:"));
     mapSizeYLabel.setTextColor(color);
     mapSizeYDropDownBox.setColor(color);
-    mapSizeYDropDownBox.addEntry("32",32);
     mapSizeYDropDownBox.addEntry("64",64);
     mapSizeYDropDownBox.addEntry("128",128);
-    mapSizeYDropDownBox.setSelectedItem(2);
+    mapSizeYDropDownBox.addEntry("192",192);
+    mapSizeYDropDownBox.addEntry("256",256);
+    mapSizeYDropDownBox.addEntry("320",320);
+    mapSizeYDropDownBox.addEntry("384",384);
+    mapSizeYDropDownBox.addEntry("448",448);
+    mapSizeYDropDownBox.addEntry("512",512);
+    mapSizeYDropDownBox.setSelectedItem(1);
     mapSizeYDropDownBox.setOnSelectionChange(std::bind(&NewMapWindow::onMapPropertiesChanged,this));
 
 
@@ -336,30 +347,27 @@ sdl2::surface_ptr NewMapWindow::createMinimapPicture(MapData& mapdata, int borde
     SDL_Rect dest = { borderWidth, borderWidth, pMinimap->w - 2*borderWidth, pMinimap->h - 2*borderWidth};
     SDL_FillRect(pMinimap.get(), &dest, COLOR_BLACK);
 
-    int scale = 1;
     int offsetX;
     int offsetY;
 
-    RadarViewBase::calculateScaleAndOffsets(mapdata.getSizeX(), mapdata.getSizeY(), scale, offsetX, offsetY);
+    RadarScaleInfo scaleInfo = RadarViewBase::calculateScaleAndOffsets(mapdata.getSizeX(), mapdata.getSizeY());
 
-    offsetX += borderWidth;
-    offsetY += borderWidth;
+    offsetX = scaleInfo.offsetX + borderWidth;
+    offsetY = scaleInfo.offsetY + borderWidth;
+    sdl2::surface_lock lock{pMinimap.get()};
+    for(int pixelY = 0; pixelY < scaleInfo.scaledHeight; ++pixelY) {
+        const int tileY = std::clamp(static_cast<int>(pixelY / scaleInfo.scale), 0, mapdata.getSizeY() - 1);
+        Uint32* row = reinterpret_cast<Uint32*>(reinterpret_cast<Uint8*>(pMinimap->pixels) + (offsetY + pixelY) * pMinimap->pitch) + offsetX;
+        for(int pixelX = 0; pixelX < scaleInfo.scaledWidth; ++pixelX) {
+            const int tileX = std::clamp(static_cast<int>(pixelX / scaleInfo.scale), 0, mapdata.getSizeX() - 1);
 
-    for(int y = 0; y < mapdata.getSizeY(); y++) {
-        for(int x = 0; x < mapdata.getSizeX(); x++) {
-
-            TERRAINTYPE terrainType = mapdata(x,y);
+            TERRAINTYPE terrainType = mapdata(tileX, tileY);
 
             Uint32 color = getColorByTerrainType(terrainType);
 
-            for(int i=0;i<scale;i++) {
-                for(int j=0;j<scale;j++) {
-                    putPixel(pMinimap.get(), x*scale + i + offsetX, y*scale + j + offsetY, color);
-                }
-            }
+            row[pixelX] = MapRGBA(pMinimap->format, color);
         }
     }
 
     return pMinimap;
 }
-
