@@ -69,13 +69,9 @@ void RadarView::draw(Point position)
             int mapSizeX = currentGameMap->getSizeX();
             int mapSizeY = currentGameMap->getSizeY();
 
-            int scale = 1;
-            int offsetX = 0;
-            int offsetY = 0;
+            RadarScaleInfo scaleInfo = calculateScaleAndOffsets(mapSizeX, mapSizeY);
 
-            calculateScaleAndOffsets(mapSizeX, mapSizeY, scale, offsetX, offsetY);
-
-            updateRadarSurface(mapSizeX, mapSizeY, scale, offsetX, offsetY);
+            updateRadarSurface(mapSizeX, mapSizeY, scaleInfo);
 
             SDL_UpdateTexture(radarTexture.get(), nullptr, radarSurface->pixels, radarSurface->pitch);
 
@@ -83,30 +79,36 @@ void RadarView::draw(Point position)
             SDL_RenderCopy(renderer, radarTexture.get(), nullptr, &dest);
 
             SDL_Rect radarRect;
-            radarRect.x = (screenborder->getLeft() * mapSizeX*scale) / (mapSizeX*TILESIZE) + offsetX;
-            radarRect.y = (screenborder->getTop() * mapSizeY*scale) / (mapSizeY*TILESIZE) + offsetY;
-            radarRect.w = ((screenborder->getRight() - screenborder->getLeft()) * mapSizeX*scale) / (mapSizeX*TILESIZE);
-            radarRect.h = ((screenborder->getBottom() - screenborder->getTop()) * mapSizeY*scale) / (mapSizeY*TILESIZE);
+            const float viewLeftTiles = screenborder->getLeft() / static_cast<float>(TILESIZE);
+            const float viewTopTiles = screenborder->getTop() / static_cast<float>(TILESIZE);
+            const float viewWidthTiles = (screenborder->getRight() - screenborder->getLeft()) / static_cast<float>(TILESIZE);
+            const float viewHeightTiles = (screenborder->getBottom() - screenborder->getTop()) / static_cast<float>(TILESIZE);
 
-            if(radarRect.x < offsetX) {
-                radarRect.w -= radarRect.x;
-                radarRect.x = offsetX;
+            radarRect.x = static_cast<int>(std::floor(viewLeftTiles * scaleInfo.scale)) + scaleInfo.offsetX;
+            radarRect.y = static_cast<int>(std::floor(viewTopTiles * scaleInfo.scale)) + scaleInfo.offsetY;
+            radarRect.w = std::max(1, static_cast<int>(std::ceil(viewWidthTiles * scaleInfo.scale)));
+            radarRect.h = std::max(1, static_cast<int>(std::ceil(viewHeightTiles * scaleInfo.scale)));
+
+            const int mapLeft = scaleInfo.offsetX;
+            const int mapTop = scaleInfo.offsetY;
+            const int mapRight = scaleInfo.offsetX + scaleInfo.scaledWidth;
+            const int mapBottom = scaleInfo.offsetY + scaleInfo.scaledHeight;
+
+            if(radarRect.x < mapLeft) {
+                radarRect.w -= (mapLeft - radarRect.x);
+                radarRect.x = mapLeft;
             }
 
-            if(radarRect.y < offsetY) {
-                radarRect.h -= radarRect.y;
-                radarRect.y = offsetY;
+            if(radarRect.y < mapTop) {
+                radarRect.h -= (mapTop - radarRect.y);
+                radarRect.y = mapTop;
             }
 
-            int offsetFromRightX = 128 - mapSizeX*scale - offsetX;
-            if(radarRect.x + radarRect.w > radarPosition.w - offsetFromRightX) {
-                radarRect.w  = radarPosition.w - offsetFromRightX - radarRect.x - 1;
-            }
+            radarRect.w = std::min(mapRight, radarRect.x + radarRect.w) - radarRect.x;
+            radarRect.h = std::min(mapBottom, radarRect.y + radarRect.h) - radarRect.y;
 
-            int offsetFromBottomY = 128 - mapSizeY*scale - offsetY;
-            if(radarRect.y + radarRect.h > radarPosition.h - offsetFromBottomY) {
-                radarRect.h = radarPosition.h - offsetFromBottomY - radarRect.y - 1;
-            }
+            radarRect.w = std::max(0, radarRect.w);
+            radarRect.h = std::max(0, radarRect.h);
 
             renderDrawRect( renderer,
                             radarPosition.x + radarRect.x,
@@ -192,25 +194,31 @@ void RadarView::switchRadarMode(bool bOn) {
     }
 }
 
-void RadarView::updateRadarSurface(int mapSizeX, int mapSizeY, int scale, int offsetX, int offsetY) {
+void RadarView::updateRadarSurface(int mapSizeX, int mapSizeY, const RadarScaleInfo& scaleInfo) {
+    SDL_FillRect(radarSurface.get(), nullptr, COLOR_BLACK);
+
     sdl2::surface_lock lock{ radarSurface.get() };
-    for(int x = 0; x <  mapSizeX; x++) {
-        for(int y = 0; y <  mapSizeY; y++) {
 
-            Tile* pTile = currentGameMap->getTile(x,y);
+    const int maxTileX = mapSizeX - 1;
+    const int maxTileY = mapSizeY - 1;
 
-            /* Selecting the right color is handled in Tile::getRadarColor() */
-            Uint32 color = pTile->getRadarColor(pLocalHouse, ((currentRadarMode == RadarMode::RadarOn) || (currentRadarMode == RadarMode::AnimationRadarOff)));
-            color = MapRGBA(radarSurface->format, color);
+    auto getTileColor = [&](int tileX, int tileY) {
+        Tile* pTile = currentGameMap->getTile(tileX, tileY);
 
-            for(int j = 0; j < scale; j++) {
-                Uint32* p = ((Uint32*) ((Uint8 *) radarSurface->pixels + (offsetY + scale*y + j) * radarSurface->pitch)) + (offsetX + scale*x);
+        /* Selecting the right color is handled in Tile::getRadarColor() */
+        Uint32 color = pTile->getRadarColor(pLocalHouse, ((currentRadarMode == RadarMode::RadarOn) || (currentRadarMode == RadarMode::AnimationRadarOff)));
+        return MapRGBA(radarSurface->format, color);
+    };
 
-                for(int i = 0; i < scale; i++, p++) {
-                    // Do not use putPixel here to avoid overhead
-                    *p = color;
-                }
-            }
+    for(int pixelY = 0; pixelY < scaleInfo.scaledHeight; ++pixelY) {
+        const int tileY = std::clamp(static_cast<int>(pixelY / scaleInfo.scale), 0, maxTileY);
+        Uint32* p = reinterpret_cast<Uint32*>(reinterpret_cast<Uint8*>(radarSurface->pixels)
+                            + (scaleInfo.offsetY + pixelY) * radarSurface->pitch)
+                    + scaleInfo.offsetX;
+
+        for(int pixelX = 0; pixelX < scaleInfo.scaledWidth; ++pixelX, ++p) {
+            const int tileX = std::clamp(static_cast<int>(pixelX / scaleInfo.scale), 0, maxTileX);
+            *p = getTileColor(tileX, tileY);
         }
     }
 }

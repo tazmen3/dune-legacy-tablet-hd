@@ -96,7 +96,7 @@ private:
         AnimationRadarOn
     };
 
-    void updateRadarSurface(int mapSizeX, int mapSizeY, int scale, int offsetX, int offsetY);
+    void updateRadarSurface(int mapSizeX, int mapSizeY, const RadarScaleInfo& scaleInfo);
 
     RadarMode currentRadarMode;             ///< the current mode of the radar
 
