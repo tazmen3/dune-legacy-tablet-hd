@@ -15,377 +15,573 @@
  *  along with Dune Legacy.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #include <players/CampaignAIPlayer.h>
 #include <House.h>
 #include <sand.h>
 #include <Map.h>
+#include <Game.h>
 #include <misc/Random.h>
 
 #include <structures/ConstructionYard.h>
 #include <structures/Palace.h>
+#include <structures/BuilderBase.h>
 #include <units/UnitBase.h>
+#include <algorithm>
 
 #define AIUPDATEINTERVAL 50
 
-static std::map<Uint32, int> buildPriorityMap = {
-    { Unit_Carryall, 2 },
-    { Unit_Ornithopter, 6 },
-    { Unit_Infantry, 2 },
-    { Unit_Troopers, 3 },
-    { Unit_Soldier, 1 },
-    { Unit_Trooper, 2 },
-    { Unit_Saboteur, 0 },
-    { Unit_Launcher, 8 },
-    { Unit_Deviator, 3 },
-    { Unit_Tank, 7 },
-    { Unit_SiegeTank, 9 },
-    { Unit_Devastator, 10 },
-    { Unit_SonicTank, 7 },
-    { Unit_Trike, 3 },
-    { Unit_RaiderTrike, 4 },
-    { Unit_Quad, 5 },
-    { Unit_Harvester, 1 },
-    { Unit_MCV, 1 }
+// Build priorities from Dune Dynasty unitinfo.c/structureinfo.c (priorityBuild field)
+// Higher value = HIGHER priority (opposite of buildtime)
+// NOTE: Most structure priorities are 0, but turrets have non-zero values (for rebuild priority)
+static const int buildPriorityMap[Num_ItemID] = {
+    // Units (from Dynasty src/table/unitinfo.c)
+    [Unit_Carryall] = 20,
+    [Unit_Ornithopter] = 75,
+    [Unit_Infantry] = 20,       // Soldier
+    [Unit_Troopers] = 50,       // Trooper
+    [Unit_Soldier] = 20,        // Infantry squad
+    [Unit_Trooper] = 50,        // Trooper squad
+    [Unit_Saboteur] = 0,        // Never auto-build
+    [Unit_Launcher] = 100,
+    [Unit_Deviator] = 50,
+    [Unit_Tank] = 80,
+    [Unit_SiegeTank] = 130,
+    [Unit_Devastator] = 175,
+    [Unit_SonicTank] = 80,
+    [Unit_Trike] = 50,
+    [Unit_RaiderTrike] = 55,
+    [Unit_Quad] = 60,
+    [Unit_Harvester] = 10,      // Low (rarely auto-built in Original AI)
+    [Unit_MCV] = 10,            // Low (never auto-built)
+    [Unit_Frigate] = 0,         // Never
+    [Unit_Sandworm] = 0,        // Never
+    
+    // Structures (from Dynasty src/table/structureinfo.c)
+    // Most are zero (CY uses FIFO queue), but turrets have priorities for rebuild
+    [Structure_Slab1] = 0,
+    [Structure_Slab4] = 0,
+    [Structure_Palace] = 0,
+    [Structure_LightFactory] = 0,
+    [Structure_HeavyFactory] = 0,
+    [Structure_HighTechFactory] = 0,
+    [Structure_IX] = 0,
+    [Structure_WOR] = 0,
+    [Structure_ConstructionYard] = 0,
+    [Structure_WindTrap] = 0,
+    [Structure_Barracks] = 0,
+    [Structure_StarPort] = 0,
+    [Structure_Refinery] = 0,
+    [Structure_RepairYard] = 0,
+    [Structure_Wall] = 0,
+    [Structure_GunTurret] = 75,      // Dynasty structureinfo.c line 1037
+    [Structure_RocketTurret] = 100,  // Dynasty structureinfo.c line 1103
+    [Structure_Silo] = 0,
+    [Structure_Radar] = 0
 };
 
-static std::map<Uint32, int> targetPriorityMap = {
-    { Unit_Carryall, 36 },
-    { Unit_Ornithopter, 105 },
-    { Unit_Infantry, 40 },
-    { Unit_Troopers, 100 },
-    { Unit_Soldier, 20 },
-    { Unit_Trooper, 50 },
-    { Unit_Saboteur, 700 },
-    { Unit_Launcher, 250 },
-    { Unit_Deviator, 225 },
-    { Unit_Tank, 180 },
-    { Unit_SiegeTank, 280 },
-    { Unit_Devastator, 355 },
-    { Unit_SonicTank, 190 },
-    { Unit_Trike, 100 },
-    { Unit_RaiderTrike, 115 },
-    { Unit_Quad, 120 },
-    { Unit_Harvester, 160 },
-    { Unit_MCV, 160 },
-    { Unit_Frigate, 0 },
-    { Unit_Sandworm, 0 },
-    { Structure_Slab1, 5 },
-    { Structure_Slab4, 10 },
-    { Structure_Palace, 400 },
-    { Structure_LightFactory, 200 },
-    { Structure_HeavyFactory, 600 },
-    { Structure_HighTechFactory, 200 },
-    { Structure_IX, 100 },
-    { Structure_WOR, 175 },
-    { Structure_ConstructionYard, 300 },
-    { Structure_WindTrap, 300 },
-    { Structure_Barracks, 100 },
-    { Structure_StarPort, 250 },
-    { Structure_Refinery, 300 },
-    { Structure_RepairYard, 600 },
-    { Structure_Wall, 30 },
-    { Structure_GunTurret, 225 },
-    { Structure_RocketTurret, 175 },
-    { Structure_Silo, 150 },
-    { Structure_Radar, 275 }
+// Target priorities for attack selection (kept from old implementation)
+static const int targetPriorityMap[Num_ItemID] = {
+    [Unit_Carryall] = 36,
+    [Unit_Ornithopter] = 105,
+    [Unit_Infantry] = 40,
+    [Unit_Troopers] = 100,
+    [Unit_Soldier] = 20,
+    [Unit_Trooper] = 50,
+    [Unit_Saboteur] = 700,
+    [Unit_Launcher] = 250,
+    [Unit_Deviator] = 225,
+    [Unit_Tank] = 180,
+    [Unit_SiegeTank] = 280,
+    [Unit_Devastator] = 355,
+    [Unit_SonicTank] = 190,
+    [Unit_Trike] = 100,
+    [Unit_RaiderTrike] = 115,
+    [Unit_Quad] = 120,
+    [Unit_Harvester] = 160,
+    [Unit_MCV] = 160,
+    [Unit_Frigate] = 0,
+    [Unit_Sandworm] = 0,
+    [Structure_Slab1] = 5,
+    [Structure_Slab4] = 10,
+    [Structure_Palace] = 400,
+    [Structure_LightFactory] = 200,
+    [Structure_HeavyFactory] = 600,
+    [Structure_HighTechFactory] = 200,
+    [Structure_IX] = 100,
+    [Structure_WOR] = 175,
+    [Structure_ConstructionYard] = 300,
+    [Structure_WindTrap] = 300,
+    [Structure_Barracks] = 100,
+    [Structure_StarPort] = 250,
+    [Structure_Refinery] = 300,
+    [Structure_RepairYard] = 600,
+    [Structure_Wall] = 30,
+    [Structure_GunTurret] = 225,
+    [Structure_RocketTurret] = 175,
+    [Structure_Silo] = 150,
+    [Structure_Radar] = 275
 };
 
+// =============================================================================
+// RebuildQueueEntry implementation
+// =============================================================================
+
+CampaignAIPlayer::RebuildQueueEntry::RebuildQueueEntry(InputStream& stream) {
+    itemID = stream.readSint32();
+    location.x = stream.readSint32();
+    location.y = stream.readSint32();
+}
+
+void CampaignAIPlayer::RebuildQueueEntry::save(OutputStream& stream) const {
+    stream.writeSint32(itemID);
+    stream.writeSint32(location.x);
+    stream.writeSint32(location.y);
+}
+
+// =============================================================================
+// CampaignAIPlayer lifecycle
+// =============================================================================
 
 CampaignAIPlayer::CampaignAIPlayer(House* associatedHouse, const std::string& playername)
  : Player(associatedHouse, playername) {
+    init();
 }
 
-CampaignAIPlayer::CampaignAIPlayer(InputStream& stream, House* associatedHouse) : Player(stream, associatedHouse) {
-    CampaignAIPlayer::init();
-
-    Uint32 numStructureInfo = stream.readUint32();
-    for(Uint32 i = 0; i < numStructureInfo; i++) {
-        structureQueue.emplace_back(stream);
+CampaignAIPlayer::CampaignAIPlayer(InputStream& stream, House* associatedHouse) 
+ : Player(stream, associatedHouse) {
+    init();
+    
+    Uint32 numRebuildEntries = stream.readUint32();
+    for(Uint32 i = 0; i < numRebuildEntries; i++) {
+        rebuildQueue.emplace_back(stream);
+    }
+    
+    // attackTriggered was added in version 9804
+    if(currentGame->getLoadedSavegameVersion() >= 9804) {
+        attackTriggered = stream.readBool();
     }
 }
 
 void CampaignAIPlayer::init() {
 }
 
-
 CampaignAIPlayer::~CampaignAIPlayer() = default;
 
 void CampaignAIPlayer::save(OutputStream& stream) const {
     Player::save(stream);
-
-    stream.writeUint32(structureQueue.size());
-    for(const auto& structureInfo : structureQueue) {
-        structureInfo.save(stream);
+    
+    stream.writeUint32(rebuildQueue.size());
+    for(const auto& entry : rebuildQueue) {
+        entry.save(stream);
     }
+    
+    stream.writeBool(attackTriggered);
 }
 
-
+// =============================================================================
+// Main update loop
+// =============================================================================
 
 void CampaignAIPlayer::update() {
-    if( (getGameCycleCount() + getHouse()->getHouseID()) % AIUPDATEINTERVAL != 0) {
-        // we are not updating this AI player this cycle
+    if((getGameCycleCount() + getHouse()->getHouseID()) % AIUPDATEINTERVAL != 0) {
+        return;  // Not our turn this cycle
+    }
+    
+    // ORIGINAL AI: Only act when AI is activated (ground unit contact)
+    if(!getHouse()->isAIActivated()) {
         return;
     }
-
-    if(!getHouse()->hadDirectContactWithEnemy()) {
-        // we are not doing anything until we had contact with the enemy
-        return;
-    }
-
+    
     updateStructures();
     updateUnits();
 }
 
 void CampaignAIPlayer::onObjectWasBuilt(const ObjectBase* pObject) {
+    // Nothing special needed here for Original AI
 }
 
 void CampaignAIPlayer::onDecrementStructures(int itemID, const Coord& location) {
-    if(structureQueue.size() < 5) {
-        structureQueue.emplace_back(itemID, location);
+    // ORIGINAL AI: Add to 5-slot rebuild queue (structure.c:340-354)
+    if(rebuildQueue.size() < 5) {
+        rebuildQueue.emplace_back(itemID, location);
     }
 }
 
 void CampaignAIPlayer::onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID) {
+    // ORIGINAL AI: Trigger full-scale attack when structures are damaged (structure.c:2057-2070)
+    if(pObject->isAStructure()) {
+        const ObjectBase* pDamager = getObject(damagerID);
+        // Only trigger for actual enemies (not allies) - check team IDs to respect alliances
+        if(pDamager && pDamager->getOwner() && (pObject->getOwner()->getTeamID() != pDamager->getOwner()->getTeamID())) {
+            triggerFullScaleAttack();
+        }
+        return;
+    }
     
+    // Handle unit damage
     if(!pObject->isAUnit() || !pObject->isRespondable()) {
         return;
     }
-    const UnitBase* pUnit = static_cast<const UnitBase*>(pObject);
-
-    const ObjectBase* pDamager = getObject(damagerID);
-    if(!pDamager) {
-        return;
-    }
-
-    if(pDamager->getOwner()->getTeamID() == pUnit->getOwner()->getTeamID()) {
-        // do not respond to friendly fire
-        return;
-    }
-
     
-
-    // Once we have had direct contact we want to start attacking
-    auto* pHouse = getHouse();  
-    if (pHouse) {
-
-        pHouse->hadDirectContactWithEnemy();
-    }
-
-
-
-    if(!pUnit->canAttack(pDamager)) {
+    const UnitBase* pUnit = static_cast<const UnitBase*>(pObject);
+    const ObjectBase* pDamager = getObject(damagerID);
+    if(!pDamager || !pDamager->getOwner()) {
         return;
     }
-
-    if(!pUnit->hasATarget() || pUnit->getTarget()->getTarget() != pUnit) {
-        // the unit has no target or the target is not targeting the unit
+    
+    // Ignore friendly/allied damage
+    if(pDamager->getOwner()->getTeamID() == pUnit->getOwner()->getTeamID()) {
+        return;
+    }
+    
+    // Unit has been engaged by an enemy – allow attack waves to launch
+    attackTriggered = true;
+    
+    // Optional immediate retaliation if capable
+    if(pUnit->canAttack(pDamager) && (!pUnit->hasATarget() || pUnit->getTarget()->getTarget() != pUnit)) {
         doAttackObject(pUnit, pDamager, true);
     }
 }
+
+// =============================================================================
+// Structure management (Original AI)
+// =============================================================================
 
 void CampaignAIPlayer::updateStructures() {
     for(const StructureBase* pStructure : getStructureList()) {
         if(pStructure->getOwner() != getHouse()) {
             continue;
         }
-
-        if( pStructure->getItemID() == Structure_Palace) { 
+        
+        // ORIGINAL AI: Palace auto-fire when charged and AI active (structure.c:115)
+        if(pStructure->getItemID() == Structure_Palace) {
             const Palace* pPalace = static_cast<const Palace*>(pStructure);
-            if(pPalace->isSpecialWeaponReady()){
-
-                if(getHouse()->getHouseID() != HOUSE_HARKONNEN && getHouse()->getHouseID() != HOUSE_SARDAUKAR) {
+            if(pPalace->isSpecialWeaponReady()) {
+                if(getHouse()->getHouseID() != HOUSE_HARKONNEN && 
+                   getHouse()->getHouseID() != HOUSE_SARDAUKAR) {
                     doSpecialWeapon(pPalace);
                 } else {
+                    // Death Hand - target house with most structures
                     const House* pBestHouse = nullptr;
-
                     for(int i = 0; i < NUM_HOUSES; i++) {
                         const House* pHouse = getHouse(i);
                         if(!pHouse || pHouse->getTeamID() == getHouse()->getTeamID()) {
                             continue;
                         }
-
-                        if(!pBestHouse) {
+                        if(!pBestHouse || pHouse->getNumStructures() > pBestHouse->getNumStructures()) {
                             pBestHouse = pHouse;
-                        } else if(pHouse->getNumStructures() > pBestHouse->getNumStructures()) {
-                            pBestHouse = pHouse;
-                        } else if(pBestHouse->getNumStructures() == 0 && (pHouse->getNumUnits() > pBestHouse->getNumUnits())) {
+                        } else if(pBestHouse->getNumStructures() == 0 && 
+                                  pHouse->getNumUnits() > pBestHouse->getNumUnits()) {
                             pBestHouse = pHouse;
                         }
                     }
-
+                    
                     if(pBestHouse) {
-                        Coord target = pBestHouse->getNumStructures() > 0 ? pBestHouse->getCenterOfMainBase() : pBestHouse->getStrongestUnitPosition();
+                        Coord target = pBestHouse->getNumStructures() > 0 
+                            ? pBestHouse->getCenterOfMainBase() 
+                            : pBestHouse->getStrongestUnitPosition();
                         doLaunchDeathhand(pPalace, target.x, target.y);
                     }
                 }
             }
         }
-
-        if( pStructure->getHealth() < pStructure->getMaxHealth()/2 ) {
+        
+        // Repair damaged structures (< 50% health)
+        if(pStructure->getHealth() < pStructure->getMaxHealth() / 2) {
             if(!pStructure->isRepairing()) {
                 doRepair(pStructure);
             }
             continue;
         }
-
+        
+        // Handle builders
         if(pStructure->isABuilder()) {
             const BuilderBase* pBuilder = static_cast<const BuilderBase*>(pStructure);
-            if( pBuilder->getCurrentUpgradeLevel() < pBuilder->getMaxUpgradeLevel()) {
+            
+            // Upgrade if not at max level
+            if(pBuilder->getCurrentUpgradeLevel() < pBuilder->getMaxUpgradeLevel()) {
                 if(!pStructure->isRepairing() && !pBuilder->isUpgrading()) {
                     doUpgrade(pBuilder);
                 }
                 continue;
             }
-
+            
+            // ORIGINAL AI: Construction Yard rebuild queue handling (structure.c:242-305)
             if(pBuilder->getItemID() == Structure_ConstructionYard) {
-                // rebuild the last five destroyed buildings
                 if(pBuilder->isWaitingToPlace()) {
                     int itemID = pBuilder->getCurrentProducedItem();
-                    for(auto iter = structureQueue.begin(); iter != structureQueue.end(); ++iter) {
+                    
+                    // Try to place from rebuild queue at original location
+                    for(auto iter = rebuildQueue.begin(); iter != rebuildQueue.end(); ++iter) {
                         if(iter->itemID == itemID) {
                             const auto location = iter->location;
                             Coord itemsize = getStructureSize(itemID);
                             const auto* pConstYard = static_cast<const ConstructionYard*>(pBuilder);
-                            if(getMap().okayToPlaceStructure(location.x, location.y, itemsize.x, itemsize.y, false, pConstYard->getOwner())) {
+                            
+                            if(getMap().okayToPlaceStructure(location.x, location.y, 
+                                                            itemsize.x, itemsize.y, false, 
+                                                            pConstYard->getOwner())) {
                                 doPlaceStructure(pConstYard, location.x, location.y);
-                            } else if(itemID == Structure_Slab1) {
-                                //forget about concrete
-                                doCancelItem(pConstYard, Structure_Slab1);
-                            } else if(itemID == Structure_Slab4) {
-                                //forget about concrete
-                                doCancelItem(pConstYard, Structure_Slab4);
+                            } else if(itemID == Structure_Slab1 || itemID == Structure_Slab4) {
+                                // Forget about concrete slabs that can't be placed
+                                doCancelItem(pConstYard, itemID);
                             } else {
-                                //cancel item
+                                // Can't place - cancel and refund
                                 doCancelItem(pConstYard, itemID);
                             }
-                            structureQueue.erase(iter);
+                            
+                            rebuildQueue.erase(iter);
                             break;
                         }
                     }
-                } else if(!structureQueue.empty() && (pBuilder->getProductionQueueSize() <= 0)) {
-                    const StructureInfo& structureInfo = structureQueue.front();
-                    if(pBuilder->isAvailableToBuild(structureInfo.itemID)) {
-                        doSetBuildSpeedLimit(pBuilder, std::min(1.0_fix, ((getTechLevel()-1) * 20 + 95)/255.0_fix) );
-                        doProduceItem(pBuilder, structureInfo.itemID);
+                } else if(!rebuildQueue.empty() && pBuilder->getProductionQueueSize() <= 0) {
+                    // Start building from rebuild queue
+                    const RebuildQueueEntry& entry = rebuildQueue.front();
+                    if(pBuilder->isAvailableToBuild(entry.itemID)) {
+                        doSetBuildSpeedLimit(pBuilder, 
+                            std::min(1.0_fix, ((getTechLevel()-1) * 20 + 95)/255.0_fix));
+                        doProduceItem(pBuilder, entry.itemID);
                     } else {
-                        // dequeue unavailable structures
-                        structureQueue.erase(structureQueue.begin());
+                        // Unavailable - dequeue
+                        rebuildQueue.erase(rebuildQueue.begin());
                     }
                 }
-
             } else if(pBuilder->getItemID() != Structure_StarPort) {
-                // build units
-
+                // ORIGINAL AI: Factory unit production
                 if(pBuilder->getProductionQueueSize() >= 1) {
-                    // already busy building something
-                    continue;
+                    continue;  // Already busy
                 }
-
-                Uint32 bestItemID = ItemID_Invalid;
-                int bestItemPriority = 0;
-                for(Uint32 currentItemID = ItemID_FirstID; currentItemID < ItemID_LastID; currentItemID++) {
-                    if(!pBuilder->isAvailableToBuild(currentItemID)) {
-                        continue;
-                    }
-
-                    if((currentItemID == Unit_Carryall) && getHouse()->hasCarryalls()) {
-                        // build only one carryall
-                        continue;
-                    }
-
-                    if((currentItemID == Unit_Harvester) || (currentItemID == Unit_MCV)) {
-                        // never build harvesters or MCVs
-                        continue;
-                    }
-
-                    auto buildPriorityIter = buildPriorityMap.find(currentItemID);
-                    if(buildPriorityIter == buildPriorityMap.end()) {
-                        continue;
-                    }
-
-                    // MULTIPLAYER FIX (Issue #4): Deterministic build selection
-                    // Use house ID + item ID to create deterministic 25% chance
-                    const bool shouldConsider = ((getHouse()->getHouseID() + currentItemID) % 4 == 0);
-                    if(shouldConsider || (buildPriorityIter->second > bestItemPriority)) {
-                        // build with 25% chance or if higher priority
-                        bestItemID = currentItemID;
-                        bestItemPriority = buildPriorityIter->second;
-                    }
-                }
-
-                if(bestItemID != ItemID_Invalid) {
-                    doSetBuildSpeedLimit(pBuilder, std::min(1.0_fix, ((getTechLevel()-1) * 20 + 95)/255.0_fix) );
-                    doProduceItem(pBuilder, bestItemID);
+                
+                Uint32 itemID = pickNextToBuild(pBuilder);
+                if(itemID != ItemID_Invalid) {
+                    doSetBuildSpeedLimit(pBuilder, 
+                        std::min(1.0_fix, ((getTechLevel()-1) * 20 + 95)/255.0_fix));
+                    doProduceItem(pBuilder, itemID);
                 }
             }
         }
     }
 }
 
-void CampaignAIPlayer::updateUnits() {
-    for(const UnitBase* pUnit : getUnitList()) {
-        
-        // Don't attack if we haven't been in contact yet
-        if (!getHouse()->hadDirectContactWithEnemy()) {
-            return;
-        }
+// =============================================================================
+// Original AI build selection (ai.c:349-406)
+// =============================================================================
 
-
-        if(pUnit->getOwner() != getHouse() || pUnit->wasForced() || !pUnit->isRespondable() || pUnit->isByScenario() || pUnit->hasATarget()) {
-            continue;
-        }
-
-        if((    pUnit->getItemID() == Unit_Harvester) || 
-                (pUnit->getItemID() == Unit_MCV) || 
-                (pUnit->getItemID() == Unit_Carryall) || 
-                (pUnit->getItemID() == Unit_Frigate) ||
-                (pUnit->getItemID() == Unit_Sandworm)) // remove sandworms from update
-        {
-
-            continue;
-        }
-
-        const ObjectBase* pBestCandidate = nullptr;
-        int bestCandidatePriority = -1;
-        for(const StructureBase* pCandidate : getStructureList()) {
-            if(!pUnit->canAttack(pCandidate)) {
-                continue;
-            }
-
-            int priority = calculateTargetPriority(pUnit, pCandidate);
-            if(priority > bestCandidatePriority) {
-                bestCandidatePriority = priority;
-                pBestCandidate = pCandidate;
-            }
-        }
-
-        for(const UnitBase* pCandidate : getUnitList()) {
-            if(!pUnit->canAttack(pCandidate)) {
-                continue;
-            }
-
-            int priority = calculateTargetPriority(pUnit, pCandidate);
-            if(priority > bestCandidatePriority) {
-                bestCandidatePriority = priority;
-                pBestCandidate = pCandidate;
-            }
-        }
-
-        if(pBestCandidate) {
-            !getHouse()->hadDirectContactWithEnemy();
-            doAttackObject(pUnit, pBestCandidate, true);
+Uint32 CampaignAIPlayer::pickNextToBuild(const BuilderBase* pBuilder) {
+    if(!pBuilder) return ItemID_Invalid;
+    
+    // Get buildable items from builder's build list
+    const std::list<BuildItem>& buildList = pBuilder->getBuildList();
+    if(buildList.empty()) return ItemID_Invalid;
+    
+    // Build filtered candidate list (Original AI filters)
+    std::vector<Uint32> candidates;
+    candidates.reserve(buildList.size());
+    
+    for(const BuildItem& item : buildList) {
+        if(shouldBuildItem(pBuilder->getItemID(), item.itemID)) {
+            candidates.push_back(item.itemID);
         }
     }
+    
+    if(candidates.empty()) return ItemID_Invalid;
+    
+    // ORIGINAL AI: 25% chance to pick early, else highest priority
+    Uint32 selectedItem = ItemID_Invalid;
+    int selectedPriority = -1;
+    
+    for(Uint32 itemID : candidates) {
+        // Use Dynasty build priorities (higher value = higher priority)
+        int priority = (itemID < Num_ItemID) ? buildPriorityMap[itemID] : 0;
+        
+        // 25% chance to select immediately (deterministic for MP)
+        if(((getHouse()->getHouseID() + itemID) % 4) == 0) {
+            selectedItem = itemID;
+            selectedPriority = priority;
+        }
+        
+        // Otherwise pick if HIGHER priority
+        if(selectedItem != ItemID_Invalid && priority <= selectedPriority) {
+            continue;
+        }
+        
+        selectedItem = itemID;
+        selectedPriority = priority;
+    }
+    
+    return selectedItem;
+}
+
+// ORIGINAL AI build filters (ai.c:199-226)
+// Returns true if this item should be built by this builder type
+bool CampaignAIPlayer::shouldBuildItem(int builderType, Uint32 itemID) const {
+    switch(builderType) {
+        case Structure_HeavyFactory:
+            // NEVER auto-build harvesters (must be manually queued)
+            if(itemID == Unit_Harvester) return false;
+            // NEVER build MCVs
+            if(itemID == Unit_MCV) return false;
+            break;
+            
+        case Structure_HighTechFactory:
+            // Max 1 carryall (if one exists, don't build more)
+            if(itemID == Unit_Carryall && getHouse()->getNumItems(Unit_Carryall) > 0) {
+                return false;
+            }
+            
+            // Ornithopter delay: Don't build within first 10 minutes in skirmish/MP
+            if(itemID == Unit_Ornithopter) {
+                const GameInitSettings& settings = currentGame->getGameInitSettings();
+                if(settings.getGameType() == GameType::Skirmish || 
+                   settings.getGameType() == GameType::CustomMultiplayer) {
+                    // 10 minutes = 600 seconds = 30000 cycles at 50Hz
+                    Uint32 gameMinutes = currentGame->getGameCycleCount() / (60 * 50);
+                    if(gameMinutes < 10) {
+                        return false;
+                    }
+                }
+            }
+            break;
+        
+        default:
+            break;
+    }
+    
+    return true;
+}
+
+// =============================================================================
+// Unit management (Original AI)
+// =============================================================================
+
+void CampaignAIPlayer::updateUnits() {
+    // Simple staging: gather idle combat units and launch waves only when we have enough
+    std::vector<const UnitBase*> stagingUnits;
+    stagingUnits.reserve(getUnitList().size());
+    
+    Uint32 now = getGameCycleCount();
+    
+    // Do not launch waves until we've been engaged (unit damaged by enemy)
+    if(!attackTriggered && !getHouse()->hasTriggeredFullScaleAttack()) {
+        return;
+    }
+    
+    // Clear and rebuild the attack team each update (avoids O(N²) deduplication)
+    attackTeam.memberIds.clear();
+    
+    // Collect idle combat units for attack team staging
+    for(const UnitBase* pUnit : getUnitList()) {
+        if(pUnit->getOwner() != getHouse() || 
+           pUnit->wasForced() || 
+           !pUnit->isRespondable() || 
+           pUnit->isByScenario() || 
+           pUnit->hasATarget()) {
+            continue;
+        }
+        
+        // Skip non-combat units
+        if(pUnit->getItemID() == Unit_Harvester || 
+           pUnit->getItemID() == Unit_MCV || 
+           pUnit->getItemID() == Unit_Carryall || 
+           pUnit->getItemID() == Unit_Frigate ||
+           pUnit->getItemID() == Unit_Sandworm) {
+            continue;
+        }
+        
+        attackTeam.memberIds.push_back(pUnit->getObjectID());
+    }
+    
+    // Launch only if we have enough units and cooldown has passed
+    if(static_cast<int>(attackTeam.memberIds.size()) < static_cast<int>(attackTeam.minSize)) {
+        return;
+    }
+    if(now < attackTeam.nextLaunchCycle) {
+        return;
+    }
+    
+    // Pick best target using all staged units
+    const ObjectBase* pBestCandidate = nullptr;
+    int bestPriority = -1;
+    
+    auto considerTarget = [&](const ObjectBase* target) {
+        int priority = -1;
+        for(Uint32 id : attackTeam.memberIds) {
+            const UnitBase* pUnit = static_cast<const UnitBase*>(getObject(id));
+            if(!pUnit || !pUnit->canAttack(target)) continue;
+            priority = std::max(priority, calculateTargetPriority(pUnit, target));
+        }
+        if(priority > bestPriority) {
+            bestPriority = priority;
+            pBestCandidate = target;
+        }
+    };
+    
+    for(const StructureBase* pCandidate : getStructureList()) {
+        if(!pCandidate || pCandidate->getOwner() == getHouse()) continue;
+        considerTarget(pCandidate);
+    }
+    for(const UnitBase* pCandidate : getUnitList()) {
+        if(!pCandidate || pCandidate->getOwner() == getHouse()) continue;
+        considerTarget(pCandidate);
+    }
+    
+    if(!pBestCandidate) {
+        return;
+    }
+    
+    // Launch the wave: set to HUNT and attack the selected target
+    for(Uint32 id : attackTeam.memberIds) {
+        const UnitBase* pUnit = static_cast<const UnitBase*>(getObject(id));
+        if(!pUnit) continue;
+        doSetAttackMode(pUnit, HUNT);
+        doAttackObject(pUnit, pBestCandidate, true);
+    }
+    
+    // Team will be cleared and rebuilt on next update
+    attackTeam.nextLaunchCycle = now + attackTeam.cooldownCycles;
 }
 
 int CampaignAIPlayer::calculateTargetPriority(const UnitBase* pUnit, const ObjectBase* pObject) {
-    if (pUnit->getLocation().isInvalid() || pObject->getLocation().isInvalid()) {
+    if(pUnit->getLocation().isInvalid() || pObject->getLocation().isInvalid()) {
         return 0;
     }
-
-    int priority = targetPriorityMap[pObject->getItemID()];
+    
+    int basePriority = targetPriorityMap[pObject->getItemID()];
     int distance = blockDistanceApprox(pUnit->getLocation(), pObject->getLocation());
+    
+    return (distance > 0) ? ((basePriority / distance) + 1) : basePriority;
+}
 
-    return (distance > 0) ? ( (priority / distance) + 1 ) : priority;
+// =============================================================================
+// Full-scale attack (Original AI) - structure.c:2057-2070
+// =============================================================================
+
+void CampaignAIPlayer::triggerFullScaleAttack() {
+    const House* pHouse = getHouse();
+    
+    // Only trigger once
+    if(pHouse->hasTriggeredFullScaleAttack()) {
+        return;
+    }
+    
+    // Mark house as having done full-scale attack (need non-const access)
+    const_cast<House*>(pHouse)->triggerFullScaleAttack();
+    
+    // Set all combat units to HUNT mode
+    for(const UnitBase* pUnit : getUnitList()) {
+        if(pUnit->getOwner() != pHouse) continue;
+        
+        // Skip non-combat units
+        if(pUnit->getItemID() == Unit_Carryall || 
+           pUnit->getItemID() == Unit_Harvester || 
+           pUnit->getItemID() == Unit_MCV || 
+           pUnit->getItemID() == Unit_Saboteur) {
+            continue;
+        }
+        
+        // Set to hunt/attack mode
+        if(!pUnit->hasATarget()) {
+            doSetAttackMode(pUnit, HUNT);
+        }
+    }
 }

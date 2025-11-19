@@ -19,63 +19,104 @@
 #define CAMPAIGNAIPLAYER_H
 
 #include <players/Player.h>
+#include <DataTypes.h>
+#include <misc/InputStream.h>
+#include <misc/OutputStream.h>
 
 #include <vector>
 
+// Forward declarations
+class House;
+class ObjectBase;
+class BuilderBase;
+class StructureBase;
+class UnitBase;
+
 /**
-    This AI player tries to resemble the original Dune II AI:
-    - Build speed is dependent on mission number (slower in earlier missions)
-    - Wait for the human player to find the AI player before becoming active and doing the following things:
-     - Units are build when builders are idle
-     - Built units are send out to attack the structure/unit with the highest priority
-     - Teams are waiting till they reach a minimum number of units before attacking
-     - Structures are only build when they were destroyed before (queue of at most 5 structures)
-     - Special weapons are launched as soon as they get ready
-*/
-class CampaignAIPlayer : public Player
-{
+ * Campaign AI Player - Original Dune II AI behavior (from Dune Dynasty)
+ * 
+ * Key features:
+ * - Ground-only contact activation (mutual activation of both houses)
+ * - 5-slot rebuild queue with original position tracking
+ * - Original AI build filters (no harvester auto-build, carryall max 1, ornithopter 10min delay)
+ * - 25% randomization + priority-based build selection
+ * - Palace auto-fire when AI active
+ * - One-time full-scale attack on base damage
+ */
+class CampaignAIPlayer : public Player {
 public:
     CampaignAIPlayer(House* associatedHouse, const std::string& playername);
     CampaignAIPlayer(InputStream& stream, House* associatedHouse);
     void init();
-    ~CampaignAIPlayer();
-    void save(OutputStream& stream) const override;
+    virtual ~CampaignAIPlayer();
 
-    void update() override;
+    virtual void save(OutputStream& stream) const;
 
-    void onObjectWasBuilt(const ObjectBase* pObject) override;
-    void onDecrementStructures(int itemID, const Coord& location) override;
-    void onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID) override;
+    virtual void update();
+
+    virtual void onObjectWasBuilt(const ObjectBase* pObject);
+    virtual void onDecrementStructures(int itemID, const Coord& location);
+    virtual void onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID);
 
 private:
-    class StructureInfo {
-    public:
-        StructureInfo(int itemID, const Coord& location)
-         : itemID(itemID), location(location) {
-        }
-
-        StructureInfo(InputStream& stream) {
-            itemID = stream.readUint32();
-            location.x = stream.readSint32();
-            location.y = stream.readSint32();
-        }
-
-        void save(OutputStream& stream) const {
-            stream.writeUint32(itemID);
-            stream.writeSint32(location.x);
-            stream.writeSint32(location.y);
-        }
-
+    /**
+     * Rebuild queue entry - stores type and original position (from Dune Dynasty)
+     */
+    struct RebuildQueueEntry {
         int itemID;
         Coord location;
+        
+        RebuildQueueEntry() : itemID(ItemID_Invalid), location(-1, -1) {}
+        RebuildQueueEntry(int id, const Coord& loc) : itemID(id), location(loc) {}
+        RebuildQueueEntry(InputStream& stream);
+        void save(OutputStream& stream) const;
     };
 
     void updateStructures();
     void updateUnits();
-
+    
+    /**
+     * Pick next item to build (Original AI selection algorithm - ai.c:349-406)
+     * @param pBuilder The factory/construction yard
+     * @return ItemID to build, or ItemID_Invalid if nothing available
+     */
+    Uint32 pickNextToBuild(const BuilderBase* pBuilder);
+    
+    /**
+     * Check if AI should build this item (Original AI filters - ai.c:199-226)
+     * @param builderType Factory type
+     * @param itemID Item to check
+     * @return True if item should be auto-built
+     */
+    bool shouldBuildItem(int builderType, Uint32 itemID) const;
+    
+    /**
+     * Calculate target priority for attack selection
+     * @param pUnit Attacking unit
+     * @param pObject Target object
+     * @return Priority value (higher = better target)
+     */
     int calculateTargetPriority(const UnitBase* pUnit, const ObjectBase* pObject);
+    
+    /**
+     * Trigger full-scale attack (all combat units hunt) - structure.c:2057-2070
+     */
+    void triggerFullScaleAttack();
 
-    std::vector<StructureInfo> structureQueue;    ///< Last destroyed structures and their location
+    std::vector<RebuildQueueEntry> rebuildQueue;  // Max 5 entries (Original AI limit)
+
+    // Simple team/wave staging (lightweight stand-in for Dynasty team scripts)
+    struct AttackTeam {
+        Uint32 minSize = 8;                 // Launch threshold
+        Uint32 cooldownCycles = MILLI2CYCLES(12000); // 12s between launches
+        Uint32 nextLaunchCycle = 0;
+        std::vector<Uint32> memberIds;      // Object IDs of staged units
+    };
+    AttackTeam attackTeam;
+    
+    // Attack trigger: waves only launch after AI has been engaged at least once
+    // SAVE COMPATIBILITY NOTE: Added in SAVEGAMEVERSION 9804
+    bool attackTriggered = false;
 };
 
-#endif //CAMPAIGNAIPLAYER_H
+#endif // CAMPAIGNAIPLAYER_H
