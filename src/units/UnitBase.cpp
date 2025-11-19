@@ -1547,6 +1547,13 @@ void UnitBase::updateVisibleUnits() {
         if(pTile->isExploredByHouse(h) && (pHouse->getTeamID() != getOwner()->getTeamID()) && (pHouse != getOwner())) {
             pHouse->informDirectContactWithEnemy();
             getOwner()->informDirectContactWithEnemy();
+            
+            // ORIGINAL AI: Ground-only contact triggers mutual activation (unit.c:3111-3116)
+            // Only ground units (not wingers/carryalls/ornithopters) activate AI
+            if(isAGroundUnit() && !isAFlyingUnit()) {
+                pHouse->activateAI();        // Observing house activates
+                getOwner()->activateAI();    // Unit's house also activates (mutual)
+            }
         }
 
         if(pTile->isExploredByTeam(pHouse->getTeamID())) {
