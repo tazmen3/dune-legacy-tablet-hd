@@ -383,8 +383,29 @@ void QuantBot::update() {
 
 	case GameMode::Custom: {
 		// set initial unit position
-		findSquadRallyLocation();
-		retreatAllUnits();
+		squadRallyLocation = findSquadRallyLocation();
+		
+		// Move all military units to the squad rally location at game start
+		if (squadRallyLocation.isValid()) {
+			SDL_Log("  Moving all units to squad rally point: (%d, %d)", 
+				squadRallyLocation.x, squadRallyLocation.y);
+			
+			int unitsMoved = 0;
+			for (const UnitBase* pUnit : getUnitList()) {
+				if (pUnit->getOwner() == getHouse()
+					&& pUnit->getItemID() != Unit_Carryall
+					&& pUnit->getItemID() != Unit_Sandworm
+					&& pUnit->getItemID() != Unit_Harvester
+					&& pUnit->getItemID() != Unit_MCV
+					&& pUnit->getItemID() != Unit_Frigate) {
+					
+					doMove2Pos(pUnit, squadRallyLocation.x, squadRallyLocation.y, true);
+					unitsMoved++;
+				}
+			}
+			
+			SDL_Log("  Moved %d units to rally point", unitsMoved);
+		}
 
 		// Set harvester/military limits based on map size and difficulty from config
 		int mapsize = 4096; // Default fallback size
@@ -878,26 +899,26 @@ Coord QuantBot::findPlaceLocation(Uint32 itemID) {
 				for (int i = placeLocationX - 1; i <= placeLocationEndX; i++) {
 					for (int j = placeLocationY - 1; j <= placeLocationEndY; j++) {
 						if (getMap().tileExists(i, j) && (getMap().getSizeX() > i) && (0 <= i) && (getMap().getSizeY() > j) && (0 <= j)) {
-							if (getMap().getTile(i, j)->hasAStructure()) {
-								// Favor being near our buildings, avoid enemy buildings
-								if (getMap().getTile(i, j)->getOwner() == getHouse()->getHouseID()) {
-									locationScore += 3;
-								}
-								else {
-									locationScore -= 10;
-								}
+						if (getMap().getTile(i, j)->hasAStructure()) {
+							// Favor being near our buildings, avoid enemy buildings
+							if (getMap().getTile(i, j)->getOwner() == getHouse()->getHouseID()) {
+								locationScore += 8;  // Slightly higher than edge/sand to encourage compact bases
 							}
+							else {
+								locationScore -= 10;
+							}
+						}
 						else if (!getMap().getTile(i, j)->isRock()) {
 							// Favor non-rock tiles (easier building)
 							locationScore += 4;
 						}
-						else if (getMap().getTile(i, j)->hasAGroundObject()) {
-							if (getMap().getTile(i, j)->getOwner() != getHouse()->getHouseID()) {
-								// Avoid building next to enemy units
-								locationScore -= 100;
-							}
-							// No penalty for own units
+					else if (getMap().getTile(i, j)->hasAGroundObject()) {
+						if (getMap().getTile(i, j)->getOwner() != getHouse()->getHouseID()) {
+							// Avoid building next to enemy units
+							locationScore -= 100;
 						}
+						// No penalty for own units
+					}
 						}
 			// Don't penalize tiles outside map - edge placement should be encouraged
 				}
@@ -915,6 +936,24 @@ Coord QuantBot::findPlaceLocation(Uint32 itemID) {
 		// Building-specific positioning
 		if (itemIsBuilder || itemID == Structure_GunTurret || itemID == Structure_RocketTurret) {
 			locationScore -= lround(blockDistance(squadRallyLocation, Coord(placeLocationX, placeLocationY)));
+			locationScore -= lround(blockDistance(baseCenter, Coord(placeLocationX, placeLocationY)));
+		} else if (itemID == Structure_Refinery) {
+			// Refineries prefer being close to spice deposits
+			int closestSpiceDistance = 10000;
+			for (int spiceX = 0; spiceX < getMap().getSizeX(); spiceX++) {
+				for (int spiceY = 0; spiceY < getMap().getSizeY(); spiceY++) {
+					if (getMap().tileExists(spiceX, spiceY) && getMap().getTile(spiceX, spiceY)->hasSpice()) {
+						int spiceDistance = lround(blockDistance(Coord(placeLocationX, placeLocationY), Coord(spiceX, spiceY)));
+						if (spiceDistance < closestSpiceDistance) {
+							closestSpiceDistance = spiceDistance;
+						}
+					}
+				}
+			}
+			if (closestSpiceDistance < 10000) {
+				locationScore += 50 - closestSpiceDistance * 2; // Strong bonus for being closer to spice
+			}
+			// Also apply base center distance penalty (but weaker than spice bonus)
 			locationScore -= lround(blockDistance(baseCenter, Coord(placeLocationX, placeLocationY)));
 		} else {
 			// For other buildings, apply base center distance penalty
@@ -939,7 +978,6 @@ Coord QuantBot::findSlabPlaceLocation(Uint32 itemID) {
 	
 	int bestLocationScore = -10000;
 	Coord bestLocation = Coord::Invalid();
-	Coord baseCenter = findBaseCentre(getHouse()->getHouseID());
 
 	// Check all map tiles for valid slab placement
 	for (int x = 0; x <= getMap().getSizeX() - slabSizeX; x++) {
@@ -1034,21 +1072,15 @@ Coord QuantBot::findSlabPlaceLocation(Uint32 itemID) {
 					if (atPerimeter) break;
 				}
 				
-		if (atPerimeter) {
-			locationScore += 5;  // Bonus for perimeter expansion
-		}
-		
-		// 6. Bonus for being closer to base center (integrated base building)
-		if (baseCenter.isValid()) {
-			int distanceFromBase = lround(blockDistance(Coord(x, y), baseCenter));
-			locationScore -= distanceFromBase / 2;  // Penalty for being far from center
-		}
-			
-			// Pick this location if it has the best score
-			if (locationScore > bestLocationScore) {
-				bestLocationScore = locationScore;
-				bestLocation = Coord(x, y);
+			if (atPerimeter) {
+				locationScore += 5;  // Bonus for perimeter expansion
 			}
+				
+				// Pick this location if it has the best score
+				if (locationScore > bestLocationScore) {
+					bestLocationScore = locationScore;
+					bestLocation = Coord(x, y);
+				}
 			}
 		}
 	}
@@ -1097,41 +1129,24 @@ Coord QuantBot::findTurretPlaceLocation(Uint32 itemID) {
 				FixPoint distanceFromBase = blockDistance(candidatePos, baseCenter);
 				score -= distanceFromBase * 2; // Penalty for being far from center
 				
-			// 2. Strong bonus for adjacency to own buildings
-			int adjacentOwnBuildings = 0;
-			int adjacentBuilders = 0;
-			for (int dx = -1; dx <= newSizeX; dx++) {
-				for (int dy = -1; dy <= newSizeY; dy++) {
-					// Check tiles around the structure
-					if ((dx == -1 || dx == newSizeX || dy == -1 || dy == newSizeY) && 
-						getMap().tileExists(x + dx, y + dy)) {
-						const Tile* pTile = getMap().getTile(x + dx, y + dy);
-						if (pTile->hasAStructure()) {
-							const StructureBase* pStructure = dynamic_cast<const StructureBase*>(pTile->getObject());
-							if (pStructure && pStructure->getOwner() == getHouse()) {
-								adjacentOwnBuildings++;
-								
-								// Check if this is a builder structure
-								Uint32 structureID = pStructure->getItemID();
-								if (structureID == Structure_HeavyFactory || 
-									structureID == Structure_LightFactory ||
-									structureID == Structure_WOR ||
-									structureID == Structure_Barracks ||
-									structureID == Structure_RepairYard ||
-									structureID == Structure_StarPort) {
-									adjacentBuilders++;
+				// 2. Strong bonus for adjacency to own buildings
+				int adjacentOwnBuildings = 0;
+				for (int dx = -1; dx <= newSizeX; dx++) {
+					for (int dy = -1; dy <= newSizeY; dy++) {
+						// Check tiles around the structure
+						if ((dx == -1 || dx == newSizeX || dy == -1 || dy == newSizeY) && 
+							getMap().tileExists(x + dx, y + dy)) {
+							const Tile* pTile = getMap().getTile(x + dx, y + dy);
+							if (pTile->hasAStructure()) {
+								const StructureBase* pStructure = dynamic_cast<const StructureBase*>(pTile->getObject());
+								if (pStructure && pStructure->getOwner() == getHouse()) {
+									adjacentOwnBuildings++;
 								}
 							}
 						}
 					}
 				}
-			}
-			score += adjacentOwnBuildings * 15; // Strong bonus for being next to own buildings
-			
-			// Small bonus for turrets next to builder structures (protecting production)
-			if (itemID == Structure_RocketTurret) {
-				score += adjacentBuilders * 3; // Small bonus for defending builders
-			}
+				score += adjacentOwnBuildings * 15; // Strong bonus for being next to own buildings
 				
 				// 3. Favor the side of the base closest to the enemy
 				// We want turrets between our base and the enemy
@@ -1488,10 +1503,12 @@ void QuantBot::build(int militaryValue) {
 							}
 						}
 
-						if ((enemyHouseID != -1) && (houseID == HOUSE_HARKONNEN || houseID == HOUSE_SARDAUKAR)) {
-							Coord target = findBaseCentre(enemyHouseID);
+					if ((enemyHouseID != -1) && (houseID == HOUSE_HARKONNEN || houseID == HOUSE_SARDAUKAR)) {
+						Coord target = findBestDeathHandTarget(enemyHouseID);
+						if (target.isValid()) {
 							doLaunchDeathhand(pPalace, target.x, target.y);
 						}
+					}
 					}
 				}
 			}
@@ -2669,6 +2686,104 @@ Coord QuantBot::findBaseCentre(int houseID) {
 	}
 
 	return baseCentreLocation;
+}
+
+double QuantBot::getProductionBuildingMultiplier(int itemID) const {
+	switch (itemID) {
+		case Structure_ConstructionYard:
+			return 2.0;
+		case Structure_RepairYard:
+			return 2.0;
+		case Structure_HeavyFactory:
+			return 1.5;
+		case Structure_Refinery:
+			return 1.3;
+		case Structure_StarPort:
+			return 1.3;
+		default:
+			return 1.0;
+	}
+}
+
+Coord QuantBot::findBestDeathHandTarget(int enemyHouseID) {
+	const QuantBotConfig& config = getQuantBotConfig();
+	const int myTeam = getHouse()->getTeamID();
+	
+	const StructureBase* bestTarget = nullptr;
+	double bestScore = -1.0;
+	
+	// Evaluate each enemy structure as a potential target
+	for (const StructureBase* pCandidate : getStructureList()) {
+		if (!pCandidate || !pCandidate->isActive()) {
+			continue;
+		}
+		
+		if (pCandidate->getOwner()->getHouseID() != enemyHouseID) {
+			continue;
+		}
+		
+		if (!pCandidate->isVisible(myTeam)) {
+			continue;
+		}
+		
+		// Get base priority from config
+		const QuantBotConfig::TargetPriority& priority = config.getStructurePriority(pCandidate->getItemID());
+		const int weight = priority.build + priority.target;
+		if (weight <= 0) {
+			continue;
+		}
+		
+		// Apply production building multiplier
+		const double productionMultiplier = getProductionBuildingMultiplier(pCandidate->getItemID());
+		double score = static_cast<double>(weight) * productionMultiplier;
+		
+		// Center of mass calculation: add weighted value of nearby buildings
+		// Death hand has 10-tile inaccuracy, so check 5-tile radius for nearby targets
+		const Coord candidatePos = pCandidate->getLocation();
+		constexpr int CHECK_RADIUS = 5;
+		double centerOfMassBonus = 0.0;
+		
+		for (const StructureBase* pNearby : getStructureList()) {
+			if (!pNearby || !pNearby->isActive() || pNearby == pCandidate) {
+				continue;
+			}
+			
+			if (pNearby->getOwner()->getHouseID() != enemyHouseID) {
+				continue;
+			}
+			
+			if (!pNearby->isVisible(myTeam)) {
+				continue;
+			}
+			
+			FixPoint distance = blockDistance(candidatePos, pNearby->getLocation());
+			if (distance.toDouble() <= CHECK_RADIUS) {
+				// Get this nearby building's priority weight
+				const QuantBotConfig::TargetPriority& nearbyPriority = config.getStructurePriority(pNearby->getItemID());
+				const int nearbyWeight = nearbyPriority.build + nearbyPriority.target;
+				
+				if (nearbyWeight > 0) {
+					// Add distance-weighted contribution: closer buildings contribute more
+					centerOfMassBonus += static_cast<double>(nearbyWeight) / (distance.toDouble() + 1.0);
+				}
+			}
+		}
+		
+		// Final score is base score plus center of mass bonus
+		score += centerOfMassBonus;
+		
+		if (score > bestScore) {
+			bestScore = score;
+			bestTarget = pCandidate;
+		}
+	}
+	
+	if (bestTarget != nullptr) {
+		return bestTarget->getLocation();
+	}
+	
+	// Fallback to center of base if no suitable target found
+	return findBaseCentre(enemyHouseID);
 }
 
 

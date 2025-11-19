@@ -106,6 +106,8 @@ private:
     Coord findTurretPlaceLocation(Uint32 itemID);
     Coord findSquadCenter(int houseID);
     Coord findBaseCentre(int houseID);
+    Coord findBestDeathHandTarget(int enemyHouseID);
+    double getProductionBuildingMultiplier(int itemID) const;
     Coord findSquadRallyLocation();
     Coord findSquadRetreatLocation();
 
