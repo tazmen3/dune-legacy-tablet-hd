@@ -159,14 +159,20 @@ endif()
 # Install data files
 # Install configuration template files to config subdirectory
 # For macOS bundles, these are already inside the .app via POST_BUILD commands
+# For Windows with VS build, config files are installed from VS output directory
 if(NOT APPLE)
-    install(FILES 
-        config/ObjectData.bak
-        "config/QuantBot Config.bak"
-        "config/Dune Legacy.ini"
-        config/README.md
-        DESTINATION ${DUNELEGACY_CONFIG_DIR}
-    )
+    set(VS_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/bin/Release-x64")
+    if(WIN32 AND EXISTS "${VS_OUTPUT_DIR}/config")
+        # Config files will be installed from VS output directory (see src/CMakeLists.txt)
+    else()
+        install(FILES 
+            config/ObjectData.bak
+            "config/QuantBot Config.bak"
+            "config/Dune Legacy.ini"
+            config/README.md
+            DESTINATION ${DUNELEGACY_CONFIG_DIR}
+        )
+    endif()
 endif()
 
 # Install desktop file and icons on Linux

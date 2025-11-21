@@ -441,11 +441,46 @@ endif()
 # For macOS bundles, data files are already inside the .app via POST_BUILD commands
 if(WIN32)
     # Windows: install data to share/DuneLegacy to match hardcoded game paths
-    install(
-        DIRECTORY ${DATA_DIR}/
-        DESTINATION share/${PROJECT_NAME}
-        FILES_MATCHING PATTERN "*.*"
-    )
+    # Use Visual Studio build output which has all PAK files
+    set(VS_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/bin/Release-x64")
+    
+    if(EXISTS "${VS_OUTPUT_DIR}")
+        # Install all PAK files from VS build output
+        install(
+            DIRECTORY ${VS_OUTPUT_DIR}/
+            DESTINATION share/${PROJECT_NAME}
+            FILES_MATCHING PATTERN "*.PAK"
+        )
+        
+        # Install all other data files (locale, maps, config, txt files)
+        install(
+            DIRECTORY ${VS_OUTPUT_DIR}/locale
+            DESTINATION share/${PROJECT_NAME}
+            OPTIONAL
+        )
+        install(
+            DIRECTORY ${VS_OUTPUT_DIR}/maps
+            DESTINATION share/${PROJECT_NAME}
+            OPTIONAL
+        )
+        install(
+            DIRECTORY ${VS_OUTPUT_DIR}/config
+            DESTINATION share/${PROJECT_NAME}
+            OPTIONAL
+        )
+        install(
+            FILES "${VS_OUTPUT_DIR}/Dune2-Versions.txt"
+            DESTINATION share/${PROJECT_NAME}
+            OPTIONAL
+        )
+    else()
+        # Fallback to data directory if VS output doesn't exist
+        install(
+            DIRECTORY ${DATA_DIR}/
+            DESTINATION share/${PROJECT_NAME}
+            FILES_MATCHING PATTERN "*.*"
+        )
+    endif()
 elseif(NOT APPLE)
     # Linux: use FHS structure
     install(
@@ -458,16 +493,32 @@ endif()
 # Install executable
 if(WIN32)
     # Windows: install to root directory
-    install(TARGETS dunelegacy
-        RUNTIME DESTINATION .
-    )
+    set(VS_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/bin/Release-x64")
     
-    # Install vcpkg DLLs for Windows
-    if(CMAKE_BUILD_TYPE STREQUAL "Release" OR NOT CMAKE_BUILD_TYPE)
-        install(DIRECTORY ${CMAKE_BINARY_DIR}/bin/Release/
+    if(EXISTS "${VS_OUTPUT_DIR}/DuneLegacy.exe")
+        # Use Visual Studio build output if it exists
+        install(FILES "${VS_OUTPUT_DIR}/DuneLegacy.exe"
+            DESTINATION .
+            RENAME "dunelegacy.exe"
+        )
+        # Install DLLs from VS output
+        install(
+            DIRECTORY ${VS_OUTPUT_DIR}/
             DESTINATION .
             FILES_MATCHING PATTERN "*.dll"
         )
+    else()
+        # Fallback to CMake build output
+        install(TARGETS dunelegacy
+            RUNTIME DESTINATION .
+        )
+        # Install vcpkg DLLs for Windows
+        if(CMAKE_BUILD_TYPE STREQUAL "Release" OR NOT CMAKE_BUILD_TYPE)
+            install(DIRECTORY ${CMAKE_BINARY_DIR}/bin/Release/
+                DESTINATION .
+                FILES_MATCHING PATTERN "*.dll"
+            )
+        endif()
     endif()
 elseif(APPLE)
     # macOS: install as bundle
