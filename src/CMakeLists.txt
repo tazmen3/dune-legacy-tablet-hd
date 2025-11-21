@@ -440,47 +440,39 @@ endif()
 # Install data directory
 # For macOS bundles, data files are already inside the .app via POST_BUILD commands
 if(WIN32)
-    # Windows: install PAK files to root directory where game expects them
-    # Use VS IDE build output which has all PAK files (from post-build copy)
-    set(VS_DATA_DIR "${CMAKE_SOURCE_DIR}/bin/Release-x64")
+    # Windows: install PAK files and data to root directory where game expects them
+    # Use data directory which has all PAK files
     
-    if(EXISTS "${VS_DATA_DIR}")
-        # Install all PAK files from VS IDE output to root directory
-        install(
-            DIRECTORY ${VS_DATA_DIR}/
-            DESTINATION .
-            FILES_MATCHING PATTERN "*.PAK"
-        )
-        
-        # Install all other data files (locale, maps, config, txt files) to root
-        install(
-            DIRECTORY ${VS_DATA_DIR}/locale
-            DESTINATION .
-            OPTIONAL
-        )
-        install(
-            DIRECTORY ${VS_DATA_DIR}/maps
-            DESTINATION .
-            OPTIONAL
-        )
-        install(
-            DIRECTORY ${VS_DATA_DIR}/config
-            DESTINATION .
-            OPTIONAL
-        )
-        install(
-            FILES "${VS_DATA_DIR}/Dune2-Versions.txt"
-            DESTINATION .
-            OPTIONAL
-        )
-    else()
-        # Fallback to data directory if VS output doesn't exist
-        install(
-            DIRECTORY ${DATA_DIR}/
-            DESTINATION .
-            FILES_MATCHING PATTERN "*.*"
-        )
-    endif()
+    # Install all PAK files from data directory to root
+    install(
+        DIRECTORY ${DATA_DIR}/
+        DESTINATION .
+        FILES_MATCHING PATTERN "*.PAK"
+    )
+    
+    # Install locale files
+    install(
+        DIRECTORY ${DATA_DIR}/locale
+        DESTINATION .
+    )
+    
+    # Install maps
+    install(
+        DIRECTORY ${DATA_DIR}/maps
+        DESTINATION .
+    )
+    
+    # Install Dune2-Versions.txt
+    install(
+        FILES "${DATA_DIR}/Dune2-Versions.txt"
+        DESTINATION .
+    )
+    
+    # Install config files from config directory (not data)
+    install(
+        DIRECTORY ${CMAKE_SOURCE_DIR}/config
+        DESTINATION .
+    )
 elseif(NOT APPLE)
     # Linux: use FHS structure
     install(
