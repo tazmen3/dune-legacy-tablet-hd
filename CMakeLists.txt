@@ -320,6 +320,8 @@ elseif(APPLE)
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/dunelegacy.app /tmp/dunelegacy_dmg_staging/dunelegacy.app
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/README /tmp/dunelegacy_dmg_staging/README
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/release_notes/RELEASE_NOTES_${PROJECT_VERSION}.md /tmp/dunelegacy_dmg_staging/Release\\ Notes.md
+        COMMAND ${CMAKE_COMMAND} -E echo "Creating Applications symlink for drag-and-drop install..."
+        COMMAND ln -sf /Applications /tmp/dunelegacy_dmg_staging/Applications
         COMMAND ${CMAKE_COMMAND} -E echo "Creating DMG with hdiutil..."
         COMMAND hdiutil create -volname "Dune Legacy ${PROJECT_VERSION}" -srcfolder /tmp/dunelegacy_dmg_staging -ov -format UDZO ${CMAKE_BINARY_DIR}/DuneLegacy-${PROJECT_VERSION}-macOS.dmg
         COMMAND ${CMAKE_COMMAND} -E echo "Cleaning up staging..."
