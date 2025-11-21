@@ -440,38 +440,38 @@ endif()
 # Install data directory
 # For macOS bundles, data files are already inside the .app via POST_BUILD commands
 if(WIN32)
-    # Windows: install PAK files and data to root directory where game expects them
+    # Windows: install PAK files and data to share/DuneLegacy where game expects them
     # Use data directory which has all PAK files
     
-    # Install all PAK files from data directory to root
+    # Install all PAK files from data directory to share/DuneLegacy
     install(
         DIRECTORY ${DATA_DIR}/
-        DESTINATION .
+        DESTINATION share/${PROJECT_NAME}
         FILES_MATCHING PATTERN "*.PAK"
     )
     
     # Install locale files
     install(
         DIRECTORY ${DATA_DIR}/locale
-        DESTINATION .
+        DESTINATION share/${PROJECT_NAME}
     )
     
     # Install maps
     install(
         DIRECTORY ${DATA_DIR}/maps
-        DESTINATION .
+        DESTINATION share/${PROJECT_NAME}
     )
     
     # Install Dune2-Versions.txt
     install(
         FILES "${DATA_DIR}/Dune2-Versions.txt"
-        DESTINATION .
+        DESTINATION share/${PROJECT_NAME}
     )
     
-    # Install config files from config directory (not data)
+    # Install config files from config directory to share/DuneLegacy/config
     install(
         DIRECTORY ${CMAKE_SOURCE_DIR}/config
-        DESTINATION .
+        DESTINATION share/${PROJECT_NAME}
     )
 elseif(NOT APPLE)
     # Linux: use FHS structure
