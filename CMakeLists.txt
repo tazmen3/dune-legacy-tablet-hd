@@ -194,14 +194,24 @@ endif()
 
 # Install documentation
 if(WIN32)
-    # Windows: install docs to root with .txt extension
+    # Windows: install docs to root
     install(FILES AUTHORS COPYING NEWS README
         DESTINATION ${DUNELEGACY_DOC_DIR}
+    )
+    # Install release notes
+    install(FILES "release_notes/RELEASE_NOTES_${PROJECT_VERSION}.md"
+        DESTINATION ${DUNELEGACY_DOC_DIR}
+        RENAME "Release_Notes.md"
     )
 elseif(NOT APPLE)
     # Linux: use standard doc directory
     install(FILES AUTHORS COPYING NEWS README
         DESTINATION ${DUNELEGACY_DOC_DIR}
+    )
+    install(FILES "release_notes/RELEASE_NOTES_${PROJECT_VERSION}.md"
+        DESTINATION ${DUNELEGACY_DOC_DIR}
+        RENAME "Release_Notes.md"
+        OPTIONAL
     )
 endif()
 
@@ -228,13 +238,31 @@ if(WIN32)
     set(CPACK_NSIS_EXECUTABLES_DIRECTORY ".")
     set(CPACK_NSIS_MUI_FINISHPAGE_RUN "dunelegacy.exe")
     
+    # Add checkbox to view release notes on finish page
+    set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "
+        WriteRegStr HKLM \\\"Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\App Paths\\\\dunelegacy.exe\\\" \\\"\\\" \\\"$INSTDIR\\\\dunelegacy.exe\\\"
+        WriteRegStr HKLM \\\"Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\App Paths\\\\dunelegacy.exe\\\" \\\"Path\\\" \\\"$INSTDIR\\\"
+    ")
+    set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "
+        DeleteRegKey HKLM \\\"Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\App Paths\\\\dunelegacy.exe\\\"
+    ")
+    
+    # Custom NSIS code for release notes checkbox on finish page
+    set(CPACK_NSIS_DEFINES "
+        !define MUI_FINISHPAGE_SHOWREADME \\\"$INSTDIR\\\\Release_Notes.md\\\"
+        !define MUI_FINISHPAGE_SHOWREADME_TEXT \\\"View Release Notes\\\"
+        !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
+    ")
+    
     # Create Start Menu shortcuts
     set(CPACK_NSIS_CREATE_ICONS_EXTRA "
         CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Dune Legacy.lnk\\\" \\\"$INSTDIR\\\\dunelegacy.exe\\\"
+        CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Release Notes.lnk\\\" \\\"$INSTDIR\\\\Release_Notes.md\\\"
         CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Readme.lnk\\\" \\\"$INSTDIR\\\\README\\\"
     ")
     set(CPACK_NSIS_DELETE_ICONS_EXTRA "
         Delete \\\"$SMPROGRAMS\\\\$MUI_TEMP\\\\Dune Legacy.lnk\\\"
+        Delete \\\"$SMPROGRAMS\\\\$MUI_TEMP\\\\Release Notes.lnk\\\"
         Delete \\\"$SMPROGRAMS\\\\$MUI_TEMP\\\\Readme.lnk\\\"
     ")
     
