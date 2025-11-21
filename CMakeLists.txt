@@ -268,18 +268,20 @@ if(WIN32)
     
     # Add custom target for Windows installer
     add_custom_target(installer
-        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning CPack cache..."
+        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning CPack cache and install directory..."
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/_CPack_Packages
         COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/*.exe
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/install
         COMMAND ${CMAKE_COMMAND} -E echo "Building binary..."
         COMMAND ${CMAKE_COMMAND} --build . --config Release
-        COMMAND ${CMAKE_COMMAND} -E echo "Installing to staging directory..."
+        COMMAND ${CMAKE_COMMAND} -E echo "Removing install directory to force fresh install..."
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/install
+        COMMAND ${CMAKE_COMMAND} -E echo "Installing to staging directory..."
         COMMAND ${CMAKE_COMMAND} --install . --prefix install --config Release
         COMMAND ${CMAKE_COMMAND} -E echo "Creating installer..."
         COMMAND ${CMAKE_CPACK_COMMAND} -G NSIS -C Release
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Building Windows NSIS installer (with clean CPack cache)..."
+        COMMENT "Building Windows NSIS installer (with guaranteed fresh install)..."
     )
 elseif(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
@@ -306,19 +308,20 @@ elseif(APPLE)
     
     # Add custom target for quick DMG creation
     add_custom_target(dmg
-        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning CPack cache..."
+        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning CPack cache and install directory..."
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/_CPack_Packages
         COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/*.dmg
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/install
-        COMMAND ${CMAKE_COMMAND} -E echo "Force rebuilding binary..."
-        COMMAND ${CMAKE_COMMAND} --build . --target clean
+        COMMAND ${CMAKE_COMMAND} -E echo "Building binary..."
         COMMAND ${CMAKE_COMMAND} --build . --config Release
+        COMMAND ${CMAKE_COMMAND} -E echo "Removing install directory to force fresh install..."
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/install
         COMMAND ${CMAKE_COMMAND} -E echo "Installing to staging directory..."
         COMMAND ${CMAKE_COMMAND} --install . --prefix install --config Release
         COMMAND ${CMAKE_COMMAND} -E echo "Creating DMG..."
         COMMAND ${CMAKE_CPACK_COMMAND} -G DragNDrop -C Release
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Building macOS DMG installer (with clean CPack cache)..."
+        COMMENT "Building macOS DMG installer (with guaranteed fresh install)..."
     )
 else()
     set(CPACK_GENERATOR "DEB;RPM;TGZ")
@@ -331,18 +334,20 @@ else()
     
     # Add custom target for Linux packages
     add_custom_target(package
-        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning CPack cache..."
+        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning CPack cache and install directory..."
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/_CPack_Packages
         COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/*.deb ${CMAKE_BINARY_DIR}/*.rpm ${CMAKE_BINARY_DIR}/*.tar.gz
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/install
         COMMAND ${CMAKE_COMMAND} -E echo "Building binary..."
         COMMAND ${CMAKE_COMMAND} --build . --config Release
-        COMMAND ${CMAKE_COMMAND} -E echo "Installing to staging directory..."
+        COMMAND ${CMAKE_COMMAND} -E echo "Removing install directory to force fresh install..."
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/install
+        COMMAND ${CMAKE_COMMAND} -E echo "Installing to staging directory..."
         COMMAND ${CMAKE_COMMAND} --install . --prefix install --config Release
         COMMAND ${CMAKE_COMMAND} -E echo "Creating packages..."
         COMMAND ${CMAKE_CPACK_COMMAND} -G "DEB;RPM;TGZ" -C Release
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Building Linux packages (DEB, RPM, TGZ) (with clean CPack cache)..."
+        COMMENT "Building Linux packages (DEB, RPM, TGZ) (with guaranteed fresh install)..."
     )
 endif()
 
