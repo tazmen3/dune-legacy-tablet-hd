@@ -145,18 +145,18 @@ Brutal_MilitaryValueLimitLargeMap=100000
 #       Ordos cannot build launchers (Builder=Invalid in ObjectData.ini)
 
 [Unit Ratios]
-# Atreides - Specializes in Sonic Tanks with balanced ornithopter support
-Atreides_Tank=0.0
-Atreides_SiegeTank=0.0
-Atreides_Launcher=0.20
-Atreides_Special=0.65
+# Atreides - Balanced army composition with launchers and sonic tanks
+Atreides_Tank=0.05
+Atreides_SiegeTank=0.10
+Atreides_Launcher=0.35
+Atreides_Special=0.35
 Atreides_Ornithopter=0.15
 
-# Harkonnen - Cannot build ornithopters, focuses on heavy firepower
-Harkonnen_Tank=0.10
-Harkonnen_SiegeTank=0.10
-Harkonnen_Launcher=0.70
-Harkonnen_Special=0.10
+# Harkonnen - Cannot build ornithopters, focuses on heavy firepower (capped launcher at 50%)
+Harkonnen_Tank=0.17
+Harkonnen_SiegeTank=0.17
+Harkonnen_Launcher=0.50
+Harkonnen_Special=0.16
 Harkonnen_Ornithopter=0.0
 
 # Ordos - Cannot build launchers, highest ornithopter ratio for air superiority
@@ -166,12 +166,12 @@ Ordos_Launcher=0.0
 Ordos_Special=0.25
 Ordos_Ornithopter=0.25
 
-# Fremen - Balanced with light ornithopter support
-Fremen_Tank=0.65
-Fremen_SiegeTank=0.05
-Fremen_Launcher=0.20
+# Fremen - Balanced with light ornithopter support (capped tank at 50%)
+Fremen_Tank=0.50
+Fremen_SiegeTank=0.10
+Fremen_Launcher=0.27
 Fremen_Special=0.0
-Fremen_Ornithopter=0.10
+Fremen_Ornithopter=0.13
 
 # Sardaukar - Heavy firepower with light ornithopter support
 Sardaukar_Tank=0.05
