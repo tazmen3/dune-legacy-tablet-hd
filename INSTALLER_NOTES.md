@@ -41,55 +41,39 @@ C:\Program Files\Dune Legacy\
 
 ---
 
-## ⚠️ Important: Original Dune 2 PAK Files NOT Included
+## ✅ All PAK Files Included
 
-The installer includes **ONLY 3 PAK files**:
+The installer now includes **ALL 18 PAK files**:
+
+**Dune Legacy PAK files (3):**
 - ✅ `GFXHD.PAK` - HD graphics (Dune Legacy)
 - ✅ `LEGACY.PAK` - Enhanced features (Dune Legacy)
 - ✅ `OPENSD2.PAK` - Open source data (Dune Legacy)
 
-### Required PAK Files from Original Dune 2
+**Original Dune 2 PAK files (15):**
+- ✅ `HARK.PAK` - Harkonnen house data
+- ✅ `ATRE.PAK` - Atreides house data
+- ✅ `ORDOS.PAK` - Ordos house data
+- ✅ `ENGLISH.PAK` - English text
+- ✅ `DUNE.PAK` - Main game data
+- ✅ `SCENARIO.PAK` - Campaign missions
+- ✅ `MENTAT.PAK` - Mentat advisor graphics
+- ✅ `VOC.PAK` - Voice samples
+- ✅ `MERC.PAK` - Mercenary house data
+- ✅ `FINALE.PAK` - End game cinematics
+- ✅ `INTRO.PAK` - Intro cinematics
+- ✅ `INTROVOC.PAK` - Intro voice
+- ✅ `SOUND.PAK` - Sound effects
+- ✅ `GERMAN.PAK` - German language
+- ✅ `FRENCH.PAK` - French language
 
-**Users must obtain these separately** (copyright reasons):
-
-**Required:**
-- `HARK.PAK` - Harkonnen house data
-- `ATRE.PAK` - Atreides house data
-- `ORDOS.PAK` - Ordos house data
-- `ENGLISH.PAK` - English text
-- `DUNE.PAK` - Main game data
-- `SCENARIO.PAK` - Campaign missions
-- `MENTAT.PAK` - Mentat advisor graphics
-- `VOC.PAK` - Voice samples
-- `MERC.PAK` - Mercenary house data
-- `FINALE.PAK` - End game cinematics
-- `INTRO.PAK` - Intro cinematics
-- `INTROVOC.PAK` - Intro voice
-- `SOUND.PAK` - Sound effects
-
-**Optional:**
-- `GERMAN.PAK` - German language
-- `FRENCH.PAK` - French language
-
-### Where to Put Original PAK Files
-
-**Option 1:** Copy to game data directory (Recommended):
-```
-C:\Program Files\Dune Legacy\share\DuneLegacy\
-```
-
-**Option 2:** User data directory (if no admin rights):
-```
-C:\Users\<YourName>\AppData\Roaming\dunelegacy\data\
-```
-
-**Note:** The game will search in both locations, with user data directory taking precedence.
+**The game is ready to play immediately after installation!**
 
 ---
 
 ## 📦 Complete Installer Contents
 
-### Included Files (3.5 MB NSIS installer)
+### Included Files (7.1 MB NSIS installer)
 
 **Executable:**
 - `dunelegacy.exe` (2.6 MB)
@@ -102,11 +86,11 @@ C:\Users\<YourName>\AppData\Roaming\dunelegacy\data\
 - `wavpackdll.dll`, `zlib1.dll`
 
 **Data Files:**
-- 3 bundled PAK files (GFXHD, LEGACY, OPENSD2)
+- 18 PAK files (3 Dune Legacy + 15 original Dune 2)
 - Maps (singleplayer & multiplayer)
 - Locale files (5 languages)
 - Config templates
-- Documentation (AUTHORS, COPYING, NEWS, README)
+- Documentation (AUTHORS, COPYING, NEWS, README, Release_Notes)
 
 ---
 
