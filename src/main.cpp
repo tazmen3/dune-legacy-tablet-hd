@@ -925,7 +925,7 @@ int main(int argc, char *argv[]) {
                 SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "0");
                 SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1");
                 SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
-                SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");         // Enable VSync to prevent screen tearing
+                SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");         // Disable VSync for higher FPS
                 SDL_SetHint(SDL_HINT_VIDEO_X11_FORCE_EGL, "0");  // Disable EGL
                 SDL_SetHint(SDL_HINT_RENDER_BATCHING, "1");      // Enable render batching
                 SDL_SetHint(SDL_HINT_RENDER_LINE_METHOD, "3");   // Best line rendering quality
