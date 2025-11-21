@@ -110,6 +110,7 @@ private:
     double getProductionBuildingMultiplier(int itemID) const;
     Coord findSquadRallyLocation();
     Coord findSquadRetreatLocation();
+    void moveToOptimalSquadPosition(const UnitBase* pUnit, FixPoint squadRadius);
 
     bool tryLaunchOrnithopterStrike(const QuantBotConfig::DifficultySettings& diffSettings,
                                     const QuantBotConfig& config);

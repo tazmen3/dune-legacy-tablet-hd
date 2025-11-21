@@ -719,10 +719,10 @@ void QuantBot::onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID)
 		else if ((pGroundUnit->getItemID() == Unit_Launcher
 			|| pGroundUnit->getItemID() == Unit_Deviator)
 			&& (difficulty != Difficulty::Easy)) {
-			// Always keep Launchers away from harm
-
+			// Always keep Launchers/Deviators away from harm
+			// Move to optimal position (closer of squad center or rally point)
 			doSetAttackMode(pGroundUnit, AREAGUARD);
-			doMove2Pos(pGroundUnit, squadCenterLocation.x, squadCenterLocation.y, true);
+			moveToOptimalSquadPosition(pGroundUnit, 6);  // 6 tile radius
 
 		}
 		else if ((currentGame->techLevel > 3)
@@ -734,7 +734,7 @@ void QuantBot::onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID)
 			// We want out quads as raiders
 			// Quads flee from every unit except trikes, infantry and other quads (but only if quads are not our main vehicle for that techlevel)
 			doSetAttackMode(pGroundUnit, AREAGUARD);
-			doMove2Pos(pGroundUnit, squadCenterLocation.x, squadCenterLocation.y, true);
+			moveToOptimalSquadPosition(pGroundUnit, 6);  // 6 tile radius
 		}
 		else if ((currentGame->techLevel > 3)
 			&& ((pGroundUnit->getItemID() == Unit_RaiderTrike) || (pGroundUnit->getItemID() == Unit_Trike))
@@ -747,7 +747,7 @@ void QuantBot::onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID)
 			// but should run away from tanks
 
 			doSetAttackMode(pGroundUnit, AREAGUARD);
-			doMove2Pos(pGroundUnit, squadCenterLocation.x, squadCenterLocation.y, true);
+			moveToOptimalSquadPosition(pGroundUnit, 6);  // 6 tile radius
 
 		}
 
@@ -778,7 +778,7 @@ void QuantBot::onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID)
 				else if (pGroundUnit->getItemID() != Unit_Devastator 
 						&& pGroundUnit->getItemID() != Unit_SiegeTank) {
 					doSetAttackMode(pGroundUnit, AREAGUARD);
-					doMove2Pos(pGroundUnit, squadCenterLocation.x, squadCenterLocation.y, true);
+					moveToOptimalSquadPosition(pGroundUnit, 6);  // 6 tile radius
 				}
 
 
@@ -2969,6 +2969,61 @@ Coord QuantBot::findSquadCenter(int houseID) {
 }
 
 /**
+ * Move a unit to the optimal squad position.
+ * Chooses between actual squad center and squad rally point based on which is closer.
+ * Only moves if the unit is outside the radius of both positions.
+ * 
+ * @param pUnit The unit to potentially move
+ * @param squadRadius The acceptable radius around either position (unit won't move if within this radius)
+ */
+void QuantBot::moveToOptimalSquadPosition(const UnitBase* pUnit, FixPoint squadRadius) {
+	if (!pUnit || !pUnit->isRespondable()) {
+		return;
+	}
+
+	// Calculate actual squad center (dynamic, based on unit positions)
+	Coord actualSquadCenter = findSquadCenter(getHouse()->getHouseID());
+	
+	// Use established rally location (static, set by AI)
+	Coord rallyPoint = squadRallyLocation;
+	
+	// If neither location is valid, do nothing
+	if (!actualSquadCenter.isValid() && !rallyPoint.isValid()) {
+		return;
+	}
+	
+	Coord unitLocation = pUnit->getLocation();
+	
+	// Calculate distances to both positions
+	FixPoint distToSquadCenter = actualSquadCenter.isValid() ? 
+		blockDistance(unitLocation, actualSquadCenter) : FixPt_MAX;
+	FixPoint distToRallyPoint = rallyPoint.isValid() ? 
+		blockDistance(unitLocation, rallyPoint) : FixPt_MAX;
+	
+	// Check if unit is already within acceptable radius of either position
+	bool withinSquadRadius = (distToSquadCenter <= squadRadius);
+	bool withinRallyRadius = (distToRallyPoint <= squadRadius);
+	
+	// If within radius of either, don't move
+	if (withinSquadRadius || withinRallyRadius) {
+		return;
+	}
+	
+	// Unit is outside both radii - move to the closer one
+	Coord targetPosition;
+	if (distToSquadCenter < distToRallyPoint) {
+		targetPosition = actualSquadCenter;
+	} else {
+		targetPosition = rallyPoint;
+	}
+	
+	// Move to the closer position
+	if (targetPosition.isValid()) {
+		doMove2Pos(pUnit, targetPosition.x, targetPosition.y, false);
+	}
+}
+
+/**
 	Set a rally / retreat location for all our military units.
 	This should be near our base but within it
 	The retreat mode causes all our military units to move
@@ -3143,37 +3198,45 @@ void QuantBot::retreatAllUnits() {
                                 doSetAttackMode(pUnit, AREAGUARD);
                             }
 
-                            if (blockDistance(pUnit->getLocation(), squadCenterLocation) > squadRadius - 1) {
-                                    doMove2Pos(pUnit, squadCenterLocation.x, squadCenterLocation.y, true);
-                            }
+                            // Move to optimal position (closer of squad center or rally point, only if outside radius)
+                            moveToOptimalSquadPosition(pUnit, squadRadius - 1);
                         }
                     }
 					else if ((pUnit->getItemID() == Unit_Launcher || pUnit->getItemID() == Unit_Deviator)
                         && pUnit->hasATarget() && (difficulty != Difficulty::Easy)) {
-					// Special logic to keep launchers away from harm
+					// Special logic to keep launchers/deviators away from harm
 					if (pUnit->getTarget() != nullptr) {
 						if (blockDistance(pUnit->getLocation(), pUnit->getTarget()->getLocation()) <= 6 && pUnit->getTarget()->getItemID() != Unit_Ornithopter) {
 							doSetAttackMode(pUnit, AREAGUARD); // Change mode to stop launchers freezing
-                                doMove2Pos(pUnit, squadCenterLocation.x, squadCenterLocation.y, true);
+                                moveToOptimalSquadPosition(pUnit, 6);  // 6 tile radius
                             }
                         }
                     }
                     else if (pUnit->getItemID() != Unit_Ornithopter && pUnit->getAttackMode() != HUNT && !pUnit->hasATarget() && !pUnit->wasForced()) {
                         if (pUnit->getAttackMode() == AREAGUARD && squadCenterLocation.isValid() && (gameMode != GameMode::Campaign)) {
-                            if (blockDistance(pUnit->getLocation(), squadCenterLocation) > squadRadius) {
 							if (!pUnit->hasATarget()) {
-                                    doMove2Pos(pUnit, squadCenterLocation.x, squadCenterLocation.y, false);
-                                }
+                                // Move to optimal position (closer of squad center or rally point, only if outside radius)
+                                moveToOptimalSquadPosition(pUnit, squadRadius);
                             }
                         }
                         else if (pUnit->getAttackMode() == RETREAT) {
-						if (blockDistance(pUnit->getLocation(), squadRetreatLocation) > squadRadius + 2 && !pUnit->wasForced()) {
+                            if (!pUnit->wasForced()) {
                                 if (pUnit->getHealth() < pUnit->getMaxHealth()) {
                                     doRepair(pUnit);
                                 }
-                                doMove2Pos(pUnit, squadRetreatLocation.x, squadRetreatLocation.y, true);
+                                // Move to optimal position (closer of squad center or rally point, only if outside radius)
+                                moveToOptimalSquadPosition(pUnit, squadRadius + 2);
                             }
-                            else {
+                            
+                            // Check if we've reached the retreat position
+                            Coord actualSquadCenter = findSquadCenter(getHouse()->getHouseID());
+                            FixPoint distToSquadCenter = actualSquadCenter.isValid() ? 
+                                blockDistance(pUnit->getLocation(), actualSquadCenter) : FixPt_MAX;
+                            FixPoint distToRallyPoint = squadRallyLocation.isValid() ? 
+                                blockDistance(pUnit->getLocation(), squadRallyLocation) : FixPt_MAX;
+                            
+                            // If within radius of either, we've finished retreating
+                            if (distToSquadCenter <= squadRadius + 2 || distToRallyPoint <= squadRadius + 2) {
                                 // We have finished retreating back to the rally point
                                 doSetAttackMode(pUnit, AREAGUARD);
                             }
