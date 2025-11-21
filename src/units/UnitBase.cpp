@@ -73,6 +73,8 @@ UnitBase::UnitBase(House* newOwner) : ObjectBase(newOwner) {
     nextSpotAngle = drawnAngle;
     recalculatePathTimer = 0;
     nextSpot = Coord::Invalid();
+    cachedPathDestination.invalidate();
+    cachedPathRevision = 0;
 
     findTargetTimer = 0;
     primaryWeaponTimer = 0;
@@ -112,6 +114,10 @@ UnitBase::UnitBase(InputStream& stream) : ObjectBase(stream) {
         Sint32 y = stream.readSint32();
         pathList.emplace_back(x,y);
     }
+    cachedPathDestination = resolvePathDestination();
+    cachedPathRevision = (currentGameMap != nullptr) ? currentGameMap->getPathingRevision() : 0;
+    
+    // Stuck detection fields are transient (not saved) - they reset on load
 
     findTargetTimer = stream.readSint32();
     primaryWeaponTimer = stream.readSint32();
@@ -186,6 +192,8 @@ void UnitBase::save(OutputStream& stream) const {
         stream.writeSint32(coord.x);
         stream.writeSint32(coord.y);
     }
+    
+    // Stuck detection fields are transient (not saved)
 
     stream.writeSint32(findTargetTimer);
     stream.writeSint32(primaryWeaponTimer);
@@ -224,6 +232,8 @@ bool UnitBase::attack() {
                     currentWeaponDamage -= currentWeaponDamage/4;
                 }
             } 
+            // Dynasty: Launchers and Deviators use same rocket type for both ground and air
+            // Air targets get scatter + tracking + immediate detonation (no timer check) 
 
             if(primaryWeaponTimer == 0) {
                 // MULTIPLAYER-SAFE: Track launcher unit firing at ornithopters
@@ -490,15 +500,24 @@ void UnitBase::engageTarget() {
         Coord targetLocation = target.getObjPointer()->getClosestPoint(location);
 
         if(destination != targetLocation) {
-            // Only recalculate path if target moved significantly (> 1 tile)
-            // This prevents constant path recalculation for minor movement
             FixPoint movementDistance = blockDistance(destination, targetLocation);
+            FixPoint distanceToTarget = blockDistance(location, targetLocation);
+            
             if(movementDistance > 1) {
-                // Target moved significantly, recalculate path
-                clearPath();
+                // Target moved more than 1 tile
+                if(distanceToTarget > 10) {
+                    // Target is far away (>10 tiles) - don't repath yet
+                    // Update destination AND cached path metadata to keep path valid
+                    destination = targetLocation;
+                    cachedPathDestination = targetLocation;
+                } else {
+                    // Target is close (<= 10 tiles) and moved significantly - repath now
+                    clearPath();
+                }
             } else {
-                // Minor movement, just update destination without clearing path
+                // Minor movement (<= 1 tile), update destination and cached metadata
                 destination = targetLocation;
+                cachedPathDestination = targetLocation;
             }
         }
 
@@ -654,6 +673,10 @@ void UnitBase::move() {
     checkPos();
 }
 
+namespace {
+constexpr int kPathValidationProbeCount = 6;
+}
+
 void UnitBase::bumpyMovementOnRock(FixPoint fromDistanceX, FixPoint fromDistanceY, FixPoint toDistanceX, FixPoint toDistanceY) {
 
     if(hasBumpyMovementOnRock() && ((currentGameMap->getTile(location)->getType() == Terrain_Rock)
@@ -702,7 +725,25 @@ void UnitBase::navigate() {
         // navigation is only performed every 5th frame
 
         if(!moving && !justStoppedMoving) {
-            if(location != destination) {
+            if(!pathList.empty() && !isCachedPathStillValid()) {
+                clearPath();
+            }
+
+            // Check if we're "close enough" to destination (within 3 tiles for non-forced moves)
+            // This prevents traffic jams when many units try to reach the same rally point
+            // EXCLUDE utility units (harvesters, MCVs, sandworms) that need precise positioning
+            bool closeEnough = false;
+            const bool isUtilityUnit = (itemID == Unit_Harvester || itemID == Unit_MCV || itemID == Unit_Sandworm);
+            if(!forced && !isUtilityUnit && location != destination) {
+                FixPoint distToDest = blockDistance(location, destination);
+                if(distToDest <= 3) {
+                    closeEnough = true;
+                    // Clear path and stop trying to get closer
+                    clearPath();
+                }
+            }
+            
+            if(location != destination && !closeEnough) {
                 if(nextSpotFound == false)  {
 
                     if(pathList.empty() && (recalculatePathTimer == 0) && !pathRequestQueued) {
@@ -715,6 +756,13 @@ void UnitBase::navigate() {
                         nextSpotFound = true;
                         recalculatePathTimer = 0;
                         noCloserPointCount = 0;
+                    } else {
+                        // Unit is paused - track why
+                        if(pathRequestQueued) {
+                            currentGame->frameTiming.pauseWaitingForPath++;
+                        } else if(recalculatePathTimer > 0) {
+                            currentGame->frameTiming.pauseRecalcCooldown++;
+                        }
                     }
                 } else {
                     int tempAngle = currentGameMap->getPosAngle(location, nextSpot);
@@ -723,6 +771,25 @@ void UnitBase::navigate() {
                     }
 
                     if(!canPass(nextSpot.x, nextSpot.y)) {
+                        // Check if blockage is temporary (another moving unit)
+                        // First verify nextSpot is on the map (canPass returns false for out-of-bounds)
+                        if(currentGameMap->tileExists(nextSpot)) {
+                            Tile* nextTile = currentGameMap->getTile(nextSpot);
+                            if(nextTile && nextTile->hasAnObject()) {
+                                ObjectBase* blocker = nextTile->getObject();
+                                if(blocker && blocker->isAUnit()) {
+                                    UnitBase* blockingUnit = static_cast<UnitBase*>(blocker);
+                                    if(blockingUnit->isMoving()) {
+                                        // Both units are moving - wait a cycle for blocker to move
+                                        // Don't clear path, blocker will likely move soon
+                                        currentGame->frameTiming.pauseWaitingForBlocker++;
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Static blocker, structure, or out-of-bounds - clear path and reroute
                         clearPath();
                     } else {
                         if (drawnAngle == nextSpotAngle)    {
@@ -732,6 +799,9 @@ void UnitBase::navigate() {
                             assignToMap(nextSpot);
                             angle = drawnAngle;
                             setSpeeds();
+                        } else {
+                            // Unit needs to turn to face next waypoint
+                            currentGame->frameTiming.pauseTurningToFace++;
                         }
                     }
                 }
@@ -1256,9 +1326,10 @@ void UnitBase::targeting() {
                !isInWeaponRange(target.getObjPointer())) {
                 enqueueTargetRequest(TargetRequestKind::Refresh);
             } else if(!target && !attackPos && !forced) {
-                // For HUNT mode, allow target search even while moving (critical for air units)
-                // For other modes, only search when not moving
-                if(attackMode == HUNT || (!moving && !justStoppedMoving)) {
+                // Utility units (harvesters, MCVs, sandworms) and HUNT mode can acquire targets while moving
+                // Other attack modes only when stopped
+                const bool isUtilityUnit = (itemID == Unit_Harvester || itemID == Unit_MCV || itemID == Unit_Sandworm);
+                if(isUtilityUnit || attackMode == HUNT || (!moving && !justStoppedMoving)) {
                     enqueueTargetRequest(TargetRequestKind::Acquire);
                 }
             }
@@ -1307,9 +1378,9 @@ void UnitBase::resolvePendingTargetRequest() {
     }
 
     if(request == TargetRequestKind::Acquire) {
-        // For HUNT mode, allow target search even while moving (critical for air units)
-        // For other modes, only search when not moving
-        if(!target && !attackPos && !forced && (attackMode == HUNT || (!moving && !justStoppedMoving))) {
+        // By the time we're resolving, targeting() already decided this request was appropriate
+        // Just execute it without re-checking queue stress or movement state
+        if(!target && !attackPos && !forced) {
             const ObjectBase* pNewTarget = findTarget();
 
             if(pNewTarget != nullptr) {
@@ -1370,6 +1441,35 @@ UnitBase::PathRequestStats UnitBase::resolvePendingPathRequest() {
     if(invalidDestination) {
         return stats;
     }
+    
+    // Simple stuck detection: track if we're making progress toward destination
+    const FixPoint currentDistance = blockDistance(location, destination);
+    
+    // Check on EVERY path attempt (success or failure): did we get closer?
+    if(lastDistanceToDestination >= 0) {
+        if(currentDistance < lastDistanceToDestination - 0.5_fix) {
+            // Made progress, reset counter
+            noProgressCount = 0;
+        } else {
+            // No progress, increment counter
+            noProgressCount++;
+            
+            // After 3 attempts without progress, request carryall (if cooldown expired)
+            if(noProgressCount >= 3 && carryallRequestCooldown <= 0 && (location != oldLocation)) {
+                if(getOwner()->hasCarryalls()
+                   && this->isAGroundUnit()
+                   && (currentGame->getGameInitSettings().getGameOptions().manualCarryallDrops || getOwner()->isAI())
+                   && currentDistance >= MIN_CARRYALL_LIFT_DISTANCE) {
+                    
+                    static_cast<GroundUnit*>(this)->requestCarryall();
+                    noProgressCount = 0;
+                    carryallRequestCooldown = MILLI2CYCLES(5000); // 5 second cooldown
+                }
+            }
+        }
+    }
+    
+    lastDistanceToDestination = currentDistance;
 
     if(!pathFound) {
         if((++noCloserPointCount >= 3) && (location != oldLocation)) {
@@ -1518,6 +1618,7 @@ bool UnitBase::update() {
     if(recalculatePathTimer > 0) recalculatePathTimer--;
     if(findTargetTimer > 0) findTargetTimer--;
     if(primaryWeaponTimer > 0) primaryWeaponTimer--;
+    if(carryallRequestCooldown > 0) carryallRequestCooldown--;
     if(secondaryWeaponTimer > 0) secondaryWeaponTimer--;
     if(deviationTimer != INVALID) {
         if(--deviationTimer <= 0) {
@@ -1599,33 +1700,128 @@ bool UnitBase::canPass(int xPos, int yPos) const {
     return true;
 }
 
+Coord UnitBase::resolvePathDestination() const {
+    if(target && target.getObjPointer() != nullptr) {
+        const ObjectBase* pTargetObject = target.getObjPointer();
+
+        if(itemID == Unit_Carryall && pTargetObject->getItemID() == Structure_Refinery) {
+            return pTargetObject->getLocation() + Coord(2,0);
+        } else if(itemID == Unit_Frigate && pTargetObject->getItemID() == Structure_StarPort) {
+            return pTargetObject->getLocation() + Coord(1,1);
+        }
+
+        return pTargetObject->getClosestPoint(location);
+    }
+
+    return destination;
+}
+
+void UnitBase::updateCachedPathMetadata(const Coord& destinationCoord) {
+    cachedPathDestination = destinationCoord;
+    cachedPathRevision = (currentGameMap != nullptr) ? currentGameMap->getPathingRevision() : 0;
+}
+
+bool UnitBase::isCachedPathStillValid() {
+    auto registerHit = [&]() {
+        if(currentGame != nullptr) {
+            currentGame->frameTiming.pathReuseHitsWindow++;
+        }
+    };
+    auto registerMiss = [&]() {
+        if(currentGame != nullptr) {
+            currentGame->frameTiming.pathReuseMissesWindow++;
+        }
+    };
+
+    if(pathList.empty() || currentGameMap == nullptr) {
+        registerMiss();
+        return false;
+    }
+
+    Coord desiredDestination = resolvePathDestination();
+    if(!desiredDestination.isValid()) {
+        registerMiss();
+        return false;
+    }
+    
+    // HUNT mode optimization: allow path reuse if target moved slightly
+    // Only apply tolerance when queue is building up (>= 10) to reduce load
+    if(desiredDestination != cachedPathDestination) {
+        if(attackMode == HUNT) {
+            // Check if queue is building up
+            const bool queueBusy = (currentGame != nullptr) && 
+                                   (currentGame->getPathRequestQueueSize() >= 10);
+            
+            if(queueBusy) {
+                FixPoint distance = blockDistance(desiredDestination, cachedPathDestination);
+                if(distance < 5) {
+                    // Queue is building up and target moved < 5 tiles - keep heading in that direction
+                    cachedPathDestination = desiredDestination;
+                    registerHit();
+                    return true;
+                }
+            }
+            
+            // Queue is healthy or target moved >5 tiles - repath for responsiveness
+            if(currentGame != nullptr) {
+                currentGame->frameTiming.pathInvalidHuntTooFar++;
+            }
+        } else {
+            if(currentGame != nullptr) {
+                currentGame->frameTiming.pathInvalidDestChanged++;
+            }
+        }
+        
+        // Not in HUNT or destination changed significantly
+        registerMiss();
+        return false;
+    }
+
+    const Uint32 currentRevision = currentGameMap->getPathingRevision();
+    if(cachedPathRevision == currentRevision) {
+        registerHit();
+        return true;
+    }
+
+    int nodesChecked = 0;
+    for(const Coord& coord : pathList) {
+        if(!currentGameMap->tileExists(coord) || !canPass(coord.x, coord.y)) {
+            if(currentGame != nullptr) {
+                currentGame->frameTiming.pathInvalidBlocked++;
+            }
+            registerMiss();
+            return false;
+        }
+
+        if(++nodesChecked >= kPathValidationProbeCount) {
+            registerHit();
+            return true;
+        }
+    }
+
+    cachedPathRevision = currentRevision;
+    registerHit();
+    return true;
+}
+
 bool UnitBase::SearchPathWithAStar(std::size_t& nodesExpanded, bool& invalidDestination) {
     nodesExpanded = 0;
     invalidDestination = false;
 
-    Coord destinationCoord;
-
-    if(target && target.getObjPointer() != nullptr) {
-        if(itemID == Unit_Carryall && target.getObjPointer()->getItemID() == Structure_Refinery) {
-            destinationCoord = target.getObjPointer()->getLocation() + Coord(2,0);
-        } else if(itemID == Unit_Frigate && target.getObjPointer()->getItemID() == Structure_StarPort) {
-            destinationCoord = target.getObjPointer()->getLocation() + Coord(1,1);
-        } else {
-            destinationCoord = target.getObjPointer()->getClosestPoint(location);
-        }
-    } else {
-        destinationCoord = destination;
-    }
+    Coord destinationCoord = resolvePathDestination();
 
     AStarSearch pathfinder(currentGameMap, this, location, destinationCoord);
     nodesExpanded = static_cast<size_t>(pathfinder.getNodesChecked());
     pathList = pathfinder.getFoundPath();
 
     if(pathList.empty()) {
+        cachedPathDestination.invalidate();
+        cachedPathRevision = 0;
         nextSpotFound = false;
         return false;
     }
 
+    updateCachedPathMetadata(destinationCoord);
     return true;
 }
 
