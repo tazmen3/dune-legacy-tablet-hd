@@ -684,9 +684,6 @@ void QuantBot::onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID)
 	else if (!supportMode && pObject->isAGroundUnit()) {
 		const GroundUnit* pGroundUnit = static_cast<const GroundUnit*>(pObject);
 
-		// Use rally location instead of squad center to avoid constant destination changes
-		Coord squadCenterLocation = squadRallyLocation;
-
 		if (pGroundUnit->isAwaitingPickup()) {
 			return;
 		}
@@ -2721,9 +2718,6 @@ void QuantBot::attack(int militaryValue) {
 	logDebug("Attack: house: %d  dif: %d  mStr: %d  mLim: %d  attackTimer: %d",
 		getHouse()->getHouseID(), static_cast<Uint8>(difficulty), militaryValue, militaryValueLimit, attackTimer);
 
-	// Use rally location instead of squad center to avoid constant destination changes
-	Coord squadCenterLocation = squadRallyLocation;
-
 	for (const UnitBase* pUnit : getUnitList()) {
 		if (pUnit->isRespondable()
 			&& (pUnit->getOwner() == getHouse())
@@ -2969,58 +2963,55 @@ Coord QuantBot::findSquadCenter(int houseID) {
 }
 
 /**
- * Move a unit to the optimal squad position.
- * Chooses between actual squad center and squad rally point based on which is closer.
- * Only moves if the unit is outside the radius of both positions.
+ * Move a unit to the rally point if outside acceptable radius.
+ * SIMPLIFIED: Only uses static rally point, not dynamic squad center.
+ * This prevents constant repathing as the squad center shifts every cycle.
  * 
  * @param pUnit The unit to potentially move
- * @param squadRadius The acceptable radius around either position (unit won't move if within this radius)
+ * @param squadRadius The acceptable radius around rally point (unit won't move if within this radius)
  */
 void QuantBot::moveToOptimalSquadPosition(const UnitBase* pUnit, FixPoint squadRadius) {
 	if (!pUnit || !pUnit->isRespondable()) {
 		return;
 	}
 
-	// Calculate actual squad center (dynamic, based on unit positions)
-	Coord actualSquadCenter = findSquadCenter(getHouse()->getHouseID());
-	
 	// Use established rally location (static, set by AI)
 	Coord rallyPoint = squadRallyLocation;
 	
-	// If neither location is valid, do nothing
-	if (!actualSquadCenter.isValid() && !rallyPoint.isValid()) {
+	// If no rally point, do nothing
+	if (!rallyPoint.isValid()) {
 		return;
 	}
 	
 	Coord unitLocation = pUnit->getLocation();
+	Coord unitDestination = pUnit->getDestination();
 	
-	// Calculate distances to both positions
-	FixPoint distToSquadCenter = actualSquadCenter.isValid() ? 
-		blockDistance(unitLocation, actualSquadCenter) : FixPt_MAX;
-	FixPoint distToRallyPoint = rallyPoint.isValid() ? 
-		blockDistance(unitLocation, rallyPoint) : FixPt_MAX;
+	// Calculate distance to rally point
+	FixPoint distToRallyPoint = blockDistance(unitLocation, rallyPoint);
 	
-	// Check if unit is already within acceptable radius of either position
-	bool withinSquadRadius = (distToSquadCenter <= squadRadius);
-	bool withinRallyRadius = (distToRallyPoint <= squadRadius);
-	
-	// If within radius of either, don't move
-	if (withinSquadRadius || withinRallyRadius) {
-		return;
+	// Check if unit is already within acceptable radius
+	if (distToRallyPoint <= squadRadius) {
+		return;  // Already close enough
 	}
 	
-	// Unit is outside both radii - move to the closer one
-	Coord targetPosition;
-	if (distToSquadCenter < distToRallyPoint) {
-		targetPosition = actualSquadCenter;
-	} else {
-		targetPosition = rallyPoint;
+	// Check if unit is already heading to a location within the acceptable radius
+	// This prevents repathing when the unit is already on its way
+	if (unitDestination.isValid()) {
+		FixPoint destToRallyPoint = blockDistance(unitDestination, rallyPoint);
+		if (destToRallyPoint <= squadRadius) {
+			return;  // Already heading close enough, keep current path
+		}
 	}
 	
-	// Move to the closer position
-	if (targetPosition.isValid()) {
-		doMove2Pos(pUnit, targetPosition.x, targetPosition.y, false);
+	// CRITICAL: Don't add non-essential rally movements when pathfinding is overloaded
+	// If queue is stressed (>300 paths), skip rally repositioning
+	// Combat/retreat movements will still happen via other code paths
+	if (currentGame != nullptr && currentGame->isPathQueueStressed()) {
+		return;  // Queue overloaded, skip non-critical movement
 	}
+	
+	// Unit is outside radius and not heading there - move to rally point
+	doMove2Pos(pUnit, rallyPoint.x, rallyPoint.y, false);
 }
 
 /**
@@ -3228,17 +3219,15 @@ void QuantBot::retreatAllUnits() {
                                 moveToOptimalSquadPosition(pUnit, squadRadius + 2);
                             }
                             
-                            // Check if we've reached the retreat position
-                            Coord actualSquadCenter = findSquadCenter(getHouse()->getHouseID());
-                            FixPoint distToSquadCenter = actualSquadCenter.isValid() ? 
-                                blockDistance(pUnit->getLocation(), actualSquadCenter) : FixPt_MAX;
-                            FixPoint distToRallyPoint = squadRallyLocation.isValid() ? 
-                                blockDistance(pUnit->getLocation(), squadRallyLocation) : FixPt_MAX;
-                            
-                            // If within radius of either, we've finished retreating
-                            if (distToSquadCenter <= squadRadius + 2 || distToRallyPoint <= squadRadius + 2) {
-                                // We have finished retreating back to the rally point
-                                doSetAttackMode(pUnit, AREAGUARD);
+                            // Check if we've reached the rally point
+                            if (squadRallyLocation.isValid()) {
+                                FixPoint distToRallyPoint = blockDistance(pUnit->getLocation(), squadRallyLocation);
+                                
+                                // If within radius, we've finished retreating
+                                if (distToRallyPoint <= squadRadius + 2) {
+                                    // We have finished retreating back to the rally point
+                                    doSetAttackMode(pUnit, AREAGUARD);
+                                }
                             }
                         }
                         else if (pUnit->getAttackMode() == GUARD
