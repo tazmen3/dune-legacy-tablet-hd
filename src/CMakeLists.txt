@@ -440,44 +440,44 @@ endif()
 # Install data directory
 # For macOS bundles, data files are already inside the .app via POST_BUILD commands
 if(WIN32)
-    # Windows: install data to share/DuneLegacy to match hardcoded game paths
+    # Windows: install PAK files to root directory where game expects them
     # Use Visual Studio build output which has all PAK files
     set(VS_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/bin/Release-x64")
     
     if(EXISTS "${VS_OUTPUT_DIR}")
-        # Install all PAK files from VS build output
+        # Install all PAK files from VS build output to root directory
         install(
             DIRECTORY ${VS_OUTPUT_DIR}/
-            DESTINATION share/${PROJECT_NAME}
+            DESTINATION .
             FILES_MATCHING PATTERN "*.PAK"
         )
         
-        # Install all other data files (locale, maps, config, txt files)
+        # Install all other data files (locale, maps, config, txt files) to root
         install(
             DIRECTORY ${VS_OUTPUT_DIR}/locale
-            DESTINATION share/${PROJECT_NAME}
+            DESTINATION .
             OPTIONAL
         )
         install(
             DIRECTORY ${VS_OUTPUT_DIR}/maps
-            DESTINATION share/${PROJECT_NAME}
+            DESTINATION .
             OPTIONAL
         )
         install(
             DIRECTORY ${VS_OUTPUT_DIR}/config
-            DESTINATION share/${PROJECT_NAME}
+            DESTINATION .
             OPTIONAL
         )
         install(
             FILES "${VS_OUTPUT_DIR}/Dune2-Versions.txt"
-            DESTINATION share/${PROJECT_NAME}
+            DESTINATION .
             OPTIONAL
         )
     else()
         # Fallback to data directory if VS output doesn't exist
         install(
             DIRECTORY ${DATA_DIR}/
-            DESTINATION share/${PROJECT_NAME}
+            DESTINATION .
             FILES_MATCHING PATTERN "*.*"
         )
     endif()

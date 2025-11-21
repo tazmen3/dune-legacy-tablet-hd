@@ -159,11 +159,11 @@ endif()
 # Install data files
 # Install configuration template files to config subdirectory
 # For macOS bundles, these are already inside the .app via POST_BUILD commands
-# For Windows with VS build, config files are installed from VS output directory
+# For Windows with VS build, config files are installed from VS output directory to root
 if(NOT APPLE)
     set(VS_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/bin/Release-x64")
     if(WIN32 AND EXISTS "${VS_OUTPUT_DIR}/config")
-        # Config files will be installed from VS output directory (see src/CMakeLists.txt)
+        # Config files will be installed from VS output directory to root (see src/CMakeLists.txt)
     else()
         install(FILES 
             config/ObjectData.bak

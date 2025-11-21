@@ -765,17 +765,18 @@ void Game::checkBudgetAdjustment() {
 }
 
 void Game::applySinglePlayerBudgetAdjustment(float avgFps) {
-    // With vsync disabled, use 80 FPS threshold for budget increases
-    const double fpsThreshold = 80.0;
+    // Use 60-80 FPS range to prevent oscillation (20 FPS dead zone for stability)
+    const double fpsIncreaseThreshold = 80.0;
+    const double fpsDecreaseThreshold = 60.0;
     
-    // DROP: If average FPS is below 50, reduce budget aggressively
-    if(avgFps < 50.0 && negotiatedBudget > kMinBudget) {
+    // DROP: If average FPS is below threshold, reduce budget aggressively
+    if(avgFps < fpsDecreaseThreshold && negotiatedBudget > kMinBudget) {
         size_t oldBudget = negotiatedBudget;
         requestLowerBudget(8);  // Reduce by 4k (8 × 500) - aggressive
         
-        SDL_Log("[PathBudget] Cycle %d: Average FPS below 50: %.1f FPS - reducing budget (8 steps × 500) %zu -> %zu", 
+        SDL_Log("[PathBudget] Cycle %d: Average FPS below 60: %.1f FPS - reducing budget (8 steps × 500) %zu -> %zu", 
                 gameCycleCount, avgFps, oldBudget, negotiatedBudget);
-        logPerformance("[PathBudget] Cycle %d: Average FPS below 50: %.1f FPS - reducing budget %zu -> %zu", 
+        logPerformance("[PathBudget] Cycle %d: Average FPS below 60: %.1f FPS - reducing budget %zu -> %zu", 
                 gameCycleCount, avgFps, oldBudget, negotiatedBudget);
         
         lastBudgetAction = BudgetAction::DECREASED;  // Track action
@@ -784,7 +785,7 @@ void Game::applySinglePlayerBudgetAdjustment(float avgFps) {
         logFrameTiming();
     }
     // RAISE: If average FPS is good AND pathfinding isn't consuming too much time
-    else if(avgFps > fpsThreshold && negotiatedBudget < kMaxBudget) {
+    else if(avgFps > fpsIncreaseThreshold && negotiatedBudget < kMaxBudget) {
         // ANTI-OSCILLATION: Don't increase if we just increased last cycle
         // This ensures at least 2 intervals (12 seconds) between increases
         if(lastBudgetAction == BudgetAction::INCREASED) {
@@ -834,7 +835,7 @@ void Game::applySinglePlayerBudgetAdjustment(float avgFps) {
                     gameCycleCount, negotiatedBudget);
         }
     }
-    // NOTE: Don't reset lastBudgetAction when FPS is stable (50-57)!
+    // NOTE: Don't reset lastBudgetAction when FPS is stable (60-80)!
     // We need to preserve the action state for anti-oscillation to work.
     // lastBudgetAction is only reset after we've skipped an increase cycle.
 }
@@ -1020,10 +1021,11 @@ void Game::makeHostBudgetDecision() {
     size_t newBudget = negotiatedBudget;
     const char* decisionReason = "STABLE";
     
-    // With vsync disabled, use 80 FPS threshold for budget increases
-    const double fpsThreshold = 80.0;
+    // Use 60-80 FPS range to prevent oscillation (20 FPS dead zone for stability)
+    const double fpsIncreaseThreshold = 80.0;
+    const double fpsDecreaseThreshold = 60.0;
     
-    if(minFps < 50.0) {
+    if(minFps < fpsDecreaseThreshold) {
         // AT LEAST ONE peer is struggling with FPS → REDUCE budget aggressively
         newBudget = negotiatedBudget >= 4000 + kMinBudget ? 
                     negotiatedBudget - 4000 : kMinBudget;
@@ -1038,7 +1040,7 @@ void Game::makeHostBudgetDecision() {
         decisionReason = "REDUCE (high CPU)";
         lastBudgetAction = BudgetAction::DECREASED;  // Track action for multiplayer sync
     }
-    else if(minFps > fpsThreshold && negotiatedBudget < kMaxBudget) {
+    else if(minFps > fpsIncreaseThreshold && negotiatedBudget < kMaxBudget) {
         // ALL peers have good FPS → consider INCREASE
         
         // ANTI-OSCILLATION: Don't increase if we just increased last cycle
