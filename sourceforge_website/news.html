@@ -130,6 +130,49 @@
           <br />
 
           <div class="post">
+            <div class="post-title"><h2><a name="2025-11-21-00-00-00">Dune Legacy 0.98.7.1 Released</a></h2></div>
+            <div class="post-date">November 21, 2025</div>
+            <div class="post-body">
+              <p>Dune Legacy 0.98.7.1 is now available! This release doubles the map editor's design canvas, overhauls the pathfinding pipeline, restores the classic Campaign AI as the default opponent, and adds stability fixes for both single-player and multiplayer queue stress situations.</p>
+              <h3>🗺️ Map Editor Enhancements</h3>
+              <ul>
+                <li><b>Expanded Map Sizes:</b> Map editor now supports creating maps up to <b>512x512 tiles</b> (doubled from previous 256x256 limit)</li>
+                <li><b>Improved Size Selection:</b> Map size dropdowns now increment by 64 tiles for better granularity (64, 128, 192, 256, 320, 384, 448, 512)</li>
+                <li><b>Enhanced Radar/Minimap:</b> Automatic scaling and centering for all map sizes on the radar viewport</li>
+              </ul>
+              <h3>⚙️ Performance & Pathfinding</h3>
+              <ul>
+                <li><b>New Path Cache:</b> Unit path requests are cached with destination and map revision tracking so idle squads no longer flush and recompute identical paths every tick</li>
+                <li><b>Map Revision System:</b> Terrain updates (like structures being placed/destroyed) now increment a pathing revision counter. Cached paths are invalidated only when the topology truly changes, keeping 90% of previously computed paths reusable</li>
+                <li><b>A* Buffer Pool:</b> The A* searcher reuses a pool of preallocated tile buffers, removing thousands of malloc/free cycles during late-game battles and cutting frame spikes</li>
+                <li><b>Stuck Detection & Rescue:</b> Units track progress toward their destination, automatically request a carryall if they fail to make progress</li>
+                <li><b>Queue-Stress Protection:</b> Military squads stop repathing when the queue depth exceeds 300. Multiplayer FPS drops (12 FPS → 50+ FPS) are eliminated</li>
+                <li><b>Uncapped Rendering:</b> VSync is now disabled by default so PCs with fast monitors can run at 120+ FPS</li>
+              </ul>
+              <h3>🧠 AI & Unit Behavior</h3>
+              <ul>
+                <li><b>Default AI:</b> CampaignAIPlayer replaces qBot as the default opponent - authentic Dune II behavior out of the box</li>
+                <li><b>Ground-Contact Activation:</b> Original AI activation now only triggers after ground-unit contact, matching the classic campaign flow</li>
+                <li><b>Builder Defaults:</b> AI-produced harvesters automatically start in HARVEST mode</li>
+                <li><b>Immediate Defense:</b> Campaign AI now scrambles defenders (including Deviators and Launchers) whenever structures or harvesters are hit</li>
+              </ul>
+              <h3>🧩 Compatibility & Build System</h3>
+              <ul>
+                <li><b>Savegame Back-Compat:</b> Save files as old as version 0.97.05 load cleanly</li>
+                <li><b>MSVC Builds Restored:</b> Campaign AI data tables rewritten to avoid GCC-only designated initializers. CMake toolchain back to C++17</li>
+                <li><b>Windows Polish:</b> The Windows executable icon embedding was fixed. <b>All PAK files now included in installer!</b></li>
+              </ul>
+              <h3>Download</h3>
+              <ul>
+                <li><b>Windows:</b> <a href="https://sourceforge.net/projects/dunelegacy/files/dunelegacy/0.98.0aplpha/DuneLegacy-0.98.7.1-Windows-x64.exe/download">DuneLegacy-0.98.7.1-Windows-x64.exe</a></li>
+                <li><b>macOS:</b> <a href="https://sourceforge.net/projects/dunelegacy/files/dunelegacy/0.98.0aplpha/DuneLegacy-0.98.7.1-macOS.dmg/download">DuneLegacy-0.98.7.1-macOS.dmg</a></li>
+              </ul>
+              <p><b>Gameplay Impact:</b> Large-scale skirmishes with 600+ active units hold steady frame times thanks to cached paths and smarter queue budgeting. Multiplayer clients no longer crater to sub-15 FPS when squads are ordered to regroup. Create epic 512x512 maps for longer strategic battles!</p>
+              <p>For full details, see the <a href="dune-legacy-0.98.7.1-released.html">release notes</a>.</p>
+            </div>
+          </div>
+
+          <div class="post">
             <div class="post-title"><h2><a name="2025-11-03-00-00-00">Dune Legacy 0.98.6.6 Released</a></h2></div>
             <div class="post-date">November 3, 2025</div>
             <div class="post-body">
