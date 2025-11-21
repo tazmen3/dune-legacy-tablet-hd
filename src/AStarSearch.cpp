@@ -24,8 +24,93 @@
 #include <units/UnitBase.h>
 
 #include <stdlib.h>
+#include <cstring>
+
+std::array<AStarSearch::TilePoolEntry, AStarSearch::TilePoolSize> AStarSearch::tilePool = {};
+static size_t gPoolReuseHits = 0;
+static size_t gPoolBufferExpansions = 0;
+static size_t gPoolFallbackAllocs = 0;
 
 #define MAX_NODES_CHECKED   (128*128)
+
+AStarSearch::TileData* AStarSearch::acquireTileBuffer(size_t requiredCount) {
+    // First pass: exact/oversized matches to minimize new allocations
+    for(TilePoolEntry& entry : tilePool) {
+        if(entry.inUse || entry.buffer == nullptr) {
+            continue;
+        }
+
+        if(entry.capacity >= requiredCount) {
+            entry.inUse = true;
+            std::memset(entry.buffer, 0, requiredCount * sizeof(TileData));
+            ++gPoolReuseHits;
+            return entry.buffer;
+        }
+    }
+
+    // Second pass: grow or create buffers in free slots
+    for(TilePoolEntry& entry : tilePool) {
+        if(entry.inUse) {
+            continue;
+        }
+
+        if(entry.buffer == nullptr || entry.capacity < requiredCount) {
+            std::free(entry.buffer);
+            entry.buffer = static_cast<TileData*>(std::calloc(requiredCount, sizeof(TileData)));
+            if(entry.buffer == nullptr) {
+                throw std::bad_alloc();
+            }
+            entry.capacity = requiredCount;
+            ++gPoolBufferExpansions;
+        } else {
+            std::memset(entry.buffer, 0, requiredCount * sizeof(TileData));
+        }
+
+        entry.inUse = true;
+        return entry.buffer;
+    }
+
+    // Fallback: allocate without pooling (should be rare)
+    TileData* buffer = static_cast<TileData*>(std::calloc(requiredCount, sizeof(TileData)));
+    if(buffer == nullptr) {
+        throw std::bad_alloc();
+    }
+    ++gPoolFallbackAllocs;
+    return buffer;
+}
+
+void AStarSearch::releaseTileBuffer(TileData* buffer) {
+    if(buffer == nullptr) {
+        return;
+    }
+
+    for(TilePoolEntry& entry : tilePool) {
+        if(entry.buffer == buffer) {
+            entry.inUse = false;
+            return;
+        }
+    }
+
+    std::free(buffer);
+}
+
+AStarSearch::PoolUsageStats AStarSearch::getPoolUsageStats() {
+    PoolUsageStats stats;
+    stats.reuseHits = gPoolReuseHits;
+    stats.bufferExpansions = gPoolBufferExpansions;
+    stats.fallbackAllocs = gPoolFallbackAllocs;
+    stats.totalBuffers = TilePoolSize;
+
+    size_t inUse = 0;
+    for(const TilePoolEntry& entry : tilePool) {
+        if(entry.inUse && entry.buffer != nullptr) {
+            ++inUse;
+        }
+    }
+    stats.buffersInUse = inUse;
+
+    return stats;
+}
 
 AStarSearch::AStarSearch(Map* pMap, UnitBase* pUnit, Coord start, Coord destination) {
     FixPoint rotationSpeed = 1.0_fix/(currentGame->objectData.data[pUnit->getItemID()][pUnit->getOriginalHouseID()].turnspeed * TILESIZE);
@@ -34,10 +119,8 @@ AStarSearch::AStarSearch(Map* pMap, UnitBase* pUnit, Coord start, Coord destinat
     sizeY = pMap->getSizeY();
     numNodesChecked = 0;
 
-    mapData = static_cast<TileData*>(calloc(sizeX*sizeY, sizeof(TileData)));
-    if(mapData == nullptr) {
-        throw std::bad_alloc();
-    }
+    const size_t tileCount = static_cast<size_t>(sizeX) * static_cast<size_t>(sizeY);
+    mapData = acquireTileBuffer(tileCount);
 
     FixPoint heuristic = blockDistance(start, destination);
     FixPoint smallestHeuristic = FixPt_MAX;
@@ -156,6 +239,5 @@ AStarSearch::AStarSearch(Map* pMap, UnitBase* pUnit, Coord start, Coord destinat
 }
 
 AStarSearch::~AStarSearch() {
-    free(mapData);
+    releaseTileBuffer(mapData);
 }
-

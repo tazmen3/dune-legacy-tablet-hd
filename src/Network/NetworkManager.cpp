@@ -611,6 +611,7 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
             } break;
 
             case NETWORKPACKET_CONFIG_HASH: {
+                Uint32 peerProtocolVersion = packetStream.readUint32();
                 std::string gameVersion = packetStream.readString();
                 std::string quantBotHash = packetStream.readString();
                 std::string objectDataHash = packetStream.readString();
@@ -623,6 +624,7 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                     
                     SDL_Log("========== CONFIG HASH RECEIVED ==========");
                     SDL_Log("From: %s", peerData->name.c_str());
+                    SDL_Log("Protocol version: %d", peerProtocolVersion);
                     SDL_Log("Game version: %s", gameVersion.c_str());
                     SDL_Log("QuantBot Config.ini hash: %s", quantBotHash.c_str());
                     SDL_Log("ObjectData.ini hash: %s", objectDataHash.c_str());
@@ -636,10 +638,13 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                     if(bIsServer) {
                         // Server: verify client matches server config
                         SDL_Log("========== SERVER CONFIG VERIFICATION ==========");
+                        SDL_Log("Server protocol version: %d", NETWORK_PROTOCOL_VERSION);
                         SDL_Log("Server game version: %s", localVersion.c_str());
                         SDL_Log("Server QuantBot Config.ini hash: %s", localQuantBotHash.c_str());
                         SDL_Log("Server ObjectData.ini hash: %s", localObjectDataHash.c_str());
                         SDL_Log("Checking peer: %s", peerData->name.c_str());
+                        SDL_Log("  Peer protocol: %d (Match: %s)", peerProtocolVersion,
+                                (peerProtocolVersion == NETWORK_PROTOCOL_VERSION) ? "YES" : "NO");
                         SDL_Log("  Peer version: %s (Match: %s)", peerData->gameVersion.c_str(),
                                 (peerData->gameVersion == localVersion) ? "YES" : "NO");
                         SDL_Log("  Peer QuantBot: %s (Match: %s)", peerData->quantBotConfigHash.c_str(), 
@@ -651,6 +656,12 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                         bool mismatchFound = false;
                         std::string mismatchMessage;
                         
+                        if(peerProtocolVersion != NETWORK_PROTOCOL_VERSION) {
+                            mismatchFound = true;
+                            mismatchMessage += fmt::sprintf("\n- %s has incompatible network protocol version\n  Client: %d\n  Server: %d",
+                                                           peerData->name.c_str(), peerProtocolVersion, NETWORK_PROTOCOL_VERSION);
+                            SDL_Log("*** MISMATCH: Network protocol version differs!");
+                        }
                         if(peerData->gameVersion != localVersion) {
                             mismatchFound = true;
                             mismatchMessage += fmt::sprintf("\n- %s has different game version\n  Client: %s\n  Server: %s",
@@ -687,10 +698,13 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                     } else {
                         // Client: verify server matches client config AND send our hash back
                         SDL_Log("========== CLIENT CONFIG VERIFICATION ==========");
+                        SDL_Log("Client protocol version: %d", NETWORK_PROTOCOL_VERSION);
                         SDL_Log("Client game version: %s", localVersion.c_str());
                         SDL_Log("Client QuantBot Config.ini hash: %s", localQuantBotHash.c_str());
                         SDL_Log("Client ObjectData.ini hash: %s", localObjectDataHash.c_str());
                         SDL_Log("Checking server: %s", peerData->name.c_str());
+                        SDL_Log("  Server protocol: %d (Match: %s)", peerProtocolVersion,
+                                (peerProtocolVersion == NETWORK_PROTOCOL_VERSION) ? "YES" : "NO");
                         SDL_Log("  Server version: %s (Match: %s)", peerData->gameVersion.c_str(),
                                 (peerData->gameVersion == localVersion) ? "YES" : "NO");
                         SDL_Log("  Server QuantBot: %s (Match: %s)", peerData->quantBotConfigHash.c_str(), 
@@ -702,6 +716,12 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                         bool mismatchFound = false;
                         std::string mismatchMessage;
                         
+                        if(peerProtocolVersion != NETWORK_PROTOCOL_VERSION) {
+                            mismatchFound = true;
+                            mismatchMessage += fmt::sprintf("\n- Network protocol version differs\n  Your version: %d\n  Server version: %d",
+                                                           NETWORK_PROTOCOL_VERSION, peerProtocolVersion);
+                            SDL_Log("*** MISMATCH: Network protocol version differs!");
+                        }
                         if(peerData->gameVersion != localVersion) {
                             mismatchFound = true;
                             mismatchMessage += fmt::sprintf("\n- Game version differs\n  Your version: %s\n  Server version: %s",
@@ -728,6 +748,7 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                         SDL_Log("Sending client config to server for verification");
                         ENetPacketOStream responsePacket(ENET_PACKET_FLAG_RELIABLE);
                         responsePacket.writeUint32(NETWORKPACKET_CONFIG_HASH);
+                        responsePacket.writeUint32(NETWORK_PROTOCOL_VERSION);
                         responsePacket.writeString(localVersion);
                         responsePacket.writeString(localQuantBotHash);
                         responsePacket.writeString(localObjectDataHash);
@@ -785,7 +806,7 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
             } break;
 
             case NETWORKPACKET_CLIENTSTATS: {
-                // Host receives client performance stats
+                // Host receives client performance stats (including simulation timing)
                 if(!bIsServer) {
                     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Client received CLIENTSTATS packet (should only be sent to host)");
                     break;
@@ -793,6 +814,7 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
 
                 Uint32 gameCycle = packetStream.readUint32();
                 float avgFps = packetStream.readFloat();
+                float simMsAvg = packetStream.readFloat();  // POST-VSYNC: Read simulation timing
                 Uint32 queueDepth = packetStream.readUint32();
                 Uint32 currentBudget = packetStream.readUint32();
 
@@ -801,7 +823,7 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                 Uint32 clientId = peer->address.host ^ peer->address.port;
 
                 if(pOnReceiveClientStats) {
-                    pOnReceiveClientStats(clientId, gameCycle, avgFps, queueDepth, currentBudget);
+                    pOnReceiveClientStats(clientId, gameCycle, avgFps, simMsAvg, queueDepth, currentBudget);
                 }
             } break;
 
@@ -901,6 +923,7 @@ void NetworkManager::sendChangeEventList(const ChangeEventList& changeEventList)
 void NetworkManager::sendConfigHash(const std::string& quantBotHash, const std::string& objectDataHash, const std::string& gameVersion) {
     SDL_Log("========== SENDING CONFIG HASHES ==========");
     SDL_Log("Role: %s", bIsServer ? "SERVER" : "CLIENT");
+    SDL_Log("Protocol Version: %d", NETWORK_PROTOCOL_VERSION);
     SDL_Log("Version: %s", gameVersion.c_str());
     SDL_Log("QuantBot: %s", quantBotHash.c_str());
     SDL_Log("ObjectData: %s", objectDataHash.c_str());
@@ -911,6 +934,7 @@ void NetworkManager::sendConfigHash(const std::string& quantBotHash, const std::
         for(ENetPeer* pCurrentPeer : peerList) {
             ENetPacketOStream packetStream(ENET_PACKET_FLAG_RELIABLE);
             packetStream.writeUint32(NETWORKPACKET_CONFIG_HASH);
+            packetStream.writeUint32(NETWORK_PROTOCOL_VERSION);
             packetStream.writeString(gameVersion);
             packetStream.writeString(quantBotHash);
             packetStream.writeString(objectDataHash);
@@ -921,6 +945,7 @@ void NetworkManager::sendConfigHash(const std::string& quantBotHash, const std::
         SDL_Log("Sending to server");
         ENetPacketOStream packetStream(ENET_PACKET_FLAG_RELIABLE);
         packetStream.writeUint32(NETWORKPACKET_CONFIG_HASH);
+        packetStream.writeUint32(NETWORK_PROTOCOL_VERSION);
         packetStream.writeString(gameVersion);
         packetStream.writeString(quantBotHash);
         packetStream.writeString(objectDataHash);
@@ -978,8 +1003,8 @@ void NetworkManager::debugNetwork(const char* fmt, ...) {
     }
 }
 
-void NetworkManager::sendClientStats(float avgFps, Uint32 queueDepth, Uint32 currentBudget, Uint32 gameCycle) {
-    // Client → Host: Send performance stats
+void NetworkManager::sendClientStats(float avgFps, float simMsAvg, Uint32 queueDepth, Uint32 currentBudget, Uint32 gameCycle) {
+    // Client → Host: Send performance stats (including simulation timing for post-vsync throttling)
     if(bIsServer) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Host trying to send client stats (should only be called by clients)");
         return;
@@ -989,6 +1014,7 @@ void NetworkManager::sendClientStats(float avgFps, Uint32 queueDepth, Uint32 cur
     packetStream.writeUint32(NETWORKPACKET_CLIENTSTATS);
     packetStream.writeUint32(gameCycle);
     packetStream.writeFloat(avgFps);
+    packetStream.writeFloat(simMsAvg);  // POST-VSYNC: Add simulation timing
     packetStream.writeUint32(queueDepth);
     packetStream.writeUint32(currentBudget);
 

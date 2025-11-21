@@ -74,6 +74,9 @@ void StructureBase::init() {
 StructureBase::~StructureBase() {
     try {
         currentGameMap->removeObjectFromMap(getObjectID()); //no map point will reference now
+        if(currentGameMap != nullptr) {
+            currentGameMap->incrementPathingRevision();
+        }
         currentGame->getObjectManager().removeObject(getObjectID());
         structureList.remove(this);
         owner->decrementStructures(itemID, location);
@@ -130,6 +133,7 @@ void StructureBase::assignToMap(const Coord& pos) {
     }
 
     currentGameMap->viewMap(getOwner()->getHouseID(), pos, getViewRange());
+    currentGameMap->incrementPathingRevision();
 
     if(!bFoundNonConcreteTile && !currentGame->getGameInitSettings().getGameOptions().structuresDegradeOnConcrete) {
         degradeTimer = -1;

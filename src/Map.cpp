@@ -34,7 +34,7 @@
 #include <set>
 
 Map::Map(int xSize, int ySize)
- : sizeX(xSize), sizeY(ySize), lastSinglySelectedObject(nullptr) {
+ : sizeX(xSize), sizeY(ySize), lastSinglySelectedObject(nullptr), pathingRevision(0) {
 
     tiles.resize(sizeX * sizeY);
 
@@ -71,6 +71,10 @@ void Map::init_tile_location() {
             tiles[tile_index(i, j)].location = Coord(i, j);
         }
     }
+}
+
+void Map::incrementPathingRevision() noexcept {
+    ++pathingRevision;
 }
 
 void Map::createSandRegions() {
@@ -757,4 +761,3 @@ void Map::createSpiceField(Coord location, int radius, bool centerIsThickSpice) 
         }
     }
 }
-

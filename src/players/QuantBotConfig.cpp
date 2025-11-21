@@ -104,18 +104,18 @@ QuantBotConfig::QuantBotConfig() {
     // Single set of ratios used across all difficulties
     // Ornithopter spam controlled by OrnithopterAttackEnabled flag (disabled for Defend/Easy/Medium)
     
-    // Atreides - Specializes in Sonic Tanks with balanced ornithopter support
-    unitRatios.atreides.tank = 0.00f;
-    unitRatios.atreides.siegeTank = 0.00f;
-    unitRatios.atreides.launcher = 0.20f;
-    unitRatios.atreides.special = 0.65f;          // Sonic tank
+    // Atreides - Balanced mix with strong launcher/sonic presence
+    unitRatios.atreides.tank = 0.05f;
+    unitRatios.atreides.siegeTank = 0.10f;
+    unitRatios.atreides.launcher = 0.35f;
+    unitRatios.atreides.special = 0.35f;          // Sonic tank
     unitRatios.atreides.ornithopter = 0.15f;
     
-    // Harkonnen - Cannot build ornithopters, focuses on heavy firepower
-    unitRatios.harkonnen.tank = 0.10f;
-    unitRatios.harkonnen.siegeTank = 0.10f;
-    unitRatios.harkonnen.launcher = 0.70f;
-    unitRatios.harkonnen.special = 0.10f;         // Devastator
+    // Harkonnen - Cannot build ornithopters, focuses on heavy firepower (capped launcher at 50%)
+    unitRatios.harkonnen.tank = 0.17f;
+    unitRatios.harkonnen.siegeTank = 0.17f;
+    unitRatios.harkonnen.launcher = 0.50f;
+    unitRatios.harkonnen.special = 0.16f;         // Devastator
     unitRatios.harkonnen.ornithopter = 0.00f;     // Can't build
     
     // Ordos - Cannot build launchers, highest ornithopter ratio for air superiority
@@ -125,12 +125,12 @@ QuantBotConfig::QuantBotConfig() {
     unitRatios.ordos.special = 0.25f;             // Deviator
     unitRatios.ordos.ornithopter = 0.25f;
     
-    // Fremen - Balanced with light ornithopter support
-    unitRatios.fremen.tank = 0.65f;
-    unitRatios.fremen.siegeTank = 0.05f;
-    unitRatios.fremen.launcher = 0.20f;
+    // Fremen - Balanced with light ornithopter support (capped tank at 50%)
+    unitRatios.fremen.tank = 0.50f;
+    unitRatios.fremen.siegeTank = 0.10f;
+    unitRatios.fremen.launcher = 0.27f;
     unitRatios.fremen.special = 0.00f;
-    unitRatios.fremen.ornithopter = 0.10f;
+    unitRatios.fremen.ornithopter = 0.13f;
     
     // Sardaukar - Heavy firepower with light ornithopter support
     unitRatios.sardaukar.tank = 0.05f;

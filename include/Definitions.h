@@ -30,7 +30,7 @@
 #define DEFAULT_METASERVER  "https://dunelegacy.com/metaserver/metaserver.php"
 
 #define SAVEMAGIC           8675309
-#define SAVEGAMEVERSION     9804  // Incremented for CampaignAIPlayer attackTriggered flag
+#define SAVEGAMEVERSION     9805  // Incremented for UnitBase stuck-detection fields (lastDistanceToDestination, noProgressCount, lastDestination)
 
 #define MAX_PLAYERNAMELENGHT    24
 

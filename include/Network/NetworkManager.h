@@ -55,6 +55,10 @@
 #define NETWORKPACKET_SETPATHBUDGET         12  // Phase 1.4: Budget negotiation
 #define NETWORKPACKET_CLIENTSTATS           13  // Multiplayer: Client performance stats
 
+// Network protocol version - increment when packet formats change
+// Version 2: Added simMsAvg to NETWORKPACKET_CLIENTSTATS (5 fields instead of 4)
+#define NETWORK_PROTOCOL_VERSION            2
+
 #define AWAITING_CONNECTION_TIMEOUT     5000
 
 class GameInitSettings;
@@ -192,7 +196,7 @@ public:
         Sets the function that should be called when client performance stats are received (host only).
         \param  pOnReceiveClientStats   function to call on receive
     */
-    inline void setOnReceiveClientStats(std::function<void (Uint32, Uint32, float, Uint32, Uint32)> pOnReceiveClientStats) {
+    inline void setOnReceiveClientStats(std::function<void (Uint32, Uint32, float, float, Uint32, Uint32)> pOnReceiveClientStats) {
         this->pOnReceiveClientStats = pOnReceiveClientStats;
     }
 
@@ -206,12 +210,13 @@ public:
 
     /**
         Sends client performance stats to host (client → host).
-        \param  avgFps          Average FPS
+        \param  avgFps          Average FPS (legacy metric)
+        \param  simMsAvg        Average simulation time per tick in ms (primary metric)
         \param  queueDepth      Pathfinding queue depth
         \param  currentBudget   Current path budget (for validation)
         \param  gameCycle       Current game cycle
     */
-    void sendClientStats(float avgFps, Uint32 queueDepth, Uint32 currentBudget, Uint32 gameCycle);
+    void sendClientStats(float avgFps, float simMsAvg, Uint32 queueDepth, Uint32 currentBudget, Uint32 gameCycle);
 
     /**
         Broadcasts a path budget change to all clients (host → all clients).
@@ -283,7 +288,7 @@ private:
     std::function<void (const std::string&, const CommandList&)>            pOnReceiveCommandList;
     std::function<void (const std::string&, const std::set<Uint32>&, int)>  pOnReceiveSelectionList;
     std::function<void (const std::string&)>                                 pOnConfigMismatch;
-    std::function<void (Uint32, Uint32, float, Uint32, Uint32)>             pOnReceiveClientStats;      // Host: (clientId, gameCycle, avgFps, queueDepth, currentBudget)
+    std::function<void (Uint32, Uint32, float, float, Uint32, Uint32)>     pOnReceiveClientStats;      // Host: (clientId, gameCycle, avgFps, simMsAvg, queueDepth, currentBudget)
     std::function<void (size_t, Uint32)>                                     pOnReceiveSetPathBudget;    // Client: (newBudget, applyCycle)
 
     std::unique_ptr<LANGameFinderAndAnnouncer>  pLANGameFinderAndAnnouncer = nullptr;

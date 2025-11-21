@@ -237,6 +237,10 @@ public:
         nextSpotAngle = INVALID;
         noCloserPointCount = 0;
         pathRequestQueued = false;
+        noProgressCount = 0;
+        lastDistanceToDestination = -1;
+        cachedPathDestination.invalidate();
+        cachedPathRevision = 0;
     }
 
     inline bool isTracked() const { return tracked; }
@@ -287,6 +291,9 @@ protected:
     void quitDeviation();
 
     bool SearchPathWithAStar(size_t& nodesExpanded, bool& invalidDestination);
+    bool isCachedPathStillValid();
+    void updateCachedPathMetadata(const Coord& destinationCoord);
+    Coord resolvePathDestination() const;
 
     void drawSmoke(int x, int y) const;
 
@@ -324,6 +331,13 @@ protected:
     std::list<Coord> pathList;       ///< The path to the destination found so far
     TargetRequestKind pendingTargetRequest = TargetRequestKind::None;
     bool pathRequestQueued = false;
+    Coord    cachedPathDestination = Coord::Invalid(); ///< Destination associated with the current cached path
+    Uint32   cachedPathRevision = 0;                   ///< Map revision used to validate the cached path
+    
+    // Stuck detection (transient - not saved)
+    FixPoint lastDistanceToDestination = -1;  ///< Distance to destination on last pathfinding attempt
+    Uint8    noProgressCount = 0;             ///< Attempts without getting closer
+    Sint32   carryallRequestCooldown = 0;     ///< Cooldown timer to prevent spam requests
 
     Sint32  findTargetTimer;         ///< When to look for the next target?
     Sint32  primaryWeaponTimer;      ///< When can the primary weapon shot again?

@@ -30,6 +30,8 @@
 
 #include <units/InfantryBase.h>
 
+#include <limits>
+
 #define MAX_SANDWORMSLEEPTIME 50000
 #define MIN_SANDWORMSLEEPTIME 10000
 
@@ -408,23 +410,95 @@ const ObjectBase* Sandworm::findTarget() const {
         return nullptr;
     }
 
-    const ObjectBase* closestTarget = nullptr;
-
-    if((attackMode == HUNT) || (attackMode == AREAGUARD)) {
-        FixPoint closestDistance = FixPt_MAX;
-
-        for(UnitBase* pUnit : unitList) {
-            if (canAttack(pUnit)
-                && (blockDistance(location, pUnit->getLocation()) < closestDistance)) {
-                closestTarget = pUnit;
-                closestDistance = blockDistance(location, pUnit->getLocation());
-            }
-        }
-    } else {
-        closestTarget = ObjectBase::findTarget();
+    if(!currentGameMap->tileExists(location)) {
+        return nullptr;
     }
 
-    return closestTarget;
+    const auto maxDistanceTiles = [&]() -> int {
+        if(forced) {
+            return std::numeric_limits<int>::max();
+        }
+
+        switch(attackMode) {
+            case GUARD:
+            case AMBUSH:
+                return getViewRange();
+            case AREAGUARD:
+            case HUNT:
+                return std::numeric_limits<int>::max();
+            default:
+                return 0;
+        }
+    }();
+
+    const auto calculatePriority = [&](const UnitBase* pUnit, int distance) {
+        int basePriority = 0;
+
+        if(pUnit->isInfantry()) {
+            basePriority = 0x64;
+        } else if(pUnit->getItemID() == Unit_Harvester || pUnit->isTracked()) {
+            basePriority = 0x3E8;
+        } else if(pUnit->isAGroundUnit()) {
+            // Treat remaining ground units (trikes/quads etc.) as wheeled targets
+            basePriority = 0x1388;
+        } else {
+            return 0;
+        }
+
+        if(pUnit->isMoving() || pUnit->hasATarget()) {
+            basePriority *= 4;
+        }
+
+        if(distance <= 0) {
+            distance = 1;
+        }
+
+        basePriority = (basePriority / distance);
+        if(distance < 2) {
+            basePriority *= 2;
+        }
+
+        return basePriority;
+    };
+
+    const UnitBase* bestTarget = nullptr;
+    int bestPriority = 0;
+
+    for(UnitBase* pUnit : unitList) {
+        if(pUnit == nullptr || pUnit == this) {
+            continue;
+        }
+        if(!canAttack(pUnit)) {
+            continue;
+        }
+        // NOTE: Fog-of-war check removed - sandworms should detect all valid targets
+        // in range regardless of player visibility. Fog-of-war only affects UI/player
+        // knowledge, not unit behavior. Including it breaks multiplayer determinism
+        // (each client would filter differently) and prevents worms from attacking
+        // unscouted enemies in single-player.
+
+        const FixPoint fpDistance = blockDistance(location, pUnit->getLocation());
+        if(fpDistance > maxDistanceTiles) {
+            continue;
+        }
+
+        const int distance = fpDistance.lround();
+        const int priority = calculatePriority(pUnit, distance);
+        if(priority > bestPriority) {
+            bestPriority = priority;
+            bestTarget = pUnit;
+        }
+    }
+
+    if(bestTarget != nullptr) {
+        return bestTarget;
+    }
+
+    if((attackMode == HUNT) || (attackMode == AREAGUARD)) {
+        return nullptr;
+    }
+
+    return ObjectBase::findTarget();
 }
 
 int Sandworm::getCurrentAttackAngle() const {

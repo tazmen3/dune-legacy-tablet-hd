@@ -60,7 +60,10 @@ Bullet::Bullet(Uint32 shooterID, Coord* newRealLocation, Coord* newRealDestinati
               && detonationTimer > 0) {
         const ObjectBase* pInitialTarget = target.getObjPointer();
         if(pInitialTarget && pInitialTarget->isAFlyingUnit()) {
-            detonationTimer *= 2;
+            // Air targets: Dynasty uses 120 frames @ 20Hz movement = 0.8 seconds
+            // (120 frames ÷ 3 ticks/frame ÷ 60Hz = 0.8s)
+            // Legacy: 50 cycles @ 62.5Hz = 0.8 seconds (50 × 16ms = 800ms)
+            detonationTimer = 50;
         }
     }
 
@@ -81,11 +84,28 @@ Bullet::Bullet(Uint32 shooterID, Coord* newRealLocation, Coord* newRealDestinati
         destination.x = newRealLocation->x + floor(diffX*ratio);
         destination.y = newRealLocation->y + floor(diffY*ratio);
     } else if(bulletID == Bullet_Rocket || bulletID == Bullet_DRocket) {
+        // Dynasty scatter algorithm - applies to both ground AND air targets
         FixPoint distance = distanceFrom(*newRealLocation, *newRealDestination);
+        const int distanceInTiles = std::max(0, lround(distance / TILESIZE));
 
+        // Pick scatter limit: 15/16 chance → (tiles + 8), 1/16 chance → rand(255) + 8
+        int scatterLimit;
+        if((currentGame->randomGen.rand(0, 15)) != 0) {
+            scatterLimit = distanceInTiles + 8;
+        } else {
+            scatterLimit = currentGame->randomGen.rand(0, 255) + 8;
+        }
 
-        FixPoint randAngle = 2 * FixPt_PI * currentGame->randomGen.randFixPoint();
-        int radius = currentGame->randomGen.rand(0,lround(TILESIZE/2 + (distance/TILESIZE)));
+        // Pick radius and repeatedly halve until under limit (biases toward large values)
+        int radius = currentGame->randomGen.rand(0, 255);
+        while(radius > scatterLimit) {
+            radius /= 2;
+        }
+
+        // Apply scatter in random direction
+        // Dynasty formula: offset = (k_stepX[angle] * radius) / 128
+        // where k_stepX ∈ [-128,128], so normalized = cos(angle)
+        const FixPoint randAngle = 2 * FixPt_PI * currentGame->randomGen.randFixPoint();
 
         destination.x += lround(FixPoint::cos(randAngle) * radius);
         destination.y -= lround(FixPoint::sin(randAngle) * radius);
@@ -99,8 +119,8 @@ Bullet::Bullet(Uint32 shooterID, Coord* newRealLocation, Coord* newRealDestinati
     location.x = newRealLocation->x/TILESIZE;
     location.y = newRealLocation->y/TILESIZE;
 
-    // Calculate angle based on the (possibly modified) destination, not the original target
-    FixPoint angleRad =  destinationAngleRad(*newRealLocation, destination);
+    // v0.96.4: Launch toward original target, rockets steer toward scattered destination during flight
+    FixPoint angleRad =  destinationAngleRad(*newRealLocation, *newRealDestination);
     angle = RadToDeg256(angleRad);
     drawnAngle = lround(numFrames*angle/256) % numFrames;
 
@@ -153,7 +173,7 @@ void Bullet::init()
     switch(bulletID) {
         case Bullet_DRocket: {
             damageRadius = TILESIZE/2;
-            speed = 25.6_fix;
+            speed = 19.2_fix;  // Dynasty 240 px/s × 5.0 = 1,200 px/s ÷ 62.5Hz = 19.2
             detonationTimer = 19;
             numFrames = 16;
             graphic = pGFXManager->getObjPic(ObjPic_Bullet_MediumRocket, houseID);
@@ -169,7 +189,7 @@ void Bullet::init()
 
         case Bullet_Rocket: {
             damageRadius = TILESIZE/2;
-            speed = 25.6_fix;
+            speed = 19.2_fix;  // Dynasty 240 px/s × 5.0 = 1,200 px/s ÷ 62.5Hz = 19.2
             detonationTimer = 22;
             numFrames = 16;
             graphic = pGFXManager->getObjPic(ObjPic_Bullet_MediumRocket, houseID);
@@ -177,8 +197,11 @@ void Bullet::init()
 
         case Bullet_TurretRocket: {
             damageRadius = TILESIZE/2;
-            speed = 20.48_fix;
-            detonationTimer = 60;
+            speed = 19.2_fix;  // Match launcher: Dynasty 240 px/s × 5.0 = 1,200 px/s ÷ 62.5Hz = 19.2
+            // Dynasty: fireDistance 60, doubled to 120 for air targets
+            // Dynasty fireDelay decrements every 3 ticks @ 60Hz = 120 * 3/60 = 6.0 seconds
+            // Legacy: 6000ms / 16ms per cycle = 375 cycles (at default game speed)
+            detonationTimer = MILLI2CYCLES(6000);  // 6 seconds max flight time
             numFrames = 16;
             graphic = pGFXManager->getObjPic(ObjPic_Bullet_MediumRocket, houseID);
         } break;
@@ -329,15 +352,16 @@ void Bullet::blitToScreen() const
 
 void Bullet::update()
 {
-    if(bulletID == Bullet_Rocket || bulletID == Bullet_DRocket || bulletID == Bullet_TurretRocket) {
+    if(bulletID == Bullet_Rocket || bulletID == Bullet_DRocket) {
 
-        // Note: In original Dune 2, rockets did NOT continuously track targets.
-        // For BALANCE: Enable tracking for all rockets vs air units (gameplay > authenticity)
-        // Without tracking, fast-moving ornithopters are nearly impossible to hit
+        // Dynasty: Launcher/Deviator rockets track flying units but fire at scattered position for ground
         ObjectBase* pTarget = target.getObjPointer();
-        if(pTarget && pTarget->isAFlyingUnit()) {
+        
+        if(pTarget != nullptr && pTarget->isAFlyingUnit()) {
+            // Track the moving air unit's current position (for both steering AND proximity check)
             destination = pTarget->getCenterPoint();
         }
+        // Ground targets: use the static scattered destination
 
         FixPoint angleToDestinationRad = destinationAngleRad(Coord(lround(realX), lround(realY)), destination);
         FixPoint angleToDestination = RadToDeg256(angleToDestinationRad);
@@ -349,6 +373,49 @@ void Bullet::update()
             angleDifference += 256;
         }
 
+        // v0.96.4: FixPt(4,5) = 4.5°/tick
+        static const FixPoint turnSpeed = 4.5_fix;
+
+        if(angleDifference >= turnSpeed) {
+            angleDifference = turnSpeed;
+        } else if(angleDifference <= -turnSpeed) {
+            angleDifference = -turnSpeed;
+        }
+
+        angle += angleDifference;
+
+        if(angle < 0) {
+            angle += 256;
+        } else if(angle >= 256) {
+            angle -= 256;
+        }
+
+        xSpeed = speed * FixPoint::cos(Deg256ToRad(angle));
+        ySpeed = speed * -FixPoint::sin(Deg256ToRad(angle));
+
+        drawnAngle = lround(numFrames*angle/256) % numFrames;
+    } else if(bulletID == Bullet_TurretRocket) {
+
+        // Dynasty: Turret rockets actively track their moving target
+        ObjectBase* pTarget = target.getObjPointer();
+        
+        if(pTarget != nullptr) {
+            // Update destination to track the moving target's current position
+            destination = pTarget->getCenterPoint();
+        }
+        // If target destroyed, continue to last known position (destination unchanged)
+
+        FixPoint angleToDestinationRad = destinationAngleRad(Coord(lround(realX), lround(realY)), destination);
+        FixPoint angleToDestination = RadToDeg256(angleToDestinationRad);
+
+        FixPoint angleDifference = angleToDestination - angle;
+        if(angleDifference > 128) {
+            angleDifference -= 256;
+        } else if(angleDifference < -128) {
+            angleDifference += 256;
+        }
+
+        // v0.96.4: FixPt(4,5) = 4.5°/tick (same as launcher/deviator rockets)
         static const FixPoint turnSpeed = 4.5_fix;
 
         if(angleDifference >= turnSpeed) {
@@ -391,12 +458,8 @@ void Bullet::update()
             detonationTimer--;
         }
 
-        if(bulletID == Bullet_TurretRocket && detonationTimer == 0) {
-            // MULTIPLAYER-SAFE: Track turret rocket expiration
-            ObjectBase* pTarget = target.getObjPointer();
-            if(pTarget && pTarget->getItemID() == Unit_Ornithopter) {
-                currentGame->combatStats.turretRocketsExpired++;
-            }
+        // Dynasty: All rockets with expired timers detonate mid-flight
+        if((bulletID == Bullet_TurretRocket) && detonationTimer == 0) {
             destroy();
             return;
         }
@@ -438,11 +501,26 @@ void Bullet::update()
         if(oldDistanceToDestination < newDistanceToDestination || newDistanceToDestination < 4)  {
 
             if(bulletID == Bullet_Rocket || bulletID == Bullet_DRocket) {
-                realX = destination.x;
-                realY = destination.y;
+                // Check if targeting a flying unit
+                ObjectBase* pTarget = target.getObjPointer();
+                bool isAirTarget = (pTarget != nullptr && pTarget->isAFlyingUnit());
+                
+                if(isAirTarget) {
+                    // Dynasty-style: Air targets detonate immediately on proximity (no timer check)
+                    // Scatter was already applied at launch, tracking during flight
+                    destroy();
+                    return;
+                } else {
+                    // v0.96.4: Ground targets only detonate if timer has expired
+                    // This creates the point-blank miss behavior
+                    if(detonationTimer == 0) {
                 destroy();
                 return;
+                    }
+                }
             } else if(bulletID == Bullet_TurretRocket) {
+                // Dynasty/v0.96.4: Turret rockets (anti-air) detonate IMMEDIATELY upon reaching destination
+                // No timer check needed - they should always hit their target on proximity
                 // MULTIPLAYER-SAFE: Track proximity detonation
                 ObjectBase* pTarget = target.getObjPointer();
                 if(pTarget && pTarget->getItemID() == Unit_Ornithopter) {
@@ -460,15 +538,8 @@ void Bullet::update()
             }
         }
 
-        if((bulletID == Bullet_Rocket || bulletID == Bullet_DRocket) && detonationTimer == 0) {
-            // MULTIPLAYER-SAFE: Track launcher rocket expiration
-            ObjectBase* pTarget = target.getObjPointer();
-            if(pTarget && pTarget->getItemID() == Unit_Ornithopter) {
-                currentGame->combatStats.launcherRocketsExpired++;
-            }
-            destroy();
-            return;
-        }
+        // v0.96.4: Launcher rockets do NOT explode when timer expires mid-flight
+        // They only explode when reaching destination AND timer == 0 (checked above)
     }
 }
 

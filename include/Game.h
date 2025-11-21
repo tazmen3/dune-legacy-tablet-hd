@@ -244,6 +244,8 @@ public:
     inline GameInterface& getGameInterface() { return *pInterface; };
     void queueTargetRequest(Uint32 objectId);
     void queuePathRequest(Uint32 objectId);
+    inline size_t getPathRequestQueueSize() const { return pathRequestQueue.size(); }
+    inline bool isPathQueueStressed() const { return pathRequestQueue.size() > 300; }
     SpatialGrid* getSpatialGrid() const { return spatialGrid.get(); }
     void initializeSpatialGrid(int mapWidth, int mapHeight);
 
@@ -631,6 +633,21 @@ public:
         std::array<uint64_t, 7> pathTokenHistogram{};  // Buckets for token distribution
         int maxPathQueueLength = 0;
         int pathBudgetStarvedFrames = 0;
+        size_t pathReuseHitsWindow = 0;
+        size_t pathReuseMissesWindow = 0;
+        size_t totalPathReuseHits = 0;
+        size_t totalPathReuseMisses = 0;
+        
+        // Path invalidation reasons (for debugging)
+        size_t pathInvalidDestChanged = 0;
+        size_t pathInvalidHuntTooFar = 0;
+        size_t pathInvalidBlocked = 0;
+        
+        // Movement pause reasons (for debugging stuttering)
+        uint64_t pauseWaitingForPath = 0;      // Path queued, waiting for result
+        uint64_t pauseWaitingForBlocker = 0;   // Waiting for moving unit to clear
+        uint64_t pauseRecalcCooldown = 0;      // recalculatePathTimer > 0
+        uint64_t pauseTurningToFace = 0;       // Turning to face next waypoint
         
         // Phase 2: Token budget tracking
         int tokenBudgetExhaustedCount = 0;  // How often we hit 20k token limit
@@ -687,6 +704,10 @@ public:
         double unitTurnMsThisFrame = 0.0;
         double unitVisibilityMsThisFrame = 0.0;
         int unitCount = 0;
+        
+        // Simulation timing for CPU load detection (post-vsync)
+        double simMsAvg = 0.0;              // Exponential moving average of simulation time per tick
+        bool simulationLagging = false;     // Flag: true when simMsAvg exceeds high threshold
     };
 
     FrameTiming frameTiming;
@@ -725,6 +746,7 @@ public:
     }
     
     void dumpCombatStats();  // Dump combat statistics
+    void logPathInstrumentationIfNeeded();
 
 private:
     bool        chatMode = false;   ///< chat mode on?
@@ -750,6 +772,7 @@ private:
     Uint32      gameCycleCount = 0;
 
     Uint32      skipToGameCycle = 0;            ///< skip to this game cycle
+    Uint32      lastPathInstrumentationLogCycle = 0;
     
     Uint32      loadedSavegameVersion = 0;      ///< Version of loaded savegame (for backward compatibility)
 
@@ -838,6 +861,10 @@ private:
     
     static constexpr int kBudgetCheckInterval = 375;  // Check every 375 cycles (~7.5s at 50Hz)
     
+    // Track last budget action to prevent oscillation (deterministic, synced state)
+    enum class BudgetAction { NONE, INCREASED, DECREASED };
+    BudgetAction lastBudgetAction = BudgetAction::NONE;
+    
     int cycleGuardrailTrips = 0;      // Counter for cycle limit hits
     
     void requestLowerBudget(int steps = 1);  // Request budget reduction via network (steps × 500)
@@ -846,7 +873,8 @@ private:
     struct ClientPerformanceStats {
         Uint32 clientId;
         Uint32 lastUpdateCycle;
-        float avgFps;
+        float avgFps;               // Legacy metric (still useful for display)
+        float simMsAvg;             // POST-VSYNC: Primary metric for CPU load detection
         Uint32 queueDepth;
         Uint32 currentBudget;
         int missedUpdates = 0;
@@ -864,8 +892,8 @@ private:
     
     // Multiplayer budget negotiation functions
     void checkBudgetAdjustment();
-    void sendStatsToHost(float avgFps, size_t queueDepth, size_t currentBudget);
-    void handleClientStats(Uint32 clientId, Uint32 gameCycle, float avgFps, Uint32 queueDepth, Uint32 currentBudget);
+    void sendStatsToHost(float avgFps, float simMsAvg, size_t queueDepth, size_t currentBudget);
+    void handleClientStats(Uint32 clientId, Uint32 gameCycle, float avgFps, float simMsAvg, Uint32 queueDepth, Uint32 currentBudget);
     void makeHostBudgetDecision();
     void broadcastBudgetChange(size_t newBudget);
     void handleSetPathBudget(size_t newBudget, Uint32 applyCycle);

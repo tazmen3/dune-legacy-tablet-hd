@@ -65,6 +65,12 @@ public:
 
     void createSpiceField(Coord location, int radius, bool centerIsThickSpice = false) const;
 
+    Uint32 getPathingRevision() const noexcept {
+        return pathingRevision;
+    }
+
+    void incrementPathingRevision() noexcept;
+
     Sint32 getSizeX() const noexcept {
         return sizeX;
     }
@@ -180,6 +186,7 @@ private:
     Sint32  sizeY;                          ///< number of tiles this map is high (read only)
     std::vector<Tile> tiles;                ///< the 2d-array containing all the tiles of the map
     ObjectBase* lastSinglySelectedObject;   ///< The last selected object. If selected again all units of the same type are selected
+    Uint32 pathingRevision = 0;             ///< Bumps when long-lived blocking geometry changes to invalidate cached paths
 
     void init_tile_location();
 
