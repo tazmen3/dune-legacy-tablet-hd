@@ -318,8 +318,15 @@ elseif(APPLE)
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/install
         COMMAND ${CMAKE_COMMAND} -E echo "Installing to staging directory..."
         COMMAND ${CMAKE_COMMAND} --install . --prefix install --config Release
+        COMMAND ${CMAKE_COMMAND} -E echo "Forcing correct binary into install - workaround for CMake install bug..."
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/bin/dunelegacy.app/Contents/MacOS/dunelegacy ${CMAKE_BINARY_DIR}/install/dunelegacy.app/Contents/MacOS/dunelegacy
         COMMAND ${CMAKE_COMMAND} -E echo "Creating DMG..."
         COMMAND ${CMAKE_CPACK_COMMAND} -G DragNDrop -C Release
+        COMMAND ${CMAKE_COMMAND} -E echo "Fixing binary in CPack staging - workaround for CMake install bug..."
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/bin/dunelegacy.app/Contents/MacOS/dunelegacy ${CMAKE_BINARY_DIR}/_CPack_Packages/Darwin/DragNDrop/DuneLegacy-${PROJECT_VERSION}-macOS/ALL_IN_ONE/dunelegacy.app/Contents/MacOS/dunelegacy
+        COMMAND ${CMAKE_COMMAND} -E echo "Recreating DMG with correct binary..."
+        COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/DuneLegacy-${PROJECT_VERSION}-macOS.dmg
+        COMMAND ${CMAKE_CPACK_COMMAND} -G DragNDrop -C Release --config ${CMAKE_BINARY_DIR}/CPackConfig.cmake
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "Building macOS DMG installer (with guaranteed fresh install)..."
     )
