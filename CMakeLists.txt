@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.15)
 project(DuneLegacy VERSION 0.98.7.1 LANGUAGES C CXX)
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -30,14 +30,14 @@ endif()
 # Check for modern C++ support
 if(MSVC)
     # Use C++17 consistently
-    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD 20)
 else()
     # Check if compiler supports C++17
     include(CheckCXXCompilerFlag)
     check_cxx_compiler_flag("-std=c++17" COMPILER_SUPPORTS_CXX17)
     
     if(COMPILER_SUPPORTS_CXX17)
-        set(CMAKE_CXX_STANDARD 17)
+        set(CMAKE_CXX_STANDARD 20)
     else()
         set(CMAKE_CXX_STANDARD 14)
         message(STATUS "C++17 not supported, falling back to C++14")

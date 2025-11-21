@@ -33,94 +33,81 @@
 // Build priorities from Dune Dynasty unitinfo.c/structureinfo.c (priorityBuild field)
 // Higher value = HIGHER priority (opposite of buildtime)
 // NOTE: Most structure priorities are 0, but turrets have non-zero values (for rebuild priority)
-static const int buildPriorityMap[Num_ItemID] = {
+static inline int getBuildPriority(int itemID) {
     // Units (from Dynasty src/table/unitinfo.c)
-    [Unit_Carryall] = 20,
-    [Unit_Ornithopter] = 75,
-    [Unit_Infantry] = 20,       // Soldier
-    [Unit_Troopers] = 50,       // Trooper
-    [Unit_Soldier] = 20,        // Infantry squad
-    [Unit_Trooper] = 50,        // Trooper squad
-    [Unit_Saboteur] = 0,        // Never auto-build
-    [Unit_Launcher] = 100,
-    [Unit_Deviator] = 50,
-    [Unit_Tank] = 80,
-    [Unit_SiegeTank] = 130,
-    [Unit_Devastator] = 175,
-    [Unit_SonicTank] = 80,
-    [Unit_Trike] = 50,
-    [Unit_RaiderTrike] = 55,
-    [Unit_Quad] = 60,
-    [Unit_Harvester] = 10,      // Low (rarely auto-built in Original AI)
-    [Unit_MCV] = 10,            // Low (never auto-built)
-    [Unit_Frigate] = 0,         // Never
-    [Unit_Sandworm] = 0,        // Never
+    if (itemID == Unit_Carryall) return 20;
+    if (itemID == Unit_Ornithopter) return 75;
+    if (itemID == Unit_Infantry || itemID == Unit_Soldier) return 20;  // Soldier / Infantry squad
+    if (itemID == Unit_Troopers || itemID == Unit_Trooper) return 50;  // Trooper / Trooper squad
+    if (itemID == Unit_Saboteur) return 0;  // Never auto-build
+    if (itemID == Unit_Launcher) return 100;
+    if (itemID == Unit_Deviator) return 50;
+    if (itemID == Unit_Tank) return 80;
+    if (itemID == Unit_SiegeTank) return 130;
+    if (itemID == Unit_Devastator) return 175;
+    if (itemID == Unit_SonicTank) return 80;
+    if (itemID == Unit_Trike) return 50;
+    if (itemID == Unit_RaiderTrike) return 55;
+    if (itemID == Unit_Quad) return 60;
+    if (itemID == Unit_Harvester) return 10;  // Low (rarely auto-built in Original AI)
+    if (itemID == Unit_MCV) return 10;        // Low (never auto-built)
+    if (itemID == Unit_Frigate || itemID == Unit_Sandworm) return 0;  // Never
     
     // Structures (from Dynasty src/table/structureinfo.c)
     // Most are zero (CY uses FIFO queue), but turrets have priorities for rebuild
-    [Structure_Slab1] = 0,
-    [Structure_Slab4] = 0,
-    [Structure_Palace] = 0,
-    [Structure_LightFactory] = 0,
-    [Structure_HeavyFactory] = 0,
-    [Structure_HighTechFactory] = 0,
-    [Structure_IX] = 0,
-    [Structure_WOR] = 0,
-    [Structure_ConstructionYard] = 0,
-    [Structure_WindTrap] = 0,
-    [Structure_Barracks] = 0,
-    [Structure_StarPort] = 0,
-    [Structure_Refinery] = 0,
-    [Structure_RepairYard] = 0,
-    [Structure_Wall] = 0,
-    [Structure_GunTurret] = 75,      // Dynasty structureinfo.c line 1037
-    [Structure_RocketTurret] = 100,  // Dynasty structureinfo.c line 1103
-    [Structure_Silo] = 0,
-    [Structure_Radar] = 0
-};
+    if (itemID == Structure_GunTurret) return 75;      // Dynasty structureinfo.c line 1037
+    if (itemID == Structure_RocketTurret) return 100;  // Dynasty structureinfo.c line 1103
+    
+    return 0;  // Default for all other structures
+}
 
 // Target priorities for attack selection (kept from old implementation)
-static const int targetPriorityMap[Num_ItemID] = {
-    [Unit_Carryall] = 36,
-    [Unit_Ornithopter] = 105,
-    [Unit_Infantry] = 40,
-    [Unit_Troopers] = 100,
-    [Unit_Soldier] = 20,
-    [Unit_Trooper] = 50,
-    [Unit_Saboteur] = 700,
-    [Unit_Launcher] = 250,
-    [Unit_Deviator] = 225,
-    [Unit_Tank] = 180,
-    [Unit_SiegeTank] = 280,
-    [Unit_Devastator] = 355,
-    [Unit_SonicTank] = 190,
-    [Unit_Trike] = 100,
-    [Unit_RaiderTrike] = 115,
-    [Unit_Quad] = 120,
-    [Unit_Harvester] = 160,
-    [Unit_MCV] = 160,
-    [Unit_Frigate] = 0,
-    [Unit_Sandworm] = 0,
-    [Structure_Slab1] = 5,
-    [Structure_Slab4] = 10,
-    [Structure_Palace] = 400,
-    [Structure_LightFactory] = 200,
-    [Structure_HeavyFactory] = 600,
-    [Structure_HighTechFactory] = 200,
-    [Structure_IX] = 100,
-    [Structure_WOR] = 175,
-    [Structure_ConstructionYard] = 300,
-    [Structure_WindTrap] = 300,
-    [Structure_Barracks] = 100,
-    [Structure_StarPort] = 250,
-    [Structure_Refinery] = 300,
-    [Structure_RepairYard] = 600,
-    [Structure_Wall] = 30,
-    [Structure_GunTurret] = 225,
-    [Structure_RocketTurret] = 175,
-    [Structure_Silo] = 150,
-    [Structure_Radar] = 275
-};
+static inline int getTargetPriority(int itemID) {
+    // Units
+    if (itemID == Unit_Carryall) return 36;
+    if (itemID == Unit_Ornithopter) return 105;
+    if (itemID == Unit_Infantry) return 40;
+    if (itemID == Unit_Troopers) return 100;
+    if (itemID == Unit_Soldier) return 20;
+    if (itemID == Unit_Trooper) return 50;
+    if (itemID == Unit_Saboteur) return 700;
+    if (itemID == Unit_Launcher) return 250;
+    if (itemID == Unit_Deviator) return 225;
+    if (itemID == Unit_Tank) return 180;
+    if (itemID == Unit_SiegeTank) return 280;
+    if (itemID == Unit_Devastator) return 355;
+    if (itemID == Unit_SonicTank) return 190;
+    if (itemID == Unit_Trike) return 100;
+    if (itemID == Unit_RaiderTrike) return 115;
+    if (itemID == Unit_Quad) return 120;
+    if (itemID == Unit_Harvester) return 160;
+    if (itemID == Unit_MCV) return 160;
+    if (itemID == Unit_Frigate) return 0;
+    if (itemID == Unit_Sandworm) return 0;
+    
+    // Structures
+    if (itemID == Structure_Slab1) return 5;
+    if (itemID == Structure_Slab4) return 10;
+    if (itemID == Structure_Palace) return 400;
+    if (itemID == Structure_LightFactory) return 200;
+    if (itemID == Structure_HeavyFactory) return 600;
+    if (itemID == Structure_HighTechFactory) return 200;
+    if (itemID == Structure_IX) return 100;
+    if (itemID == Structure_WOR) return 175;
+    if (itemID == Structure_ConstructionYard) return 300;
+    if (itemID == Structure_WindTrap) return 300;
+    if (itemID == Structure_Barracks) return 100;
+    if (itemID == Structure_StarPort) return 250;
+    if (itemID == Structure_Refinery) return 300;
+    if (itemID == Structure_RepairYard) return 600;
+    if (itemID == Structure_Wall) return 30;
+    if (itemID == Structure_GunTurret) return 225;
+    if (itemID == Structure_RocketTurret) return 175;
+    if (itemID == Structure_Silo) return 150;
+    if (itemID == Structure_Radar) return 275;
+    
+    return 0;  // Default
+}
 
 // =============================================================================
 // RebuildQueueEntry implementation
@@ -392,7 +379,7 @@ Uint32 CampaignAIPlayer::pickNextToBuild(const BuilderBase* pBuilder) {
     
     for(Uint32 itemID : candidates) {
         // Use Dynasty build priorities (higher value = higher priority)
-        int priority = (itemID < Num_ItemID) ? buildPriorityMap[itemID] : 0;
+        int priority = (itemID < Num_ItemID) ? getBuildPriority(itemID) : 0;
         
         // 25% chance to select immediately (deterministic for MP)
         if(((getHouse()->getHouseID() + itemID) % 4) == 0) {
@@ -546,7 +533,7 @@ int CampaignAIPlayer::calculateTargetPriority(const UnitBase* pUnit, const Objec
         return 0;
     }
     
-    int basePriority = targetPriorityMap[pObject->getItemID()];
+    int basePriority = getTargetPriority(pObject->getItemID());
     int distance = blockDistanceApprox(pUnit->getLocation(), pObject->getLocation());
     
     return (distance > 0) ? ((basePriority / distance) + 1) : basePriority;
