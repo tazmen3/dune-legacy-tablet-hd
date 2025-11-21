@@ -306,29 +306,27 @@ elseif(APPLE)
         set(CPACK_DMG_DS_STORE_SETUP_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/packaging/DMGSetup.scpt")
     endif()
     
-    # Add custom target for quick DMG creation
+    # Add custom target for DMG creation
+    # NOTE: We bypass CPack entirely due to persistent caching issues where old binaries
+    # would get packaged even after fresh builds. This manual approach uses hdiutil directly.
     add_custom_target(dmg
-        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning CPack cache and install directory..."
-        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/_CPack_Packages
-        COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/*.dmg
-        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/install
         COMMAND ${CMAKE_COMMAND} -E echo "Building binary..."
         COMMAND ${CMAKE_COMMAND} --build . --config Release
-        COMMAND ${CMAKE_COMMAND} -E echo "Removing install directory to force fresh install..."
-        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/install
-        COMMAND ${CMAKE_COMMAND} -E echo "Installing to staging directory..."
-        COMMAND ${CMAKE_COMMAND} --install . --prefix install --config Release
-        COMMAND ${CMAKE_COMMAND} -E echo "Forcing correct binary into install - workaround for CMake install bug..."
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/bin/dunelegacy.app/Contents/MacOS/dunelegacy ${CMAKE_BINARY_DIR}/install/dunelegacy.app/Contents/MacOS/dunelegacy
-        COMMAND ${CMAKE_COMMAND} -E echo "Creating DMG..."
-        COMMAND ${CMAKE_CPACK_COMMAND} -G DragNDrop -C Release
-        COMMAND ${CMAKE_COMMAND} -E echo "Fixing binary in CPack staging - workaround for CMake install bug..."
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/bin/dunelegacy.app/Contents/MacOS/dunelegacy ${CMAKE_BINARY_DIR}/_CPack_Packages/Darwin/DragNDrop/DuneLegacy-${PROJECT_VERSION}-macOS/ALL_IN_ONE/dunelegacy.app/Contents/MacOS/dunelegacy
-        COMMAND ${CMAKE_COMMAND} -E echo "Recreating DMG with correct binary..."
+        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning old DMG and staging..."
         COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/DuneLegacy-${PROJECT_VERSION}-macOS.dmg
-        COMMAND ${CMAKE_CPACK_COMMAND} -G DragNDrop -C Release --config ${CMAKE_BINARY_DIR}/CPackConfig.cmake
+        COMMAND ${CMAKE_COMMAND} -E remove_directory /tmp/dunelegacy_dmg_staging
+        COMMAND ${CMAKE_COMMAND} -E echo "Staging files for DMG..."
+        COMMAND ${CMAKE_COMMAND} -E make_directory /tmp/dunelegacy_dmg_staging
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/dunelegacy.app /tmp/dunelegacy_dmg_staging/dunelegacy.app
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/README /tmp/dunelegacy_dmg_staging/README
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/release_notes/RELEASE_NOTES_${PROJECT_VERSION}.md /tmp/dunelegacy_dmg_staging/Release\\ Notes.md
+        COMMAND ${CMAKE_COMMAND} -E echo "Creating DMG with hdiutil..."
+        COMMAND hdiutil create -volname "Dune Legacy ${PROJECT_VERSION}" -srcfolder /tmp/dunelegacy_dmg_staging -ov -format UDZO ${CMAKE_BINARY_DIR}/DuneLegacy-${PROJECT_VERSION}-macOS.dmg
+        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning up staging..."
+        COMMAND ${CMAKE_COMMAND} -E remove_directory /tmp/dunelegacy_dmg_staging
+        COMMAND ${CMAKE_COMMAND} -E echo "DMG created: DuneLegacy-${PROJECT_VERSION}-macOS.dmg"
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Building macOS DMG installer (with guaranteed fresh install)..."
+        COMMENT "Building macOS DMG installer (manual hdiutil - bypasses CPack caching issues)..."
     )
 else()
     set(CPACK_GENERATOR "DEB;RPM;TGZ")
