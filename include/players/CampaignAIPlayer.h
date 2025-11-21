@@ -103,6 +103,11 @@ private:
      */
     void triggerFullScaleAttack();
 
+    /**
+     * Scramble available combat units to defend the base/intruder location.
+     */
+    void scrambleUnitsAndDefend(const ObjectBase* pIntruder);
+
     std::vector<RebuildQueueEntry> rebuildQueue;  // Max 5 entries (Original AI limit)
 
     // Simple team/wave staging (lightweight stand-in for Dynasty team scripts)
