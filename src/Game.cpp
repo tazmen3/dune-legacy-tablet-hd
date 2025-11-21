@@ -765,6 +765,10 @@ void Game::checkBudgetAdjustment() {
 }
 
 void Game::applySinglePlayerBudgetAdjustment(float avgFps) {
+    // Detect if vsync is effectively disabled (FPS > 70) and use higher threshold (80 FPS)
+    // Otherwise use vsync-friendly threshold (57 FPS, close to 60 FPS cap)
+    const double fpsThreshold = (avgFps > 70.0) ? 80.0 : 57.0;
+    
     // DROP: If average FPS is below 50, reduce budget aggressively
     if(avgFps < 50.0 && negotiatedBudget > kMinBudget) {
         size_t oldBudget = negotiatedBudget;
@@ -780,8 +784,8 @@ void Game::applySinglePlayerBudgetAdjustment(float avgFps) {
         // Log full performance report on budget drops (critical events)
         logFrameTiming();
     }
-    // RAISE: If average FPS is above 57 AND pathfinding isn't consuming too much time
-    else if(avgFps > 57.0 && negotiatedBudget < kMaxBudget) {
+    // RAISE: If average FPS is good AND pathfinding isn't consuming too much time
+    else if(avgFps > fpsThreshold && negotiatedBudget < kMaxBudget) {
         // ANTI-OSCILLATION: Don't increase if we just increased last cycle
         // This ensures at least 2 intervals (12 seconds) between increases
         if(lastBudgetAction == BudgetAction::INCREASED) {
@@ -803,10 +807,10 @@ void Game::applySinglePlayerBudgetAdjustment(float avgFps) {
         
         // Safety check: don't increase if pathfinding is already eating too much time
         if(avgPathfindingMs > 10.0) {
-            SDL_Log("[PathBudget] Cycle %d: FPS=%.1f but pathfinding time too high (%.1fms) - blocking budget increase", 
-                    gameCycleCount, avgFps, avgPathfindingMs);
-            logPerformance("[PathBudget] Cycle %d: FPS=%.1f but pathfinding time too high (%.1fms) - blocking budget increase", 
-                    gameCycleCount, avgFps, avgPathfindingMs);
+            SDL_Log("[PathBudget] Cycle %d: FPS=%.1f (threshold=%.0f) but pathfinding time too high (%.1fms) - blocking budget increase", 
+                    gameCycleCount, avgFps, fpsThreshold, avgPathfindingMs);
+            logPerformance("[PathBudget] Cycle %d: FPS=%.1f (threshold=%.0f) but pathfinding time too high (%.1fms) - blocking budget increase", 
+                    gameCycleCount, avgFps, fpsThreshold, avgPathfindingMs);
             lastBudgetAction = BudgetAction::NONE;
         } else {
             // KEY INSIGHT: High queue + good FPS = we have CPU headroom to drain the queue!
@@ -817,10 +821,10 @@ void Game::applySinglePlayerBudgetAdjustment(float avgFps) {
             
             size_t newBudget = std::min<size_t>(negotiatedBudget + increaseAmount, kMaxBudget);
             
-            SDL_Log("[PathBudget] Cycle %d: %s FPS=%.1f pathfinding=%.1fms queue=%zu - increasing budget %zu -> %zu", 
-                    gameCycleCount, increaseReason, avgFps, avgPathfindingMs, queueDepth, oldBudget, newBudget);
-            logPerformance("[BUDGET CHANGE] Cycle %d: %s - %zu -> %zu tokens/cycle (FPS=%.1f, pathfinding=%.1fms, queue=%zu)",
-                    gameCycleCount, increaseReason, oldBudget, newBudget, avgFps, avgPathfindingMs, queueDepth);
+            SDL_Log("[PathBudget] Cycle %d: %s FPS=%.1f (threshold=%.0f) pathfinding=%.1fms queue=%zu - increasing budget %zu -> %zu", 
+                    gameCycleCount, increaseReason, avgFps, fpsThreshold, avgPathfindingMs, queueDepth, oldBudget, newBudget);
+            logPerformance("[BUDGET CHANGE] Cycle %d: %s - %zu -> %zu tokens/cycle (FPS=%.1f/%.0f, pathfinding=%.1fms, queue=%zu)",
+                    gameCycleCount, increaseReason, oldBudget, newBudget, avgFps, fpsThreshold, avgPathfindingMs, queueDepth);
             
             negotiatedBudget = newBudget;
             carryOverTokens = 0;  // Reset carry-over when budget changes
@@ -1017,6 +1021,10 @@ void Game::makeHostBudgetDecision() {
     size_t newBudget = negotiatedBudget;
     const char* decisionReason = "STABLE";
     
+    // Detect if vsync is effectively disabled (minFps > 70) and use higher threshold (80 FPS)
+    // Otherwise use vsync-friendly threshold (57 FPS, close to 60 FPS cap)
+    const double fpsThreshold = (minFps > 70.0) ? 80.0 : 57.0;
+    
     if(minFps < 50.0) {
         // AT LEAST ONE peer is struggling with FPS → REDUCE budget aggressively
         newBudget = negotiatedBudget >= 4000 + kMinBudget ? 
@@ -1032,7 +1040,7 @@ void Game::makeHostBudgetDecision() {
         decisionReason = "REDUCE (high CPU)";
         lastBudgetAction = BudgetAction::DECREASED;  // Track action for multiplayer sync
     }
-    else if(minFps > 57.0 && negotiatedBudget < kMaxBudget) {
+    else if(minFps > fpsThreshold && negotiatedBudget < kMaxBudget) {
         // ALL peers have good FPS → consider INCREASE
         
         // ANTI-OSCILLATION: Don't increase if we just increased last cycle
@@ -1072,12 +1080,12 @@ void Game::makeHostBudgetDecision() {
     // LOGGING: Only log on actual budget changes (reduce host overhead)
     if(newBudget != negotiatedBudget) {
         SDL_Log("[PathBudget HOST] ═══ BUDGET CHANGE CYCLE %d ═══", gameCycleCount);
-        SDL_Log("[PathBudget HOST] Inputs: minFps=%.1f (host=%.1f), maxQueue=%zu (host=%zu)",
-                minFps, hostFps, maxQueueDepth, hostQueueDepth);
+        SDL_Log("[PathBudget HOST] Inputs: minFps=%.1f (host=%.1f, threshold=%.0f), maxQueue=%zu (host=%zu)",
+                minFps, hostFps, fpsThreshold, maxQueueDepth, hostQueueDepth);
         SDL_Log("[PathBudget HOST] Decision: %s → %zu → %zu",
                 decisionReason, negotiatedBudget, newBudget);
-        logPerformance("[HOST DECISION] Cycle %d: %s %zu → %zu (minFps=%.1f, maxQueue=%zu)",
-                gameCycleCount, decisionReason, negotiatedBudget, newBudget, minFps, maxQueueDepth);
+        logPerformance("[HOST DECISION] Cycle %d: %s %zu → %zu (minFps=%.1f/%.0f, maxQueue=%zu)",
+                gameCycleCount, decisionReason, negotiatedBudget, newBudget, minFps, fpsThreshold, maxQueueDepth);
         
         broadcastBudgetChange(newBudget);
     }
