@@ -23,6 +23,7 @@
 #include <Game.h>
 #include <units/UnitBase.h>
 
+#include <algorithm>
 #include <stdlib.h>
 #include <cstring>
 
@@ -42,7 +43,7 @@ AStarSearch::TileData* AStarSearch::acquireTileBuffer(size_t requiredCount) {
 
         if(entry.capacity >= requiredCount) {
             entry.inUse = true;
-            std::memset(entry.buffer, 0, requiredCount * sizeof(TileData));
+            std::fill_n(entry.buffer, requiredCount, TileData{});
             ++gPoolReuseHits;
             return entry.buffer;
         }
@@ -63,7 +64,7 @@ AStarSearch::TileData* AStarSearch::acquireTileBuffer(size_t requiredCount) {
             entry.capacity = requiredCount;
             ++gPoolBufferExpansions;
         } else {
-            std::memset(entry.buffer, 0, requiredCount * sizeof(TileData));
+            std::fill_n(entry.buffer, requiredCount, TileData{});
         }
 
         entry.inUse = true;
