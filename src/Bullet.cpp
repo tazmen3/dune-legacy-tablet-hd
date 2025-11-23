@@ -354,14 +354,15 @@ void Bullet::update()
 {
     if(bulletID == Bullet_Rocket || bulletID == Bullet_DRocket) {
 
-        // Dynasty: Launcher/Deviator rockets track flying units but fire at scattered position for ground
+        // Dynasty: Launcher/Deviator rockets track ornithopters (small, fast targets)
+        // Carryalls are NOT tracked - they use static scattered destination
         ObjectBase* pTarget = target.getObjPointer();
         
-        if(pTarget != nullptr && pTarget->isAFlyingUnit()) {
-            // Track the moving air unit's current position (for both steering AND proximity check)
+        if(pTarget != nullptr && pTarget->getItemID() == Unit_Ornithopter) {
+            // Track the moving ornithopter's current position (for both steering AND proximity check)
             destination = pTarget->getCenterPoint();
         }
-        // Ground targets: use the static scattered destination
+        // Carryalls & ground targets: use the static scattered destination (no tracking)
 
         FixPoint angleToDestinationRad = destinationAngleRad(Coord(lround(realX), lround(realY)), destination);
         FixPoint angleToDestination = RadToDeg256(angleToDestinationRad);

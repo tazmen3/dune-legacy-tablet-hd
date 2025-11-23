@@ -52,9 +52,11 @@
 Defend_AttackEnabled=0
 Defend_OrnithopterAttackEnabled=0
 Defend_OrnithopterAttackThreshold=999
+Defend_AttackForceMilitaryValueRatio=0.0
 # Campaign: 2 harvesters per refinery, 1.8x initial military value
 Defend_HarvesterLimitMultiplier=2
 Defend_MilitaryValueMultiplier=1.8
+Defend_RefineryMinimum=0
 # Custom games: Small, Medium, Large map limits
 Defend_HarvesterLimitSmallMap=3
 Defend_HarvesterLimitMediumMap=4
@@ -67,9 +69,11 @@ Defend_MilitaryValueLimitLargeMap=25000
 Easy_AttackEnabled=1
 Easy_OrnithopterAttackEnabled=0
 Easy_OrnithopterAttackThreshold=999
-# Campaign: 1 harvester per refinery, 1.0x initial military (minimum 2000 at mission 21+)
+Easy_AttackForceMilitaryValueRatio=0.25
+# Campaign: 1 harvester per refinery, 2.0x initial military (minimum 2000 at mission 21+)
 Easy_HarvesterLimitMultiplier=1
-Easy_MilitaryValueMultiplier=1.0
+Easy_MilitaryValueMultiplier=2.0
+Easy_RefineryMinimum=0
 # Custom games: Small, Medium, Large map limits
 Easy_HarvesterLimitSmallMap=2
 Easy_HarvesterLimitMediumMap=2
@@ -80,15 +84,17 @@ Easy_MilitaryValueLimitLargeMap=20000
 
 # === MEDIUM - Ground units attack, ornithopters defend only ===
 Medium_AttackEnabled=1
-Medium_OrnithopterAttackEnabled=1
-Medium_OrnithopterAttackThreshold=1
-# Campaign: 2 harvesters per refinery, 1.5x initial military (minimum 4000 at mission 21+)
+Medium_OrnithopterAttackEnabled=0
+Medium_OrnithopterAttackThreshold=999
+Medium_AttackForceMilitaryValueRatio=0.40
+# Campaign: 2 harvesters per refinery, 2.0x initial military (minimum 4000 at mission 21+)
 Medium_HarvesterLimitMultiplier=2
-Medium_MilitaryValueMultiplier=1.5
+Medium_MilitaryValueMultiplier=2.0
+Medium_RefineryMinimum=0
 # Custom games: Small, Medium, Large map limits
-Medium_HarvesterLimitSmallMap=4
-Medium_HarvesterLimitMediumMap=8
-Medium_HarvesterLimitLargeMap=20
+Medium_HarvesterLimitSmallMap=3
+Medium_HarvesterLimitMediumMap=4
+Medium_HarvesterLimitLargeMap=15
 Medium_MilitaryValueLimitSmallMap=5000
 Medium_MilitaryValueLimitMediumMap=12000
 Medium_MilitaryValueLimitLargeMap=35000
@@ -96,14 +102,16 @@ Medium_MilitaryValueLimitLargeMap=35000
 # === HARD - Full aggression ===
 Hard_AttackEnabled=1
 Hard_OrnithopterAttackEnabled=1
-Hard_OrnithopterAttackThreshold=2
-# Campaign: 2 harvesters per refinery, 2.0x initial military (fixed 10000 at mission 21+)
+Hard_OrnithopterAttackThreshold=1
+Hard_AttackForceMilitaryValueRatio=0.50
+# Campaign: 2 harvesters per refinery, 2.5x initial military (fixed 10000 at mission 21+)
 Hard_HarvesterLimitMultiplier=2
-Hard_MilitaryValueMultiplier=2.0
+Hard_MilitaryValueMultiplier=2.5
+Hard_RefineryMinimum=2
 # Custom games: Small, Medium, Large map limits
-Hard_HarvesterLimitSmallMap=15
-Hard_HarvesterLimitMediumMap=30
-Hard_HarvesterLimitLargeMap=60
+Hard_HarvesterLimitSmallMap=4
+Hard_HarvesterLimitMediumMap=7
+Hard_HarvesterLimitLargeMap=40
 Hard_MilitaryValueLimitSmallMap=8000
 Hard_MilitaryValueLimitMediumMap=20000
 Hard_MilitaryValueLimitLargeMap=50000
@@ -112,16 +120,18 @@ Hard_MilitaryValueLimitLargeMap=50000
 Brutal_AttackEnabled=1
 Brutal_OrnithopterAttackEnabled=1
 Brutal_OrnithopterAttackThreshold=3
+Brutal_AttackForceMilitaryValueRatio=0.50
 # Campaign: 3 harvesters per refinery, 3.0x initial military
 Brutal_HarvesterLimitMultiplier=3
 Brutal_MilitaryValueMultiplier=3.0
+Brutal_RefineryMinimum=2
 # Custom games: Small, Medium, Large map limits
-Brutal_HarvesterLimitSmallMap=15
-Brutal_HarvesterLimitMediumMap=35
+Brutal_HarvesterLimitSmallMap=10
+Brutal_HarvesterLimitMediumMap=20
 Brutal_HarvesterLimitLargeMap=100
-Brutal_MilitaryValueLimitSmallMap=25000
-Brutal_MilitaryValueLimitMediumMap=50000
-Brutal_MilitaryValueLimitLargeMap=100000
+Brutal_MilitaryValueLimitSmallMap=20000
+Brutal_MilitaryValueLimitMediumMap=40000
+Brutal_MilitaryValueLimitLargeMap=80000
 
 # ============================================================================
 # UNIT COMPOSITION RATIOS

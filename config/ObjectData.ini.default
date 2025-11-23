@@ -511,6 +511,7 @@ Enabled = true
 HitPoints = 10
 Price = 0
 ViewRange = 1
+WeaponRange = 0
 MaxSpeed = 5.1200
 BuildTime = 48
 InfSpawnProp = 0

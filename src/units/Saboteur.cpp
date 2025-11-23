@@ -86,36 +86,23 @@ void Saboteur::checkPos()
         setVisible(getOwner()->getTeamID(), true);    //owner team can always see it
         //setVisible(pLocalHouse->getTeamID(), true);
     }
-}
-
-bool Saboteur::update() {
-    if(active) {
-        if(!moving) {
-            //check to see if close enough to blow up target
-            if(target.getObjPointer() != nullptr){ //&& target.getObjPointer()->isAStructure()
-                if(getOwner()->getTeamID() != target.getObjPointer()->getOwner()->getTeamID())
-                {
-                    Coord   closestPoint;
-                    closestPoint = target.getObjPointer()->getClosestPoint(location);
-
-
-                    if(blockDistance(location, closestPoint) <= 1.5_fix) {
-                        if(isVisible(getOwner()->getTeamID())) {
-                            screenborder->shakeScreen(18);
-                        }
-
-                        ObjectBase* pObject = target.getObjPointer();
-                        destroy();
-                        pObject->setHealth(0);
-                        pObject->destroy();
-                        return false;
-                    }
+    
+    // 0.96.4 approach: Detonate when next to target structure/unit  
+    if(active && !moving && target.getObjPointer() != nullptr) {
+        if(target.getObjPointer()->getOwner()->getTeamID() != getOwner()->getTeamID()) {
+            Coord closestPoint = target.getObjPointer()->getClosestPoint(location);
+            if(blockDistance(location, closestPoint) <= 0.5_fix) {
+                if(isVisible(getOwner()->getTeamID())) {
+                    screenborder->shakeScreen(18);
                 }
+                
+                ObjectBase* pObject = target.getObjPointer();
+                setHealth(0);
+                pObject->setHealth(0);
+                pObject->destroy();
             }
         }
     }
-
-    return InfantryBase::update();
 }
 
 void Saboteur::deploy(const Coord& newLocation) {

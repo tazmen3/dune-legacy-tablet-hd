@@ -765,27 +765,54 @@ void Game::checkBudgetAdjustment() {
 }
 
 void Game::applySinglePlayerBudgetAdjustment(float avgFps) {
-    // Use 60-80 FPS range to prevent oscillation (20 FPS dead zone for stability)
-    const double fpsIncreaseThreshold = 80.0;
-    const double fpsDecreaseThreshold = 60.0;
+    // VSync-compatible thresholds: 50/55/58 FPS for decrease, 59.5 FPS for increase
+    const double fpsIncreaseThreshold = 59.5;
+    const double fpsDecreaseThresholdModerate = 58.0;
+    const double fpsDecreaseThresholdAggressive = 55.0;
+    const double fpsDecreaseThresholdSevere = 50.0;
     
-    // DROP: If average FPS is below threshold, reduce budget aggressively
-    if(avgFps < fpsDecreaseThreshold && negotiatedBudget > kMinBudget) {
+    // DROP: Three-tier reduction based on severity
+    if(avgFps < fpsDecreaseThresholdSevere && negotiatedBudget > kMinBudget) {
+        // Severe lag: massive reduction
         size_t oldBudget = negotiatedBudget;
-        requestLowerBudget(8);  // Reduce by 4k (8 × 500) - aggressive
+        requestLowerBudget(8);  // Reduce by 4k (8 × 500)
         
-        SDL_Log("[PathBudget] Cycle %d: Average FPS below 60: %.1f FPS - reducing budget (8 steps × 500) %zu -> %zu", 
+        SDL_Log("[PathBudget] Cycle %d: Average FPS below 50: %.1f FPS - reducing budget severely (8 steps × 500) %zu -> %zu", 
                 gameCycleCount, avgFps, oldBudget, negotiatedBudget);
-        logPerformance("[PathBudget] Cycle %d: Average FPS below 60: %.1f FPS - reducing budget %zu -> %zu", 
+        logPerformance("[PathBudget] Cycle %d: Average FPS below 50: %.1f FPS - reducing budget severely %zu -> %zu", 
                 gameCycleCount, avgFps, oldBudget, negotiatedBudget);
         
-        lastBudgetAction = BudgetAction::DECREASED;  // Track action
-        
-        // Log full performance report on budget drops (critical events)
+        lastBudgetAction = BudgetAction::DECREASED;
         logFrameTiming();
     }
-    // RAISE: If average FPS is good AND pathfinding isn't consuming too much time
-    else if(avgFps > fpsIncreaseThreshold && negotiatedBudget < kMaxBudget) {
+    else if(avgFps < fpsDecreaseThresholdAggressive && negotiatedBudget > kMinBudget) {
+        // Aggressive lag: strong reduction
+        size_t oldBudget = negotiatedBudget;
+        requestLowerBudget(4);  // Reduce by 2k (4 × 500)
+        
+        SDL_Log("[PathBudget] Cycle %d: Average FPS below 55: %.1f FPS - reducing budget aggressively (4 steps × 500) %zu -> %zu", 
+                gameCycleCount, avgFps, oldBudget, negotiatedBudget);
+        logPerformance("[PathBudget] Cycle %d: Average FPS below 55: %.1f FPS - reducing budget aggressively %zu -> %zu", 
+                gameCycleCount, avgFps, oldBudget, negotiatedBudget);
+        
+        lastBudgetAction = BudgetAction::DECREASED;
+        logFrameTiming();
+    }
+    else if(avgFps < fpsDecreaseThresholdModerate && negotiatedBudget > kMinBudget) {
+        // Moderate lag: gentle reduction
+        size_t oldBudget = negotiatedBudget;
+        requestLowerBudget(2);  // Reduce by 1k (2 × 500)
+        
+        SDL_Log("[PathBudget] Cycle %d: Average FPS below 58: %.1f FPS - reducing budget moderately (2 steps × 500) %zu -> %zu", 
+                gameCycleCount, avgFps, oldBudget, negotiatedBudget);
+        logPerformance("[PathBudget] Cycle %d: Average FPS below 58: %.1f FPS - reducing budget moderately %zu -> %zu", 
+                gameCycleCount, avgFps, oldBudget, negotiatedBudget);
+        
+        lastBudgetAction = BudgetAction::DECREASED;
+        logFrameTiming();
+    }
+    // RAISE: If average FPS stable at 59.5+ AND pathfinding isn't consuming too much time
+    else if(avgFps >= fpsIncreaseThreshold && negotiatedBudget < kMaxBudget) {
         // ANTI-OSCILLATION: Don't increase if we just increased last cycle
         // This ensures at least 2 intervals (12 seconds) between increases
         if(lastBudgetAction == BudgetAction::INCREASED) {
@@ -821,7 +848,7 @@ void Game::applySinglePlayerBudgetAdjustment(float avgFps) {
             
             size_t newBudget = std::min<size_t>(negotiatedBudget + increaseAmount, kMaxBudget);
             
-            SDL_Log("[PathBudget] Cycle %d: %s FPS=%.1f pathfinding=%.1fms queue=%zu - increasing budget %zu -> %zu", 
+            SDL_Log("[PathBudget] Cycle %d: %s FPS>=59.5 (%.1f) pathfinding=%.1fms queue=%zu - increasing budget %zu -> %zu", 
                     gameCycleCount, increaseReason, avgFps, avgPathfindingMs, queueDepth, oldBudget, newBudget);
             logPerformance("[BUDGET CHANGE] Cycle %d: %s - %zu -> %zu tokens/cycle (FPS=%.1f, pathfinding=%.1fms, queue=%zu)",
                     gameCycleCount, increaseReason, oldBudget, newBudget, avgFps, avgPathfindingMs, queueDepth);
@@ -1021,15 +1048,31 @@ void Game::makeHostBudgetDecision() {
     size_t newBudget = negotiatedBudget;
     const char* decisionReason = "STABLE";
     
-    // Use 60-80 FPS range to prevent oscillation (20 FPS dead zone for stability)
-    const double fpsIncreaseThreshold = 80.0;
-    const double fpsDecreaseThreshold = 60.0;
+    // VSync-compatible thresholds: 50/55/58 FPS for decrease, 59.5 FPS for increase
+    const double fpsIncreaseThreshold = 59.5;
+    const double fpsDecreaseThresholdModerate = 58.0;
+    const double fpsDecreaseThresholdAggressive = 55.0;
+    const double fpsDecreaseThresholdSevere = 50.0;
     
-    if(minFps < fpsDecreaseThreshold) {
-        // AT LEAST ONE peer is struggling with FPS → REDUCE budget aggressively
+    if(minFps < fpsDecreaseThresholdSevere) {
+        // AT LEAST ONE peer is struggling severely → REDUCE budget massively
         newBudget = negotiatedBudget >= 4000 + kMinBudget ? 
                     negotiatedBudget - 4000 : kMinBudget;
-        decisionReason = "REDUCE (low FPS)";
+        decisionReason = "REDUCE (FPS<50, severe)";
+        lastBudgetAction = BudgetAction::DECREASED;  // Track action for multiplayer sync
+    }
+    else if(minFps < fpsDecreaseThresholdAggressive) {
+        // AT LEAST ONE peer is struggling aggressively → REDUCE budget aggressively
+        newBudget = negotiatedBudget >= 2000 + kMinBudget ? 
+                    negotiatedBudget - 2000 : kMinBudget;
+        decisionReason = "REDUCE (FPS<55, aggressive)";
+        lastBudgetAction = BudgetAction::DECREASED;  // Track action for multiplayer sync
+    }
+    else if(minFps < fpsDecreaseThresholdModerate) {
+        // AT LEAST ONE peer is struggling moderately → REDUCE budget moderately
+        newBudget = negotiatedBudget >= 1000 + kMinBudget ? 
+                    negotiatedBudget - 1000 : kMinBudget;
+        decisionReason = "REDUCE (FPS<58, moderate)";
         lastBudgetAction = BudgetAction::DECREASED;  // Track action for multiplayer sync
     }
     else if(maxSimMsAvg > 12.0f) {
@@ -1534,7 +1577,8 @@ void Game::doInput()
             drawnMouseY = std::max(0, std::min(mouse->y, settings.video.height-1));
 
             static Uint32 lastCursorLog = 0;
-            const Uint32 now = SDL_GetTicks();
+            // Cursor debug logging disabled
+            /*const Uint32 now = SDL_GetTicks();
             if(now - lastCursorLog >= 500) {
                 bool insideMap = (screenborder != nullptr) && screenborder->isScreenCoordInsideMap(drawnMouseX, drawnMouseY);
                 int mapX = insideMap ? screenborder->screen2MapX(drawnMouseX) : -1;
@@ -1551,7 +1595,7 @@ void Game::doInput()
                                static_cast<int>(currentCursorMode),
                                cursorManager.isInitialized() ? "yes" : "no");
                 lastCursorLog = now;
-            }
+            }*/
         }
 
         if(pInGameMenu != nullptr) {
@@ -1925,9 +1969,6 @@ void Game::runMainLoop() {
         frameTime += actualFrameTime;
         frameStart = frameEnd;  // Reset for next frame's game logic timing
 
-        // VSync enabled - hardware handles frame pacing at 60 FPS
-        // No software limiter needed
-
         if(bShowFPS) {
             // FPS display uses actual frame time
             averageFrameTime = 0.99f * averageFrameTime + 0.01f * actualFrameTime;
@@ -2265,13 +2306,13 @@ void Game::updateGameState() {
     checkBudgetAdjustment();
     
     // MULTIPLAYER FIX (Issue #8): Cycle-based combat stats dump (deterministic)
-    // Dump combat statistics every 30 seconds (MILLI2CYCLES(30000) cycles)
-    if(combatStats.lastDumpCycle == 0) {
+    // Combat stats logging disabled (broken anti-air analysis)
+    /*if(combatStats.lastDumpCycle == 0) {
         combatStats.lastDumpCycle = gameCycleCount;
     } else if((gameCycleCount - combatStats.lastDumpCycle) >= MILLI2CYCLES(30000)) {
         dumpCombatStats();
         combatStats.lastDumpCycle = gameCycleCount;
-    }
+    }*/
     
     // MULTIPLAYER FIX (Issue #9): Cycle-based finished level timer (deterministic)
     if(finished && (gameCycleCount - finishedLevelCycle > MILLI2CYCLES(END_WAIT_TIME))) {

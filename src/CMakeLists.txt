@@ -415,10 +415,10 @@ if(APPLE)
         # Create config subdirectory
         COMMAND ${CMAKE_COMMAND} -E make_directory
             "${BUNDLE_RESOURCES_DIR}/config"
-        # Copy config template files (.bak and .ini) to Resources/config/
+        # Copy config template files (.ini.default and .ini) to Resources/config/
         COMMAND ${CMAKE_COMMAND} -E copy
-            "${CMAKE_SOURCE_DIR}/config/ObjectData.bak"
-            "${CMAKE_SOURCE_DIR}/config/QuantBot Config.bak"
+            "${CMAKE_SOURCE_DIR}/config/ObjectData.ini.default"
+            "${CMAKE_SOURCE_DIR}/config/QuantBot Config.ini.default"
             "${CMAKE_SOURCE_DIR}/config/Dune Legacy.ini"
             "${CMAKE_SOURCE_DIR}/config/README.md"
             "${BUNDLE_RESOURCES_DIR}/config/"

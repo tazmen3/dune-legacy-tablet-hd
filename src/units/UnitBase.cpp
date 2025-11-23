@@ -1032,7 +1032,8 @@ void UnitBase::handleDamage(int damage, Uint32 damagerID, House* damagerOwner) {
 
     if(pDamager != nullptr){
 
-        if(attackMode == HUNT && !forced) {
+        // Units should retaliate when attacked in HUNT, GUARD, AREAGUARD, or AMBUSH modes
+        if((attackMode == HUNT || attackMode == GUARD || attackMode == AREAGUARD || attackMode == AMBUSH) && !forced) {
             ObjectBase* pDamager = currentGame->getObjectManager().getObject(damagerID);
             if(canAttack(pDamager)) {
                 if(!target || target.getObjPointer() == nullptr || !isInWeaponRange(target.getObjPointer())) {
@@ -1322,14 +1323,15 @@ void UnitBase::targeting() {
     if(findTargetTimer == 0 && pendingTargetRequest == TargetRequestKind::None) {
         if(attackMode != STOP && attackMode != CARRYALLREQUESTED) {
             if(target && !attackPos && !forced &&
-               (attackMode == GUARD || attackMode == AREAGUARD || attackMode == HUNT) &&
+               (attackMode == GUARD || attackMode == AREAGUARD || attackMode == AMBUSH || attackMode == HUNT) &&
                !isInWeaponRange(target.getObjPointer())) {
                 enqueueTargetRequest(TargetRequestKind::Refresh);
             } else if(!target && !attackPos && !forced) {
-                // Utility units (harvesters, MCVs, sandworms) and HUNT mode can acquire targets while moving
-                // Other attack modes only when stopped
+                // Utility units (harvesters, MCVs, sandworms), HUNT mode, GUARD, and AREAGUARD can acquire targets while moving
+                // AMBUSH mode only when stopped (it's a true ambush - wait for enemy to come close)
                 const bool isUtilityUnit = (itemID == Unit_Harvester || itemID == Unit_MCV || itemID == Unit_Sandworm);
-                if(isUtilityUnit || attackMode == HUNT || (!moving && !justStoppedMoving)) {
+                const bool canAcquireWhileMoving = isUtilityUnit || attackMode == HUNT || attackMode == GUARD || attackMode == AREAGUARD;
+                if(canAcquireWhileMoving || (!moving && !justStoppedMoving)) {
                     enqueueTargetRequest(TargetRequestKind::Acquire);
                 }
             }
@@ -1391,16 +1393,30 @@ void UnitBase::resolvePendingTargetRequest() {
                 }
                 
                 // In HUNT mode, attack targets regardless of guard range
+                // Exception: Sandworms only hunt within view range
                 // For other modes, only attack if in guard range
-                if(attackMode == HUNT || isInGuardRange(pNewTarget)) {
-                    if(attackMode == AMBUSH) {
+                bool shouldAttack = false;
+                
+                if(getItemID() == Unit_Sandworm) {
+                    // Sandworms: Only hunt within view range, don't chase across map
+                    shouldAttack = isInGuardRange(pNewTarget);
+                    
+                    // If sandworm is in HUNT mode but target is out of range, switch to AMBUSH
+                    // This prevents sandworms from being too aggressive when targets are far away
+                    if(!shouldAttack && attackMode == HUNT) {
+                        doSetAttackMode(AMBUSH);
+                    }
+                } else {
+                    // Regular units: HUNT attacks anything, other modes need target in range
+                    shouldAttack = (attackMode == HUNT || isInGuardRange(pNewTarget));
+                }
+                
+                if(shouldAttack) {
+                    // Switch from AMBUSH to HUNT when attacking (except sandworms - keep them less aggressive)
+                    if(attackMode == AMBUSH && getItemID() != Unit_Sandworm) {
                         doSetAttackMode(HUNT);
                     }
                     doAttackObject(pNewTarget, false);
-                } else if(attackMode != HUNT) {
-                    // Only switch to AMBUSH for non-HUNT modes if target out of range
-                    setGuardPoint(location);
-                    doSetAttackMode(AMBUSH);
                 }
             }
 

@@ -23,8 +23,8 @@ C:\Program Files\Dune Legacy\
     └── DuneLegacy\
         ├── config\             ← Config templates
         │   ├── Dune Legacy.ini
-        │   ├── ObjectData.bak
-        │   └── QuantBot Config.bak
+        │   ├── ObjectData.ini.default
+        │   └── QuantBot Config.ini.default
         ├── locale\             ← Translations
         │   ├── English.en.po
         │   ├── German.de.po

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 # Project name and version
-project(DuneLegacy VERSION 0.98.7.1 LANGUAGES C CXX)
+project(DuneLegacy VERSION 0.98.7.2 LANGUAGES C CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -166,8 +166,8 @@ if(NOT APPLE)
         # Config files will be installed from VS output directory to root (see src/CMakeLists.txt)
     else()
         install(FILES 
-            config/ObjectData.bak
-            "config/QuantBot Config.bak"
+            config/ObjectData.ini.default
+            "config/QuantBot Config.ini.default"
             "config/Dune Legacy.ini"
             config/README.md
             DESTINATION ${DUNELEGACY_CONFIG_DIR}

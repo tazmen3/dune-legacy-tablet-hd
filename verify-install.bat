@@ -40,15 +40,15 @@ if exist "%INSTALL_DIR%\share\DuneLegacy" (
 )
 
 echo [4/5] Checking config files...
-if exist "%INSTALL_DIR%\share\DuneLegacy\config\ObjectData.bak" (
-    echo   [OK] ObjectData.bak found
+if exist "%INSTALL_DIR%\share\DuneLegacy\config\ObjectData.ini.default" (
+    echo   [OK] ObjectData.ini.default found
 ) else (
-    echo   [ERROR] ObjectData.bak NOT FOUND!
+    echo   [ERROR] ObjectData.ini.default NOT FOUND!
 )
-if exist "%INSTALL_DIR%\share\DuneLegacy\config\QuantBot Config.bak" (
-    echo   [OK] QuantBot Config.bak found
+if exist "%INSTALL_DIR%\share\DuneLegacy\config\QuantBot Config.ini.default" (
+    echo   [OK] QuantBot Config.ini.default found
 ) else (
-    echo   [ERROR] QuantBot Config.bak NOT FOUND!
+    echo   [ERROR] QuantBot Config.ini.default NOT FOUND!
 )
 
 echo [5/5] Checking locale files...

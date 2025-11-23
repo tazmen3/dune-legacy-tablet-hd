@@ -189,7 +189,7 @@ OptionsMenu::OptionsMenu() : MenuBase()
     fullScreenCheckbox.setChecked(settings.video.fullscreen);
     fullScreenCheckbox.setOnClick(std::bind(&OptionsMenu::onChangeOption, this, true));
     videoHBox.addWidget(&fullScreenCheckbox, 155);
-    frameLimitCheckbox.setText(_("Limit to 31 FPS"));
+    frameLimitCheckbox.setText(_("Enable VSync"));
     frameLimitCheckbox.setChecked(settings.video.frameLimit);
     frameLimitCheckbox.setOnClick(std::bind(&OptionsMenu::onChangeOption, this, true));
     videoHBox.addWidget(&frameLimitCheckbox, 155);

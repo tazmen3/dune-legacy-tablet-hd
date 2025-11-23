@@ -30,12 +30,6 @@ public:
 
     void checkPos() override;
 
-    /**
-        Updates this saboteur.
-        \return true if this object still exists, false if it was destroyed
-    */
-    bool update() override;
-
     void deploy(const Coord& newLocation) override;
     bool canAttack(const ObjectBase* object) const override;
 

@@ -78,12 +78,8 @@ int MenuBase::showMenu() {
             }
         }
 
-        int frameTime = SDL_GetTicks() - frameStart;
-        if(settings.video.frameLimit == true) {
-            if(frameTime < 32) {
-                SDL_Delay(32 - frameTime);
-            }
-        }
+        // VSync is controlled via SDL_HINT_RENDER_VSYNC in main.cpp
+        // No software frame limiting needed in menus
     }
 
     return retVal;

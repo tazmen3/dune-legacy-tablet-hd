@@ -170,9 +170,16 @@ void Map::damage(Uint32 damagerID, House* damagerOwner, const Coord& realPos, Ui
                             }
                         }
                     } else {
-                        // FIX: Apply full damage to air units within explosion radius (no distance falloff)
-                        // This ensures rockets can effectively damage fast-moving air targets
-                        const auto scaledDamage = lround(damage);
+                        // Apply damage based on unit type:
+                        // - Ornithopters: Full damage (fast, fragile, need to be easy to hit)
+                        // - Carryalls: Distance-based falloff (like ground units, 0.96.4 behavior)
+                        int scaledDamage;
+                        if(pAirUnit->getItemID() == Unit_Ornithopter) {
+                            scaledDamage = lround(damage);
+                        } else {
+                            // Carryalls use same formula as ground units
+                            scaledDamage = lround(damage) >> (distance/16 + 1);
+                        }
                         const auto healthBefore = pAirUnit->getHealth();
                         pAirUnit->handleDamage(scaledDamage, damagerID, damagerOwner);
                         

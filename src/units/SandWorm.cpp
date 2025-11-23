@@ -215,12 +215,13 @@ void Sandworm::engageTarget() {
         } else {
             switch(attackMode) {
                 case GUARD:
-                case AMBUSH: {
+                case AMBUSH:
+                case HUNT: {
+                    // Sandworms should only hunt within view range, not chase across entire map
                     maxDistance = getViewRange();
                 } break;
 
-                case AREAGUARD:
-                case HUNT: {
+                case AREAGUARD: {
                     maxDistance = FixPt_MAX;
                 } break;
 
@@ -233,7 +234,10 @@ void Sandworm::engageTarget() {
         }
 
         if(targetDistance > maxDistance) {
-            // give up
+            // give up and switch to AMBUSH if in HUNT mode
+            if(attackMode == HUNT) {
+                doSetAttackMode(AMBUSH);
+            }
             setDestination(guardPoint);
             setTarget(nullptr);
         }
@@ -296,6 +300,15 @@ void Sandworm::setTarget(const ObjectBase* newTarget) {
 void Sandworm::handleDamage(int damage, Uint32 damagerID, House* damagerOwner) {
     if(damage > 0) {
         attackMode = HUNT;
+        
+        // Sandworm should attack back when damaged
+        ObjectBase* pDamager = currentGame->getObjectManager().getObject(damagerID);
+        if(pDamager != nullptr && canAttack(pDamager)) {
+            // Attack the damager if we don't have a target or if the damager is closer/more threatening
+            if(!target || target.getObjPointer() == nullptr) {
+                doAttackObject(pDamager, false);
+            }
+        }
     }
     GroundUnit::handleDamage(damage, damagerID, damagerOwner);
 }
@@ -422,9 +435,10 @@ const ObjectBase* Sandworm::findTarget() const {
         switch(attackMode) {
             case GUARD:
             case AMBUSH:
+            case HUNT:
+                // Sandworms should only hunt within view range, not chase across entire map
                 return getViewRange();
             case AREAGUARD:
-            case HUNT:
                 return std::numeric_limits<int>::max();
             default:
                 return 0;

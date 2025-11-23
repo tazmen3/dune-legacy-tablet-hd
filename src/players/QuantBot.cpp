@@ -330,7 +330,7 @@ void QuantBot::update() {
 	const QuantBotConfig::DifficultySettings& diffSettings = config.getSettings(static_cast<int>(difficulty));
 
 	// Log which config this QuantBot is using
-	SDL_Log("=== QuantBot [%s - %s] Initialization ===", 
+	logDebug("=== QuantBot [%s - %s] Initialization ===", 
 		getHouseNameByNumber(static_cast<HOUSETYPE>(getHouse()->getHouseID())).c_str(),
 		gameMode == GameMode::Campaign ? "Campaign" : "Custom");
 
@@ -340,15 +340,15 @@ void QuantBot::update() {
 		harvesterLimit = diffSettings.harvesterLimitPerRefineryMultiplier * initialItemCount[Structure_Refinery];
 		militaryValueLimit = lround(initialMilitaryValue * diffSettings.militaryValueMultiplier);
 		
-		SDL_Log("  Difficulty: %s", 
+		logDebug("  Difficulty: %s", 
 			difficulty == Difficulty::Defend ? "Defend" :
 			difficulty == Difficulty::Easy ? "Easy" :
 			difficulty == Difficulty::Medium ? "Medium" :
 			difficulty == Difficulty::Hard ? "Hard" : "Brutal");
-		SDL_Log("  Mission: %d", currentGame ? currentGame->getGameInitSettings().getMission() : 0);
-		SDL_Log("  Initial Military Value: %d", initialMilitaryValue);
-		SDL_Log("  Initial Refineries: %d", initialItemCount[Structure_Refinery]);
-		SDL_Log("  Config: HarvesterMult=%d, MilitaryMult=%.1fx",
+		logDebug("  Mission: %d", currentGame ? currentGame->getGameInitSettings().getMission() : 0);
+		logDebug("  Initial Military Value: %d", initialMilitaryValue);
+		logDebug("  Initial Refineries: %d", initialItemCount[Structure_Refinery]);
+		logDebug("  Config: HarvesterMult=%d, MilitaryMult=%.1fx",
 			diffSettings.harvesterLimitPerRefineryMultiplier,
 			diffSettings.militaryValueMultiplier);
 		
@@ -356,28 +356,35 @@ void QuantBot::update() {
 		if (currentGame && currentGame->getGameInitSettings().getMission() >= 21) {
 			if (difficulty == Difficulty::Easy && militaryValueLimit < 2000) {
 				militaryValueLimit = 2000;
-				SDL_Log("  Mission 21+ override: MilitaryValueLimit = 2000");
+				logDebug("  Mission 21+ override: MilitaryValueLimit = 2000");
 			}
 			else if (difficulty == Difficulty::Medium && militaryValueLimit < 4000) {
 				militaryValueLimit = 4000;
-				SDL_Log("  Mission 21+ override: MilitaryValueLimit = 4000");
+				logDebug("  Mission 21+ override: MilitaryValueLimit = 4000");
 			}
 			else if (difficulty == Difficulty::Hard) {
 				initialItemCount[Structure_Refinery] = 2;
 				militaryValueLimit = 10000;
 				harvesterLimit = diffSettings.harvesterLimitPerRefineryMultiplier * initialItemCount[Structure_Refinery];
-				SDL_Log("  Mission 21+ override: Refineries=2, MilitaryValueLimit=10000");
+				logDebug("  Mission 21+ override: Refineries=2, MilitaryValueLimit=10000");
 			}
 		}
 		
-		// Brutal difficulty special handling
-		if (difficulty == Difficulty::Brutal && initialItemCount[Structure_Refinery] < 2) {
-			initialItemCount[Structure_Refinery] = 2;
+		// Refinery top-up: Ensure AI has at least the minimum refineries for difficulty
+		if (diffSettings.refineryMinimum > 0 && initialItemCount[Structure_Refinery] < diffSettings.refineryMinimum) {
+			int refineriesToAdd = diffSettings.refineryMinimum - initialItemCount[Structure_Refinery];
+			initialItemCount[Structure_Refinery] = diffSettings.refineryMinimum;
 			harvesterLimit = diffSettings.harvesterLimitPerRefineryMultiplier * initialItemCount[Structure_Refinery];
-			SDL_Log("  Brutal override: Minimum 2 refineries");
+			logDebug("  Refinery top-up: Had %d, topped up to %d (granted %d refineries)", 
+				initialItemCount[Structure_Refinery] - refineriesToAdd, 
+				diffSettings.refineryMinimum,
+				refineriesToAdd);
+		} else if (diffSettings.refineryMinimum > 0) {
+			logDebug("  Refinery check: Has %d (minimum %d already met, no top-up needed)", 
+				initialItemCount[Structure_Refinery], diffSettings.refineryMinimum);
 		}
 		
-		SDL_Log("  FINAL: HarvesterLimit=%d, MilitaryValueLimit=%d", 
+		logDebug("  FINAL: HarvesterLimit=%d, MilitaryValueLimit=%d", 
 			harvesterLimit, militaryValueLimit);
 
 	} break;
@@ -388,7 +395,7 @@ void QuantBot::update() {
 		
 		// Move all military units to the squad rally location at game start
 		if (squadRallyLocation.isValid()) {
-			SDL_Log("  Moving all units to squad rally point: (%d, %d)", 
+			logDebug("  Moving all units to squad rally point: (%d, %d)", 
 				squadRallyLocation.x, squadRallyLocation.y);
 			
 			int unitsMoved = 0;
@@ -405,7 +412,7 @@ void QuantBot::update() {
 				}
 			}
 			
-			SDL_Log("  Moved %d units to rally point", unitsMoved);
+			logDebug("  Moved %d units to rally point", unitsMoved);
 		}
 
 		// Set harvester/military limits based on map size and difficulty from config
@@ -414,12 +421,12 @@ void QuantBot::update() {
 			mapsize = currentGameMap->getSizeX() * currentGameMap->getSizeY();
 		}
 		
-		SDL_Log("  Difficulty: %s", 
+		logDebug("  Difficulty: %s", 
 			difficulty == Difficulty::Defend ? "Defend" :
 			difficulty == Difficulty::Easy ? "Easy" :
 			difficulty == Difficulty::Medium ? "Medium" :
 			difficulty == Difficulty::Hard ? "Hard" : "Brutal");
-		SDL_Log("  Map Size: %dx%d = %d tiles",
+		logDebug("  Map Size: %dx%d = %d tiles",
 			currentGameMap ? currentGameMap->getSizeX() : 64,
 			currentGameMap ? currentGameMap->getSizeY() : 64,
 			mapsize);
@@ -429,32 +436,32 @@ void QuantBot::update() {
 			// Small map (32x32)
 			harvesterLimit = diffSettings.harvesterLimitCustomSmallMap;
 			militaryValueLimit = diffSettings.militaryValueLimitCustomSmallMap;
-			SDL_Log("  Map Category: Small (32x32)");
+			logDebug("  Map Category: Small (32x32)");
 		} else if (mapsize <= 4096) {
 			// Medium map (62x62, 64x64)
 			harvesterLimit = diffSettings.harvesterLimitCustomMediumMap;
 			militaryValueLimit = diffSettings.militaryValueLimitCustomMediumMap;
-			SDL_Log("  Map Category: Medium (64x64)");
+			logDebug("  Map Category: Medium (64x64)");
 		} else if (mapsize <= 16384) {
 			// Large map (128x128)
 			harvesterLimit = diffSettings.harvesterLimitCustomLargeMap;
 			militaryValueLimit = diffSettings.militaryValueLimitCustomLargeMap;
-			SDL_Log("  Map Category: Large (128x128)");
+			logDebug("  Map Category: Large (128x128)");
 		} else {
 			// Huge maps (>128x128) - scale more slowly using square root
 			// 256x256 (4x tiles) gets 2x harvesters/military, 512x512 (16x tiles) gets 4x, etc.
 			double scaleFactor = sqrt(mapsize / 16384.0);
 			harvesterLimit = diffSettings.harvesterLimitCustomLargeMap * scaleFactor;
 			militaryValueLimit = diffSettings.militaryValueLimitCustomLargeMap * scaleFactor;
-			SDL_Log("  Map Category: Huge (>128x128, scaled from Large)");
-			SDL_Log("  Scale Factor: %.2fx (sqrt-based)", scaleFactor);
+			logDebug("  Map Category: Huge (>128x128, scaled from Large)");
+			logDebug("  Scale Factor: %.2fx (sqrt-based)", scaleFactor);
 		}
 		
-		SDL_Log("  Config Values - Small(H:%d,M:%d) Med(H:%d,M:%d) Large(H:%d,M:%d)",
+		logDebug("  Config Values - Small(H:%d,M:%d) Med(H:%d,M:%d) Large(H:%d,M:%d)",
 			diffSettings.harvesterLimitCustomSmallMap, diffSettings.militaryValueLimitCustomSmallMap,
 			diffSettings.harvesterLimitCustomMediumMap, diffSettings.militaryValueLimitCustomMediumMap,
 			diffSettings.harvesterLimitCustomLargeMap, diffSettings.militaryValueLimitCustomLargeMap);
-		SDL_Log("  FINAL: HarvesterLimit=%d, MilitaryValueLimit=%d", 
+		logDebug("  FINAL: HarvesterLimit=%d, MilitaryValueLimit=%d", 
 			harvesterLimit, militaryValueLimit);
 
 		// what is this useful for? Reseting limits or something
@@ -1391,9 +1398,12 @@ void QuantBot::build(int militaryValue) {
                     attackTimer, getHouse()->getCredits(), militaryValue, militaryValueLimit, getHouse()->getUnitBuiltValue(),
                     getHouse()->getKillValue(), getHouse()->getLossValue(), lastCalculatedSpice, getHouse()->getNumItems(Unit_Harvester), harvesterLimit);
             } else {
-                logDebug("Stats: %d  crdt: %d  mVal: %d/%d  built: %d  kill: %d  loss: %d hvstr: %d/%d",
-                    attackTimer, getHouse()->getCredits(), militaryValue, militaryValueLimit, getHouse()->getUnitBuiltValue(),
-                    getHouse()->getKillValue(), getHouse()->getLossValue(), getHouse()->getNumItems(Unit_Harvester), harvesterLimit);
+                // Campaign mode - include initial military value and multiplier
+                const QuantBotConfig& config = getQuantBotConfig();
+                const QuantBotConfig::DifficultySettings& diffSettings = config.getSettings(static_cast<int>(difficulty));
+                logDebug("Stats: %d  crdt: %d  mVal: %d/%d (init: %d, mult: %.1fx)  built: %d  kill: %d  loss: %d hvstr: %d/%d",
+                    attackTimer, getHouse()->getCredits(), militaryValue, militaryValueLimit, initialMilitaryValue, diffSettings.militaryValueMultiplier,
+                    getHouse()->getUnitBuiltValue(), getHouse()->getKillValue(), getHouse()->getLossValue(), getHouse()->getNumItems(Unit_Harvester), harvesterLimit);
             }
             lastStatsLogCycle = currentCycle;
         }
@@ -1600,8 +1610,8 @@ void QuantBot::build(int militaryValue) {
 				}
 			}
 
-			// Special weapon launch logic
-			if (pStructure->getItemID() == Structure_Palace) {
+			// Special weapon launch logic (not for support AI)
+			if (pStructure->getItemID() == Structure_Palace && !supportMode) {
 
 				const Palace* pPalace = static_cast<const Palace*>(pStructure);
 				if (pPalace->isSpecialWeaponReady()) {
@@ -1634,57 +1644,74 @@ void QuantBot::build(int militaryValue) {
 
 			if (pStructure->isABuilder()) {
 				const BuilderBase* pBuilder = static_cast<const BuilderBase*>(pStructure);
+				
+				// Log all builder status for campaign AIs (not just CY)
+				if (gameMode == GameMode::Campaign && !supportMode && pStructure->getItemID() != Structure_ConstructionYard) {
+					logDebug("PRODUCTION: %s - Upgrading:%d Queue:%d Credits:%d", 
+						getItemNameByID(pStructure->getItemID()).c_str(),
+						pBuilder->isUpgrading(), pBuilder->getProductionQueueSize(), money);
+				}
+				
+				// Helper to log production for campaign enemy bots
+				auto produceItemWithLogging = [&](Uint32 itemID) {
+					if (gameMode == GameMode::Campaign && !supportMode && currentGame) {
+						std::string itemName = getItemNameByID(itemID);
+						logDebug("Queuing %s (ID:%d)", itemName.c_str(), itemID);
+					}
+					doProduceItem(pBuilder, itemID);
+				};
+				
 				switch (pStructure->getItemID()) {
 
-				case Structure_LightFactory: {
-					if (!pBuilder->isUpgrading()
-						&& gameMode == GameMode::Campaign
-						&& money > 1000
-						&& ((itemCount[Structure_HeavyFactory] == 0) || militaryValue < militaryValueLimit * 0.30_fix)
-						&& pBuilder->getProductionQueueSize() < 1
-						&& pBuilder->getBuildListSize() > 0
-						&& militaryValue < militaryValueLimit) {
-
-						if (pBuilder->getCurrentUpgradeLevel() < pBuilder->getMaxUpgradeLevel() && getHouse()->getCredits() > 1500) {
-							doUpgrade(pBuilder);
-						}
-						else if (!getHouse()->isGroundUnitLimitReached()) {
-							Uint32 itemID = NONE_ID;
-
-							if (pBuilder->isAvailableToBuild(Unit_RaiderTrike)) {
-								itemID = Unit_RaiderTrike;
-							}
-							else if (pBuilder->isAvailableToBuild(Unit_Quad)) {
-								itemID = Unit_Quad;
-							}
-							else if (pBuilder->isAvailableToBuild(Unit_Trike)) {
-								itemID = Unit_Trike;
-							}
-
-							if (itemID != NONE_ID) {
-								doProduceItem(pBuilder, itemID);
-								itemCount[itemID]++;
-							}
-						}
-					}
-				} break;
-
-			case Structure_WOR: {
+			case Structure_LightFactory: {
 				if (!pBuilder->isUpgrading()
-					&& pBuilder->isAvailableToBuild(Unit_Trooper)
 					&& gameMode == GameMode::Campaign
-					&& (currentGame == nullptr || currentGame->techLevel <= 5)  // Only produce at lower tech
 					&& money > 1000
-					&& ((itemCount[Structure_HeavyFactory] == 0) || militaryValue < militaryValueLimit * 0.30_fix)
+					&& itemCount[Structure_HeavyFactory] == 0  // Only produce from Light Factory if no Heavy Factory exists
 					&& pBuilder->getProductionQueueSize() < 1
 					&& pBuilder->getBuildListSize() > 0
-					&& !getHouse()->isInfantryUnitLimitReached()
 					&& militaryValue < militaryValueLimit) {
 
-					doProduceItem(pBuilder, Unit_Trooper);
-					itemCount[Unit_Trooper]++;
+					if (pBuilder->getCurrentUpgradeLevel() < pBuilder->getMaxUpgradeLevel() && getHouse()->getCredits() > 1500) {
+						doUpgrade(pBuilder);
+					}
+					else if (!getHouse()->isGroundUnitLimitReached()) {
+						Uint32 itemID = NONE_ID;
+
+						if (pBuilder->isAvailableToBuild(Unit_RaiderTrike)) {
+							itemID = Unit_RaiderTrike;
+						}
+						else if (pBuilder->isAvailableToBuild(Unit_Quad)) {
+							itemID = Unit_Quad;
+						}
+						else if (pBuilder->isAvailableToBuild(Unit_Trike)) {
+							itemID = Unit_Trike;
+						}
+
+						if (itemID != NONE_ID) {
+							produceItemWithLogging(itemID);
+							itemCount[itemID]++;
+						}
+					}
 				}
 			} break;
+
+		case Structure_WOR: {
+			if (!pBuilder->isUpgrading()
+				&& pBuilder->isAvailableToBuild(Unit_Trooper)
+				&& gameMode == GameMode::Campaign
+				&& (currentGame == nullptr || currentGame->techLevel <= 5)  // Only produce at lower tech
+				&& money > 1000
+				&& itemCount[Structure_HeavyFactory] == 0  // Only produce from WOR if no Heavy Factory exists
+				&& pBuilder->getProductionQueueSize() < 1
+				&& pBuilder->getBuildListSize() > 0
+				&& !getHouse()->isInfantryUnitLimitReached()
+				&& militaryValue < militaryValueLimit) {
+
+				produceItemWithLogging(Unit_Trooper);
+				itemCount[Unit_Trooper]++;
+			}
+		} break;
 
 			case Structure_Barracks: {
 				if (!pBuilder->isUpgrading()
@@ -1698,7 +1725,7 @@ void QuantBot::build(int militaryValue) {
 					&& !getHouse()->isInfantryUnitLimitReached()
 					&& militaryValue < militaryValueLimit) {
 
-					doProduceItem(pBuilder, Unit_Soldier);
+					produceItemWithLogging(Unit_Soldier);
 					itemCount[Unit_Soldier]++;
 				}
 			} break;
@@ -1711,7 +1738,7 @@ void QuantBot::build(int militaryValue) {
 						&& (pBuilder->getProductionQueueSize() < 1)
 						&& money > 1000
 						&& !getHouse()->isAirUnitLimitReached()) {
-						doProduceItem(pBuilder, Unit_Carryall);
+						produceItemWithLogging(Unit_Carryall);
 						itemCount[Unit_Carryall]++;
 					}
 					else if ((money > 500) && (pBuilder->isUpgrading() == false) && (pBuilder->getCurrentUpgradeLevel() < pBuilder->getMaxUpgradeLevel())) {
@@ -1729,7 +1756,7 @@ void QuantBot::build(int militaryValue) {
 						&& money > 1200) {
 						// Current value and what percentage of military we want used to determine
 						// whether to build an additional unit.
-						doProduceItem(pBuilder, Unit_Ornithopter);
+						produceItemWithLogging(Unit_Ornithopter);
 						itemCount[Unit_Ornithopter]++;
 						money -= data[Unit_Ornithopter][houseID].price;
 						militaryValue += data[Unit_Ornithopter][houseID].price;
@@ -1744,7 +1771,7 @@ void QuantBot::build(int militaryValue) {
 							&& itemCount[Unit_MCV] + itemCount[Structure_ConstructionYard] + itemCount[Structure_StarPort] < 1
 							&& pBuilder->isAvailableToBuild(Unit_MCV)
 							&& !getHouse()->isGroundUnitLimitReached()) {
-							doProduceItem(pBuilder, Unit_MCV);
+							produceItemWithLogging(Unit_MCV);
 							itemCount[Unit_MCV]++;
 						}
 						else if ((money > 10000) && (pBuilder->isUpgrading() == false) && (pBuilder->getCurrentUpgradeLevel() < pBuilder->getMaxUpgradeLevel())) {
@@ -1760,7 +1787,7 @@ void QuantBot::build(int militaryValue) {
 							&& itemCount[Structure_ConstructionYard] + itemCount[Unit_MCV] < 4
 							&& !getHouse()->isGroundUnitLimitReached()) {
 							// If we are really rich, like in all against Atriedes
-							doProduceItem(pBuilder, Unit_MCV);
+							produceItemWithLogging(Unit_MCV);
 							itemCount[Unit_MCV]++;
 						}
 						else if (gameMode == GameMode::Custom
@@ -1769,7 +1796,7 @@ void QuantBot::build(int militaryValue) {
 							&& itemCount[Unit_Harvester] < militaryValue / 1000
 							&& itemCount[Unit_Harvester] < harvesterLimit) {
 							// In case we get given lots of money, it will eventually run out so we need to be prepared
-							doProduceItem(pBuilder, Unit_Harvester);
+							produceItemWithLogging(Unit_Harvester);
 							itemCount[Unit_Harvester]++;
 						}
 						else if (itemCount[Unit_Harvester] < harvesterLimit
@@ -1778,7 +1805,7 @@ void QuantBot::build(int militaryValue) {
 							&& (money < 2000 || gameMode == GameMode::Campaign)) {
 							//logDebug("*Building a Harvester.",
 							//itemCount[Unit_Harvester], harvesterLimit, money);
-							doProduceItem(pBuilder, Unit_Harvester);
+							produceItemWithLogging(Unit_Harvester);
 							itemCount[Unit_Harvester]++;
 						}
 						else if ((money > 500) && (pBuilder->isUpgrading() == false) && (pBuilder->getCurrentUpgradeLevel() < pBuilder->getMaxUpgradeLevel())) {
@@ -1804,38 +1831,38 @@ void QuantBot::build(int militaryValue) {
 							/// Use current value and what percentage of military we want to determine
 							/// whether to build an additional unit.
 							if (pBuilder->isAvailableToBuild(Unit_Launcher) && (militaryValue * launcherPercent > launcherValue)) {
-								doProduceItem(pBuilder, Unit_Launcher);
+								produceItemWithLogging(Unit_Launcher);
 								itemCount[Unit_Launcher]++;
 								money -= data[Unit_Launcher][houseID].price;
 								militaryValue += data[Unit_Launcher][houseID].price;
 							}
 							else if (pBuilder->isAvailableToBuild(Unit_Devastator) && (militaryValue * specialPercent > specialValue)) {
-								doProduceItem(pBuilder, Unit_Devastator);
+								produceItemWithLogging(Unit_Devastator);
 								itemCount[Unit_Devastator]++;
 								money -= data[Unit_Devastator][houseID].price;
 								militaryValue += data[Unit_Devastator][houseID].price;
 							}
 							else if (pBuilder->isAvailableToBuild(Unit_SonicTank) && (militaryValue * specialPercent > specialValue)) {
-								doProduceItem(pBuilder, Unit_SonicTank);
+								produceItemWithLogging(Unit_SonicTank);
 								itemCount[Unit_SonicTank]++;
 								money -= data[Unit_SonicTank][houseID].price;
 								militaryValue += data[Unit_SonicTank][houseID].price;
 							}
 							else if (pBuilder->isAvailableToBuild(Unit_Deviator) && (militaryValue * specialPercent > specialValue)) {
-								doProduceItem(pBuilder, Unit_Deviator);
+								produceItemWithLogging(Unit_Deviator);
 								itemCount[Unit_Deviator]++;
 								money -= data[Unit_Deviator][houseID].price;
 								militaryValue += data[Unit_Deviator][houseID].price;
 							}
 							else if (pBuilder->isAvailableToBuild(Unit_SiegeTank) && (militaryValue * siegePercent > siegeValue)) {
-								doProduceItem(pBuilder, Unit_SiegeTank);
+								produceItemWithLogging(Unit_SiegeTank);
 								itemCount[Unit_SiegeTank]++;
 								money -= data[Unit_Tank][houseID].price;
 								militaryValue += data[Unit_SiegeTank][houseID].price;
 							}
 							else if (pBuilder->isAvailableToBuild(Unit_Tank)) {
 								// Tanks for all else
-								doProduceItem(pBuilder, Unit_Tank);
+								produceItemWithLogging(Unit_Tank);
 								itemCount[Unit_Tank]++;
 								money -= data[Unit_Tank][houseID].price;
 								militaryValue += data[Unit_Tank][houseID].price;
@@ -1855,20 +1882,20 @@ void QuantBot::build(int militaryValue) {
 							&& pStarPort->isAvailableToBuild(Unit_MCV)
 							&& choam.getNumAvailable(Unit_MCV) > 0
 							&& itemCount[Structure_ConstructionYard] + itemCount[Unit_MCV] < 1) {
-							doProduceItem(pBuilder, Unit_MCV);
+							produceItemWithLogging(Unit_MCV);
 							itemCount[Unit_MCV]++;
 							money = money - choam.getPrice(Unit_MCV);
 						}
 
 						if (money > choam.getPrice(Unit_Carryall) && choam.getNumAvailable(Unit_Carryall) > 0 && itemCount[Unit_Carryall] == 0) {
 							// Get at least one Carryall
-							doProduceItem(pBuilder, Unit_Carryall);
+							produceItemWithLogging(Unit_Carryall);
 							itemCount[Unit_Carryall]++;
 							money = money - choam.getPrice(Unit_Carryall);
 						}
 
 						while (money > choam.getPrice(Unit_Harvester) && choam.getNumAvailable(Unit_Harvester) > 0 && itemCount[Unit_Harvester] < harvesterLimit) {
-							doProduceItem(pBuilder, Unit_Harvester);
+							produceItemWithLogging(Unit_Harvester);
 							itemCount[Unit_Harvester]++;
 							money = money - choam.getPrice(Unit_Harvester);
 						}
@@ -1876,14 +1903,14 @@ void QuantBot::build(int militaryValue) {
 						int itemCountUnits = itemCount[Unit_Tank] + itemCount[Unit_SiegeTank] + itemCount[Unit_Launcher] + itemCount[Unit_Harvester];
 
 						while (money > choam.getPrice(Unit_Carryall) && choam.getNumAvailable(Unit_Carryall) > 0 && itemCount[Unit_Carryall] < itemCountUnits / 7) {
-							doProduceItem(pBuilder, Unit_Carryall);
+							produceItemWithLogging(Unit_Carryall);
 							itemCount[Unit_Carryall]++;
 							money = money - choam.getPrice(Unit_Carryall);
 						}
 
 						while (militaryValue < militaryValueLimit && money > choam.getPrice(Unit_SiegeTank) && choam.getNumAvailable(Unit_SiegeTank) > 0
 							&& choam.isCheap(Unit_SiegeTank) && militaryValue < militaryValueLimit && money > 2000) {
-							doProduceItem(pBuilder, Unit_SiegeTank);
+							produceItemWithLogging(Unit_SiegeTank);
 							itemCount[Unit_SiegeTank]++;
 							money = money - choam.getPrice(Unit_SiegeTank);
 							militaryValue += data[Unit_SiegeTank][houseID].price;
@@ -1891,7 +1918,7 @@ void QuantBot::build(int militaryValue) {
 
 						while (militaryValue < militaryValueLimit && money > choam.getPrice(Unit_Launcher) && choam.getNumAvailable(Unit_Launcher) > 0
 							&& choam.isCheap(Unit_Launcher) && militaryValue < militaryValueLimit && money > 2000) {
-							doProduceItem(pBuilder, Unit_Launcher);
+							produceItemWithLogging(Unit_Launcher);
 							itemCount[Unit_Launcher]++;
 							money = money - choam.getPrice(Unit_Launcher);
 							militaryValue += data[Unit_Launcher][houseID].price;
@@ -1899,7 +1926,7 @@ void QuantBot::build(int militaryValue) {
 
 						while (militaryValue < militaryValueLimit && money > choam.getPrice(Unit_Tank) && choam.getNumAvailable(Unit_Tank) > 0
 							&& choam.isCheap(Unit_Tank) && militaryValue < militaryValueLimit && money > 2000) {
-							doProduceItem(pBuilder, Unit_Tank);
+							produceItemWithLogging(Unit_Tank);
 							itemCount[Unit_Tank]++;
 							money = money - choam.getPrice(Unit_Tank);
 							militaryValue += data[Unit_Tank][houseID].price;
@@ -1909,7 +1936,7 @@ void QuantBot::build(int militaryValue) {
 
 						while (militaryValue < militaryValueLimit && money > choam.getPrice(Unit_Ornithopter) && choam.getNumAvailable(Unit_Ornithopter) > 0
 							&& choam.isCheap(Unit_Ornithopter) && militaryValue < militaryValueLimit && money > 2000) {
-							doProduceItem(pBuilder, Unit_Ornithopter);
+							produceItemWithLogging(Unit_Ornithopter);
 							itemCount[Unit_Ornithopter]++;
 							money = money - choam.getPrice(Unit_Ornithopter);
 							militaryValue += data[Unit_Ornithopter][houseID].price;
@@ -1934,6 +1961,9 @@ void QuantBot::build(int militaryValue) {
 
 					const ConstructionYard* pConstYard = static_cast<const ConstructionYard*>(pBuilder);
 
+					logDebug("PRODUCTION: CY Status - Upgrading:%d Queue:%d Credits:%d BuildList:%d", 
+						pBuilder->isUpgrading(), pBuilder->getProductionQueueSize(), money, pBuilder->getBuildListSize());
+
 					if (!pBuilder->isUpgrading() && getHouse()->getCredits() > 100 && (pBuilder->getProductionQueueSize() < 1) && pBuilder->getBuildListSize()) {
 
 						// Campaign Build order, iterate through the buildings, if the number that exist
@@ -1942,47 +1972,51 @@ void QuantBot::build(int militaryValue) {
 						if (gameMode == GameMode::Campaign && difficulty != Difficulty::Brutal) {
 							//logDebug("GameMode Campaign.. ");
 
-							for (int i = Structure_FirstID; i <= Structure_LastID; i++) {
-								if (itemCount[i] < initialItemCount[i]
-									&& pBuilder->isAvailableToBuild(i)
-									&& findPlaceLocation(i).isValid()
-									&& !pBuilder->isUpgrading()
-									&& pBuilder->getProductionQueueSize() < 1) {
+						for (int i = Structure_FirstID; i <= Structure_LastID; i++) {
+							if (itemCount[i] < initialItemCount[i]
+								&& pBuilder->isAvailableToBuild(i)
+								&& findPlaceLocation(i).isValid()
+								&& !pBuilder->isUpgrading()
+								&& pBuilder->getProductionQueueSize() < 1) {
 
-									logDebug("***CampAI Build itemID: %o structure count: %o, initial count: %o", i, itemCount[i], initialItemCount[i]);
-									doProduceItem(pBuilder, i);
-									itemCount[i]++;
-								}
+								logDebug("***CampAI Build itemID: %o structure count: %o, initial count: %o", i, itemCount[i], initialItemCount[i]);
+								produceItemWithLogging(i);
+								itemCount[i]++;  // Increment immediately to prevent multiple CYs from building same item
 							}
+						}
 
 							// If Campaign AI can't build military, let it build up its cash reserves and defenses
 
 							if (pStructure->getHealth() < pStructure->getMaxHealth()) {
 								doRepair(pBuilder);
+								int health = pStructure->getHealth().lround();
+								int maxHealth = pStructure->getMaxHealth();
+								logDebug("PRODUCTION: Repairing CY, health: %d/%d", health, maxHealth);
 							}
 							else if (pBuilder->getCurrentUpgradeLevel() < pBuilder->getMaxUpgradeLevel()
 								&& !pBuilder->isUpgrading()
-								&& itemCount[Unit_Harvester] >= harvesterLimit) {
+								&& itemCount[Unit_Harvester] >= harvesterLimit
+								&& money > 1500) {  // Don't upgrade if low on money (need money for structures/units)
 
 								doUpgrade(pBuilder);
-								logDebug("***CampAI Upgrade builder");
+								logDebug("PRODUCTION: Upgrading CY to level %d, credits: %d", pBuilder->getCurrentUpgradeLevel() + 1, money);
 							}
 							else if ((getHouse()->getProducedPower() < getHouse()->getPowerRequirement())
 								&& pBuilder->isAvailableToBuild(Structure_WindTrap)
-								&& itemCount[Structure_WindTrap] < initialItemCount[Structure_WindTrap]  // Only build up to initial count
 								&& findPlaceLocation(Structure_WindTrap).isValid()
 								&& pBuilder->getProductionQueueSize() == 0) {
 
-								doProduceItem(pBuilder, Structure_WindTrap);
+								produceItemWithLogging(Structure_WindTrap);
+								itemCount[Structure_WindTrap]++;
 
-								logDebug("***CampAI Build A new Windtrap increasing count to: %d (max: %d)", itemCount[Structure_WindTrap], initialItemCount[Structure_WindTrap]);
+								logDebug("***CampAI Build windtrap: power %d/%d", getHouse()->getProducedPower(), getHouse()->getPowerRequirement());
 							}
 							else if ((getHouse()->getStoredCredits() > getHouse()->getCapacity() * 0.90_fix)  // Only build when 90% full
 								&& pBuilder->isAvailableToBuild(Structure_Silo)
 								&& findPlaceLocation(Structure_Silo).isValid()
 								&& pBuilder->getProductionQueueSize() == 0) {
 
-								doProduceItem(pBuilder, Structure_Silo);
+								produceItemWithLogging(Structure_Silo);
 								itemCount[Structure_Silo]++;
 
 								logDebug("***CampAI Build A new Silo increasing count to: %d (credits: %d/%d)", itemCount[Structure_Silo], getHouse()->getStoredCredits().lround(), getHouse()->getCapacity());
@@ -1994,7 +2028,7 @@ void QuantBot::build(int militaryValue) {
 								&& (itemCount[Structure_RocketTurret] <
 									(itemCount[Structure_Silo] + itemCount[Structure_Refinery]) * 2)) {
 
-								doProduceItem(pBuilder, Structure_RocketTurret);
+								produceItemWithLogging(Structure_RocketTurret);
 								itemCount[Structure_RocketTurret]++;
 
 								logDebug("***CampAI Build A new Rocket turret increasing count to: %d", itemCount[Structure_RocketTurret]);
@@ -2161,12 +2195,15 @@ void QuantBot::build(int militaryValue) {
 							itemID = Structure_WindTrap;
 						}
 						else if (!skipRemainingStructureLogic
-							&& (itemCount[Structure_Refinery] == 0 || itemCount[Structure_Refinery] < itemCount[Unit_Harvester] / 3) && pBuilder->isAvailableToBuild(Structure_Refinery)) {
+						&& (itemCount[Structure_Refinery] == 0 || itemCount[Structure_Refinery] < itemCount[Unit_Harvester] / 3) 
+						&& pBuilder->isAvailableToBuild(Structure_Refinery)) {
 									itemID = Structure_Refinery;
 									itemCount[Unit_Harvester]++;
 								}
 								else if (!skipRemainingStructureLogic
-									&& itemCount[Structure_Refinery] < 4 && pBuilder->isAvailableToBuild(Structure_Refinery) && money < 4000) {
+								&& itemCount[Structure_Refinery] < 4 
+								&& pBuilder->isAvailableToBuild(Structure_Refinery) 
+								&& money < 4000) {
 									itemID = Structure_Refinery;
 									itemCount[Unit_Harvester]++;
 								}
@@ -2338,7 +2375,7 @@ void QuantBot::build(int militaryValue) {
 							}
 
 			if (pBuilder->isAvailableToBuild(itemID) && findPlaceLocation(itemID).isValid() && itemID != NONE_ID) {
-				doProduceItem(pBuilder, itemID);
+				produceItemWithLogging(itemID);
 				itemCount[itemID]++;
 			}
 			else if (itemID != NONE_ID && pBuilder->isAvailableToBuild(itemID) && !findPlaceLocation(itemID).isValid()) {
@@ -2360,7 +2397,7 @@ void QuantBot::build(int militaryValue) {
 						doProduceItem(pBuilder, slabType);
 						logDebug("Building concrete slab to expand buildable area for itemID %d at (%d,%d)", itemID, slabLocation.x, slabLocation.y);
 					} else {
-						logDebug("Cannot place slab for itemID %d (no valid slab location)", itemID);
+					// Cannot place slab - silenced (too spammy)
 					}
 				} else {
 					logDebug("Cannot build itemID %d: no place to build and slabs not available", itemID);
@@ -2396,6 +2433,7 @@ void QuantBot::build(int militaryValue) {
 
 				if (pBuilder->isWaitingToPlace()) {
 					Uint32 itemToBePlaced = pBuilder->getCurrentProducedItem();
+					logDebug("PRODUCTION: CY waiting to place itemID: %d, credits: %d", itemToBePlaced, money);
 					Coord location;
 					
 					// Use appropriate placement method based on item type
@@ -2412,9 +2450,10 @@ void QuantBot::build(int militaryValue) {
 
 						if (location.isValid()) {
 							doPlaceStructure(pConstYard, location.x, location.y);
+							logDebug("PRODUCTION: Placed structure itemID: %d at (%d,%d)", itemToBePlaced, location.x, location.y);
 						}
 						else {
-							logDebug("Failed to find placement location for item %d, cancelling", itemToBePlaced);
+							logDebug("PRODUCTION ERROR: Failed to find placement location for item %d, cancelling", itemToBePlaced);
 							doCancelItem(pConstYard, itemToBePlaced);
 						}
 					}
@@ -2715,8 +2754,19 @@ void QuantBot::attack(int militaryValue) {
 		}
 	}
 
-	logDebug("Attack: house: %d  dif: %d  mStr: %d  mLim: %d  attackTimer: %d",
-		getHouse()->getHouseID(), static_cast<Uint8>(difficulty), militaryValue, militaryValueLimit, attackTimer);
+	// Calculate attack force value limit based on military value and difficulty ratio
+	int attackForceValueLimit = static_cast<int>(militaryValueLimit * diffSettings.attackForceMilitaryValueRatio);
+	int attackForceValueUsed = 0;
+	
+	logDebug("=== ATTACK INITIATED: %s (%s) ===", 
+		getHouseNameByNumber(static_cast<HOUSETYPE>(getHouse()->getHouseID())).c_str(),
+		difficulty == Difficulty::Easy ? "Easy" : 
+		difficulty == Difficulty::Medium ? "Medium" : 
+		difficulty == Difficulty::Hard ? "Hard" : 
+		difficulty == Difficulty::Brutal ? "Brutal" : "Defend");
+	logDebug("  Military: %d/%d  AttackForce: %d (%.0f%% limit)", 
+		militaryValue, militaryValueLimit, attackForceValueLimit, 
+		diffSettings.attackForceMilitaryValueRatio * 100);
 
 	for (const UnitBase* pUnit : getUnitList()) {
 		if (pUnit->isRespondable()
@@ -2733,12 +2783,24 @@ void QuantBot::attack(int militaryValue) {
 			&& pUnit->getItemID() != Unit_Sandworm)
 
 		{	
-			// Send all available military units to attack (no squad size limit)
+			// Check if adding this unit would exceed the attack force value limit
+			int unitValue = currentGame->objectData.data[pUnit->getItemID()][getHouse()->getHouseID()].price;
+			if (attackForceValueUsed + unitValue > attackForceValueLimit) {
+				logDebug("Attack force value limit reached: %d/%d (skipping unit ID %d worth %d)", 
+					attackForceValueUsed, attackForceValueLimit, 
+					pUnit->getItemID(), unitValue);
+				break;  // Stop adding units to attack
+			}
+			
+			// Send unit to attack and track its value
 			doSetAttackMode(pUnit, HUNT);
+			attackForceValueUsed += unitValue;
 			attackSquadSize++;
 		}
 	}
-	logDebug("Attacking with %d units", attackSquadSize);
+	logDebug("  Sent %d units to HUNT (attack value: %d/%d)", 
+		attackSquadSize, attackForceValueUsed, attackForceValueLimit);
+	logDebug("=== END ATTACK ===");
 
 }
 
@@ -3100,6 +3162,15 @@ void QuantBot::retreatAllUnits() {
                 continue;
             }
             
+            // Log saboteur state for debugging
+            if (pUnit->getItemID() == Unit_Saboteur && pUnit->getOwner() == getHouse()) {
+                logDebug("SABOTEUR CHECK: At (%d,%d) Mode=%d Target=%s Forced=%d", 
+                    pUnit->getLocation().x, pUnit->getLocation().y,
+                    pUnit->getAttackMode(),
+                    pUnit->hasATarget() ? "Yes" : "No",
+                    pUnit->wasForced() ? 1 : 0);
+            }
+            
             // Safety check: skip units with invalid owner
             if (pUnit->getOwner() == nullptr) {
                 continue;
@@ -3172,6 +3243,15 @@ void QuantBot::retreatAllUnits() {
                     }
                 } break;
 
+                case Unit_Saboteur: {
+                    // Saboteurs operate independently - always keep them in HUNT mode
+                    if (pUnit->getAttackMode() != HUNT && !pUnit->wasForced()) {
+                        logDebug("SABOTEUR: Unit at (%d,%d) was in mode %d, setting to HUNT", 
+                            pUnit->getLocation().x, pUnit->getLocation().y, pUnit->getAttackMode());
+                        doSetAttackMode(pUnit, HUNT);
+                    }
+                } break;
+
                 default: {
                     if (supportMode) {
                         break;
@@ -3227,7 +3307,7 @@ void QuantBot::retreatAllUnits() {
                             }
                         }
                     }
-                    else if (pUnit->getItemID() != Unit_Ornithopter && pUnit->getAttackMode() != HUNT && !pUnit->hasATarget() && !pUnit->wasForced()) {
+                    else if (pUnit->getItemID() != Unit_Ornithopter && pUnit->getItemID() != Unit_Saboteur && pUnit->getAttackMode() != HUNT && !pUnit->hasATarget() && !pUnit->wasForced()) {
                         if (pUnit->getAttackMode() == AREAGUARD && squadCenterLocation.isValid() && (gameMode != GameMode::Campaign)) {
 							if (!pUnit->hasATarget()) {
                                 // Move to optimal position (closer of squad center or rally point, only if outside radius)
@@ -3259,6 +3339,9 @@ void QuantBot::retreatAllUnits() {
                         else if (pUnit->getAttackMode() == GUARD
                             && ((pUnit->getDestination() != squadRallyLocation) || (blockDistance(pUnit->getLocation(), squadRallyLocation) <= squadRadius))) {
                             // A newly deployed unit has reached the rally point, or has been diverted => Change it to area guard
+                            logDebug("UNIT GUARD->AREAGUARD: %s at (%d,%d)", 
+                                getItemNameByID(pUnit->getItemID()).c_str(), 
+                                pUnit->getLocation().x, pUnit->getLocation().y);
                             doSetAttackMode(pUnit, AREAGUARD);
                         }
                     }

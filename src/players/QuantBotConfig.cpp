@@ -39,8 +39,10 @@ QuantBotConfig::QuantBotConfig() {
     defend.attackEnabled = false;                           // Never attacks
     defend.ornithopterAttackEnabled = false;                // No ornithopter attacks
     defend.ornithopterAttackThreshold = 999;                // Effectively disabled
+    defend.attackForceMilitaryValueRatio = 0.0f;            // N/A (doesn't attack)
     defend.harvesterLimitPerRefineryMultiplier = 2;         // Campaign: 2 harvesters per refinery
     defend.militaryValueMultiplier = 1.8f;                  // Campaign: 1.8x initial military value
+    defend.refineryMinimum = 0;                             // Campaign: No guaranteed refineries
     defend.harvesterLimitCustomSmallMap = 3;                // Custom: Small map (32x32)
     defend.harvesterLimitCustomMediumMap = 4;               // Custom: Medium map (64x64)
     defend.harvesterLimitCustomLargeMap = 15;               // Custom: Large map (128x128)
@@ -52,8 +54,10 @@ QuantBotConfig::QuantBotConfig() {
     easy.attackEnabled = true;                              // Can attack
     easy.ornithopterAttackEnabled = false;                  // NO ornithopter attacks
     easy.ornithopterAttackThreshold = 999;                  // Disabled
+    easy.attackForceMilitaryValueRatio = 0.25f;             // 25% of military value per attack
     easy.harvesterLimitPerRefineryMultiplier = 1;           // Campaign: 1 harvester per refinery
-    easy.militaryValueMultiplier = 1.0f;                    // Campaign: 1.0x initial (min 2000 at mission 21+)
+    easy.militaryValueMultiplier = 2.0f;                    // Campaign: 2.0x initial (min 2000 at mission 21+)
+    easy.refineryMinimum = 0;                               // Campaign: No guaranteed refineries
     easy.harvesterLimitCustomSmallMap = 2;
     easy.harvesterLimitCustomMediumMap = 2;
     easy.harvesterLimitCustomLargeMap = 8;
@@ -65,8 +69,10 @@ QuantBotConfig::QuantBotConfig() {
     medium.attackEnabled = true;
     medium.ornithopterAttackEnabled = false;                // NO ornithopter attacks
     medium.ornithopterAttackThreshold = 999;                // Disabled
+    medium.attackForceMilitaryValueRatio = 0.40f;           // 40% of military value per attack
     medium.harvesterLimitPerRefineryMultiplier = 2;         // Campaign: 2 harvesters per refinery
-    medium.militaryValueMultiplier = 1.5f;                  // Campaign: 1.5x initial (min 4000 at mission 21+)
+    medium.militaryValueMultiplier = 2.0f;                  // Campaign: 2.0x initial (min 4000 at mission 21+)
+    medium.refineryMinimum = 0;                             // Campaign: No guaranteed refineries
     medium.harvesterLimitCustomSmallMap = 3;
     medium.harvesterLimitCustomMediumMap = 4;
     medium.harvesterLimitCustomLargeMap = 15;
@@ -78,8 +84,10 @@ QuantBotConfig::QuantBotConfig() {
     hard.attackEnabled = true;
     hard.ornithopterAttackEnabled = true;
     hard.ornithopterAttackThreshold = 1;                    // Attack as soon as 1 ornithopter is ready
-    hard.harvesterLimitPerRefineryMultiplier = 2;           // Campaign: 2 harvesters per refinery
-    hard.militaryValueMultiplier = 2.0f;                    // Campaign: 2.0x initial (fixed 10000 at mission 21+)
+    hard.attackForceMilitaryValueRatio = 0.50f;             // 50% of military value per attack
+    hard.harvesterLimitPerRefineryMultiplier = 2;           // Campaign: 2.5 harvesters per refinery (rounded to 2)
+    hard.militaryValueMultiplier = 2.5f;                    // Campaign: 2.5x initial (fixed 10000 at mission 21+)
+    hard.refineryMinimum = 2;                               // Campaign: Guaranteed 2 refineries (tops up if needed)
     hard.harvesterLimitCustomSmallMap = 4;
     hard.harvesterLimitCustomMediumMap = 7;
     hard.harvesterLimitCustomLargeMap = 40;
@@ -91,8 +99,10 @@ QuantBotConfig::QuantBotConfig() {
     brutal.attackEnabled = true;
     brutal.ornithopterAttackEnabled = true;
     brutal.ornithopterAttackThreshold = 3;                  // Attack as soon as 3 ornithopters are ready
+    brutal.attackForceMilitaryValueRatio = 0.50f;           // 50% of military value per attack
     brutal.harvesterLimitPerRefineryMultiplier = 3;         // Campaign: 3 harvesters per refinery
     brutal.militaryValueMultiplier = 3.0f;                  // Campaign: 3.0x initial military
+    brutal.refineryMinimum = 2;                             // Campaign: Guaranteed 2 refineries (tops up if needed)
     brutal.harvesterLimitCustomSmallMap = 10;
     brutal.harvesterLimitCustomMediumMap = 20;
     brutal.harvesterLimitCustomLargeMap = 100;
@@ -201,11 +211,13 @@ static void saveDifficultySettings(INIFile& iniFile, const std::string& section,
     iniFile.setBoolValue(section, prefix + "_AttackEnabled", settings.attackEnabled);
     iniFile.setBoolValue(section, prefix + "_OrnithopterAttackEnabled", settings.ornithopterAttackEnabled);
     iniFile.setIntValue(section, prefix + "_OrnithopterAttackThreshold", settings.ornithopterAttackThreshold);
+    iniFile.setDoubleValue(section, prefix + "_AttackForceMilitaryValueRatio", settings.attackForceMilitaryValueRatio);
     iniFile.setDoubleValue(section, prefix + "_MilitaryValueMultiplier", settings.militaryValueMultiplier);
     iniFile.setIntValue(section, prefix + "_MilitaryValueLimitSmallMap", settings.militaryValueLimitCustomSmallMap);
     iniFile.setIntValue(section, prefix + "_MilitaryValueLimitMediumMap", settings.militaryValueLimitCustomMediumMap);
     iniFile.setIntValue(section, prefix + "_MilitaryValueLimitLargeMap", settings.militaryValueLimitCustomLargeMap);
     iniFile.setIntValue(section, prefix + "_HarvesterLimitMultiplier", settings.harvesterLimitPerRefineryMultiplier);
+    iniFile.setIntValue(section, prefix + "_RefineryMinimum", settings.refineryMinimum);
     iniFile.setIntValue(section, prefix + "_HarvesterLimitSmallMap", settings.harvesterLimitCustomSmallMap);
     iniFile.setIntValue(section, prefix + "_HarvesterLimitMediumMap", settings.harvesterLimitCustomMediumMap);
     iniFile.setIntValue(section, prefix + "_HarvesterLimitLargeMap", settings.harvesterLimitCustomLargeMap);
@@ -217,11 +229,13 @@ static void loadDifficultySettings(const INIFile& iniFile, const std::string& se
     settings.attackEnabled = iniFile.getBoolValue(section, prefix + "_AttackEnabled", settings.attackEnabled);
     settings.ornithopterAttackEnabled = iniFile.getBoolValue(section, prefix + "_OrnithopterAttackEnabled", settings.ornithopterAttackEnabled);
     settings.ornithopterAttackThreshold = iniFile.getIntValue(section, prefix + "_OrnithopterAttackThreshold", settings.ornithopterAttackThreshold);
+    settings.attackForceMilitaryValueRatio = static_cast<float>(iniFile.getDoubleValue(section, prefix + "_AttackForceMilitaryValueRatio", settings.attackForceMilitaryValueRatio));
     settings.militaryValueMultiplier = static_cast<float>(iniFile.getDoubleValue(section, prefix + "_MilitaryValueMultiplier", settings.militaryValueMultiplier));
     settings.militaryValueLimitCustomSmallMap = iniFile.getIntValue(section, prefix + "_MilitaryValueLimitSmallMap", settings.militaryValueLimitCustomSmallMap);
     settings.militaryValueLimitCustomMediumMap = iniFile.getIntValue(section, prefix + "_MilitaryValueLimitMediumMap", settings.militaryValueLimitCustomMediumMap);
     settings.militaryValueLimitCustomLargeMap = iniFile.getIntValue(section, prefix + "_MilitaryValueLimitLargeMap", settings.militaryValueLimitCustomLargeMap);
     settings.harvesterLimitPerRefineryMultiplier = iniFile.getIntValue(section, prefix + "_HarvesterLimitMultiplier", settings.harvesterLimitPerRefineryMultiplier);
+    settings.refineryMinimum = iniFile.getIntValue(section, prefix + "_RefineryMinimum", settings.refineryMinimum);
     settings.harvesterLimitCustomSmallMap = iniFile.getIntValue(section, prefix + "_HarvesterLimitSmallMap", settings.harvesterLimitCustomSmallMap);
     settings.harvesterLimitCustomMediumMap = iniFile.getIntValue(section, prefix + "_HarvesterLimitMediumMap", settings.harvesterLimitCustomMediumMap);
     settings.harvesterLimitCustomLargeMap = iniFile.getIntValue(section, prefix + "_HarvesterLimitLargeMap", settings.harvesterLimitCustomLargeMap);
@@ -612,21 +626,21 @@ void QuantBotConfig::logSettings() const {
     SDL_Log("%s", "");
     
     SDL_Log("=== DIFFICULTY SETTINGS ===");
-    SDL_Log("DEFEND:  Attack=%d OrnAttack=%d OrnThresh=%d MilMult=%.2f HarvMult=%d",
+    SDL_Log("DEFEND:  Attack=%d OrnAttack=%d OrnThresh=%d AttackForce=%.0f%% MilMult=%.2f HarvMult=%d RefMin=%d",
         defend.attackEnabled, defend.ornithopterAttackEnabled, defend.ornithopterAttackThreshold,
-        defend.militaryValueMultiplier, defend.harvesterLimitPerRefineryMultiplier);
-    SDL_Log("EASY:    Attack=%d OrnAttack=%d OrnThresh=%d MilMult=%.2f HarvMult=%d",
+        defend.attackForceMilitaryValueRatio * 100, defend.militaryValueMultiplier, defend.harvesterLimitPerRefineryMultiplier, defend.refineryMinimum);
+    SDL_Log("EASY:    Attack=%d OrnAttack=%d OrnThresh=%d AttackForce=%.0f%% MilMult=%.2f HarvMult=%d RefMin=%d",
         easy.attackEnabled, easy.ornithopterAttackEnabled, easy.ornithopterAttackThreshold,
-        easy.militaryValueMultiplier, easy.harvesterLimitPerRefineryMultiplier);
-    SDL_Log("MEDIUM:  Attack=%d OrnAttack=%d OrnThresh=%d MilMult=%.2f HarvMult=%d",
+        easy.attackForceMilitaryValueRatio * 100, easy.militaryValueMultiplier, easy.harvesterLimitPerRefineryMultiplier, easy.refineryMinimum);
+    SDL_Log("MEDIUM:  Attack=%d OrnAttack=%d OrnThresh=%d AttackForce=%.0f%% MilMult=%.2f HarvMult=%d RefMin=%d",
         medium.attackEnabled, medium.ornithopterAttackEnabled, medium.ornithopterAttackThreshold,
-        medium.militaryValueMultiplier, medium.harvesterLimitPerRefineryMultiplier);
-    SDL_Log("HARD:    Attack=%d OrnAttack=%d OrnThresh=%d MilMult=%.2f HarvMult=%d",
+        medium.attackForceMilitaryValueRatio * 100, medium.militaryValueMultiplier, medium.harvesterLimitPerRefineryMultiplier, medium.refineryMinimum);
+    SDL_Log("HARD:    Attack=%d OrnAttack=%d OrnThresh=%d AttackForce=%.0f%% MilMult=%.2f HarvMult=%d RefMin=%d",
         hard.attackEnabled, hard.ornithopterAttackEnabled, hard.ornithopterAttackThreshold,
-        hard.militaryValueMultiplier, hard.harvesterLimitPerRefineryMultiplier);
-    SDL_Log("BRUTAL:  Attack=%d OrnAttack=%d OrnThresh=%d MilMult=%.2f HarvMult=%d",
+        hard.attackForceMilitaryValueRatio * 100, hard.militaryValueMultiplier, hard.harvesterLimitPerRefineryMultiplier, hard.refineryMinimum);
+    SDL_Log("BRUTAL:  Attack=%d OrnAttack=%d OrnThresh=%d AttackForce=%.0f%% MilMult=%.2f HarvMult=%d RefMin=%d",
         brutal.attackEnabled, brutal.ornithopterAttackEnabled, brutal.ornithopterAttackThreshold,
-        brutal.militaryValueMultiplier, brutal.harvesterLimitPerRefineryMultiplier);
+        brutal.attackForceMilitaryValueRatio * 100, brutal.militaryValueMultiplier, brutal.harvesterLimitPerRefineryMultiplier, brutal.refineryMinimum);
     SDL_Log("%s", "");
     
     SDL_Log("=== GENERAL BEHAVIOR ===");

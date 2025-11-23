@@ -42,6 +42,7 @@ struct QuantBotConfig {
         bool attackEnabled;                     // Can this difficulty attack at all?
         bool ornithopterAttackEnabled;          // Can ornithopters attack?
         int ornithopterAttackThreshold;         // Minimum ornithopters needed to attack
+        float attackForceMilitaryValueRatio;    // Max % of military value to send per attack (0.0-1.0)
         
         // Military limits
         float militaryValueMultiplier;          // Multiplier for initial military value (Campaign)
@@ -54,6 +55,9 @@ struct QuantBotConfig {
         int harvesterLimitCustomSmallMap;       // Harvester limit for small maps (Custom)
         int harvesterLimitCustomMediumMap;      // Harvester limit for medium maps (Custom)
         int harvesterLimitCustomLargeMap;       // Harvester limit for large maps (Custom)
+        
+        // Refinery minimum (Campaign)
+        int refineryMinimum;                    // Guaranteed refineries at start (tops up if below, 0 = no guarantee)
     };
     
     DifficultySettings defend;   // Very Easy (Defend only)

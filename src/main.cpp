@@ -183,10 +183,22 @@ void setVideoMode(int displayIndex)
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         exit(EXIT_FAILURE);
     }
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
+    // Create renderer (VSync set separately for macOS compatibility)
+    Uint32 rendererFlags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE;
+    
+    renderer = SDL_CreateRenderer(window, -1, rendererFlags);
     if (!renderer) {
         fprintf(stderr, "SDL_CreateRenderer failed: %s\n", SDL_GetError());
         exit(EXIT_FAILURE);
+    }
+    
+    // Set VSync after renderer creation (works better on macOS Metal)
+    if(settings.video.frameLimit) {
+        SDL_RenderSetVSync(renderer, 1);
+        SDL_Log("VSync enabled");
+    } else {
+        SDL_RenderSetVSync(renderer, 0);
+        SDL_Log("VSync disabled");
     }
     SDL_RenderSetLogicalSize(renderer, settings.video.width, settings.video.height);
     screenTexture = SDL_CreateTexture(renderer, SCREEN_FORMAT, SDL_TEXTUREACCESS_TARGET, settings.video.width, settings.video.height);
@@ -292,13 +304,13 @@ std::string getObjectDataConfigFilepath()
 
 std::string getObjectDataTemplateFilepath()
 {
-    // Template ObjectData.bak is in config subdirectory of game directory
-    return getDuneLegacyDataDir() + "/config/ObjectData.bak";
+    // Template ObjectData.ini.default is in config subdirectory of game directory
+    return getDuneLegacyDataDir() + "/config/ObjectData.ini.default";
 }
 
 static std::string getQuantBotTemplateFilepath()
 {
-    return getDuneLegacyDataDir() + "/config/QuantBot Config.bak";
+    return getDuneLegacyDataDir() + "/config/QuantBot Config.ini.default";
 }
 
 static bool computeFileDigest(const std::string& filepath, std::array<unsigned char, 16>& digest)
@@ -318,7 +330,7 @@ static bool areConfigFilesOutOfSync(bool& objectDataOutOfSync, bool& quantBotOut
     const std::string objectUser = getObjectDataConfigFilepath();
 
     if(!existsFile(objectTemplate)) {
-        SDL_Log("Warning: Template ObjectData.bak missing at %s", objectTemplate.c_str());
+        SDL_Log("Warning: Template ObjectData.ini.default missing at %s", objectTemplate.c_str());
         objectDataOutOfSync = true;
     } else if(!existsFile(objectUser)) {
         SDL_Log("ObjectData.ini missing at %s", objectUser.c_str());
@@ -338,7 +350,7 @@ static bool areConfigFilesOutOfSync(bool& objectDataOutOfSync, bool& quantBotOut
     const std::string quantUser = getQuantBotConfigFilepath();
 
     if(!existsFile(quantTemplate)) {
-        SDL_Log("Warning: Template QuantBot Config.bak missing at %s", quantTemplate.c_str());
+        SDL_Log("Warning: Template QuantBot Config.ini.default missing at %s", quantTemplate.c_str());
         quantBotOutOfSync = true;
     } else if(!existsFile(quantUser)) {
         SDL_Log("QuantBot Config.ini missing at %s", quantUser.c_str());
@@ -430,7 +442,7 @@ bool restoreDefaultConfigs() {
             std::string userPath = getObjectDataConfigFilepath();
             SDL_Log("Restoring ObjectData.ini to: %s", userPath.c_str());
             
-            if (copyTemplateFile("config/ObjectData.bak", userPath)) {
+            if (copyTemplateFile("config/ObjectData.ini.default", userPath)) {
                 SDL_Log("  ✓ ObjectData.ini restored successfully");
             } else {
                 SDL_Log("  ✗ Failed to restore ObjectData.ini");
@@ -448,7 +460,7 @@ bool restoreDefaultConfigs() {
             std::string userPath = getQuantBotConfigFilepath();
             SDL_Log("Restoring QuantBot Config.ini to: %s", userPath.c_str());
             
-            if (copyTemplateFile("config/QuantBot Config.bak", userPath)) {
+            if (copyTemplateFile("config/QuantBot Config.ini.default", userPath)) {
                 SDL_Log("  ✓ QuantBot Config.ini restored successfully");
             } else {
                 SDL_Log("  ✗ Failed to restore QuantBot Config.ini");
@@ -569,7 +581,7 @@ void createDefaultConfigFile(const std::string& configfilepath, const std::strin
                                 "Physical Width = 640\n"
                                 "Physical Height = 480\n"
                                 "Fullscreen = true\n"
-                                "FrameLimit = false          # Limit the frame rate to ~31 FPS (32ms per frame). Set to false for unlimited FPS.\n"
+                                "FrameLimit = true           # Enable VSync for smooth, tear-free rendering.\n"
                                 "Preferred Zoom Level = 1    # 0 = no zooming, 1 = 2x, 2 = 3x\n"
                                 "Scaler = ScaleHD            # Scaler to use: ScaleHD = apply manual drawn mask to upscale, Scale2x = smooth edges, ScaleNN = nearest neighbour, \n"
                                 "RotateUnitGraphics = false  # Freely rotate unit graphics, e.g. carryall graphics\n"
@@ -838,7 +850,7 @@ int main(int argc, char *argv[]) {
             settings.video.physicalWidth= myINIFile.getIntValue("Video","Physical Width",640);
             settings.video.physicalHeight = myINIFile.getIntValue("Video","Physical Height",480);
             settings.video.fullscreen = myINIFile.getBoolValue("Video","Fullscreen",false);
-            settings.video.frameLimit = myINIFile.getBoolValue("Video","FrameLimit",false);
+            settings.video.frameLimit = myINIFile.getBoolValue("Video","FrameLimit",true);
             settings.video.preferredZoomLevel = myINIFile.getIntValue("Video","Preferred Zoom Level", 0);
             settings.video.scaler = myINIFile.getStringValue("Video","Scaler","ScaleHD");
             settings.video.rotateUnitGraphics = myINIFile.getBoolValue("Video","RotateUnitGraphics",false);
@@ -925,7 +937,8 @@ int main(int argc, char *argv[]) {
                 SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "0");
                 SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1");
                 SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
-                SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");         // Disable VSync for higher FPS
+                // VSync disabled by default - controlled via renderer flags in setVideoMode()
+                SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
                 SDL_SetHint(SDL_HINT_VIDEO_X11_FORCE_EGL, "0");  // Disable EGL
                 SDL_SetHint(SDL_HINT_RENDER_BATCHING, "1");      // Enable render batching
                 SDL_SetHint(SDL_HINT_RENDER_LINE_METHOD, "3");   // Best line rendering quality
@@ -993,13 +1006,13 @@ int main(int argc, char *argv[]) {
                 if (!existsFile(userObjectDataPath)) {
                     SDL_Log("ObjectData.ini not found in user directory, copying template...");
                     try {
-                        if (copyTemplateFile("config/ObjectData.bak", userObjectDataPath)) {
+                        if (copyTemplateFile("config/ObjectData.ini.default", userObjectDataPath)) {
                             SDL_Log("ObjectData.ini created successfully at: %s", userObjectDataPath.c_str());
                         } else {
                             SDL_Log("Warning: Failed to create ObjectData.ini");
                         }
                     } catch (std::exception& e) {
-                        SDL_Log("Warning: Could not copy ObjectData.bak template: %s", e.what());
+                        SDL_Log("Warning: Could not copy ObjectData.ini.default template: %s", e.what());
                     }
                 }
             }
@@ -1010,13 +1023,13 @@ int main(int argc, char *argv[]) {
                 if (!existsFile(userQuantBotPath)) {
                     SDL_Log("QuantBot Config.ini not found in user directory, copying template...");
                     try {
-                        if (copyTemplateFile("config/QuantBot Config.bak", userQuantBotPath)) {
+                        if (copyTemplateFile("config/QuantBot Config.ini.default", userQuantBotPath)) {
                             SDL_Log("QuantBot Config.ini created successfully at: %s", userQuantBotPath.c_str());
                         } else {
                             SDL_Log("Warning: Failed to create QuantBot Config.ini");
                         }
                     } catch (std::exception& e) {
-                        SDL_Log("Warning: Could not copy QuantBot Config.bak template: %s", e.what());
+                        SDL_Log("Warning: Could not copy QuantBot Config.ini.default template: %s", e.what());
                     }
                 }
             }
