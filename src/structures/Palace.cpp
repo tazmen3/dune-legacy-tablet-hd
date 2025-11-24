@@ -267,7 +267,9 @@ bool Palace::spawnSaboteur() {
     saboteur->deploy(spot);
 
     if(getOwner()->isAI()) {
+        SDL_Log("PALACE: Spawning AI saboteur at (%d,%d), setting to HUNT mode", spot.x, spot.y);
         saboteur->doSetAttackMode(HUNT);
+        SDL_Log("PALACE: Saboteur attack mode after setting: %d", saboteur->getAttackMode());
         currentGame->addToNewsTicker(_("@DUNE.ENG|79#Saboteur is approaching"));
         soundPlayer->playVoice(SaboteurApproaching, pLocalHouse->getHouseID());
     }

@@ -215,10 +215,15 @@ void Sandworm::engageTarget() {
         } else {
             switch(attackMode) {
                 case GUARD:
-                case AMBUSH:
-                case HUNT: {
-                    // Sandworms should only hunt within view range, not chase across entire map
+                case AMBUSH: {
+                    // In GUARD and AMBUSH modes, stay near guard point (view range)
                     maxDistance = getViewRange();
+                } break;
+                
+                case HUNT: {
+                    // In HUNT mode, pursue more aggressively but still limited to view range
+                    // This allows counter-attacking units that damaged us
+                    maxDistance = getViewRange() * 2;
                 } break;
 
                 case AREAGUARD: {
@@ -298,19 +303,13 @@ void Sandworm::setTarget(const ObjectBase* newTarget) {
 }
 
 void Sandworm::handleDamage(int damage, Uint32 damagerID, House* damagerOwner) {
-    if(damage > 0) {
-        attackMode = HUNT;
-        
-        // Sandworm should attack back when damaged
-        ObjectBase* pDamager = currentGame->getObjectManager().getObject(damagerID);
-        if(pDamager != nullptr && canAttack(pDamager)) {
-            // Attack the damager if we don't have a target or if the damager is closer/more threatening
-            if(!target || target.getObjPointer() == nullptr) {
-                doAttackObject(pDamager, false);
-            }
-        }
-    }
+    // First call parent to handle counter-attack logic while still in current mode
     GroundUnit::handleDamage(damage, damagerID, damagerOwner);
+    
+    // Then switch to HUNT mode if damaged
+    if(damage > 0) {
+        doSetAttackMode(HUNT);
+    }
 }
 
 bool Sandworm::update() {
@@ -435,9 +434,11 @@ const ObjectBase* Sandworm::findTarget() const {
         switch(attackMode) {
             case GUARD:
             case AMBUSH:
-            case HUNT:
-                // Sandworms should only hunt within view range, not chase across entire map
+                // In GUARD and AMBUSH modes, stay near guard point (view range)
                 return getViewRange();
+            case HUNT:
+                // In HUNT mode (when damaged), search further to counter-attack
+                return getViewRange() * 2;
             case AREAGUARD:
                 return std::numeric_limits<int>::max();
             default:

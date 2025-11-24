@@ -86,23 +86,42 @@ void Saboteur::checkPos()
         setVisible(getOwner()->getTeamID(), true);    //owner team can always see it
         //setVisible(pLocalHouse->getTeamID(), true);
     }
-    
-    // 0.96.4 approach: Detonate when next to target structure/unit  
-    if(active && !moving && target.getObjPointer() != nullptr) {
-        if(target.getObjPointer()->getOwner()->getTeamID() != getOwner()->getTeamID()) {
-            Coord closestPoint = target.getObjPointer()->getClosestPoint(location);
-            if(blockDistance(location, closestPoint) <= 0.5_fix) {
-                if(isVisible(getOwner()->getTeamID())) {
-                    screenborder->shakeScreen(18);
+}
+
+bool Saboteur::update() {
+    if(active && target.getObjPointer() != nullptr) {
+        Coord closestPoint = target.getObjPointer()->getClosestPoint(location);
+        FixPoint dist = blockDistance(location, closestPoint);
+        
+        // Log saboteur state every 50 cycles when close to target
+        static int logCounter = 0;
+        if(dist <= 3.0_fix && (++logCounter % 50) == 0) {
+            SDL_Log("SABOTEUR at (%d,%d): moving=%d target=%d dist=%.2f attackMode=%d destination=(%d,%d)", 
+                location.x, location.y, moving, target.getObjPointer()->getItemID(), 
+                dist.toDouble(), attackMode, destination.x, destination.y);
+        }
+        
+        if(!moving) {
+            //check to see if close enough to blow up target
+            if(getOwner()->getTeamID() != target.getObjPointer()->getOwner()->getTeamID()) {
+                if(blockDistance(location, closestPoint) <= 1.5_fix) {
+                    SDL_Log("SABOTEUR DETONATING! dist=%.2f", dist.toDouble());
+                    
+                    if(isVisible(getOwner()->getTeamID())) {
+                        screenborder->shakeScreen(18);
+                    }
+
+                    ObjectBase* pObject = target.getObjPointer();
+                    destroy();
+                    pObject->setHealth(0);
+                    pObject->destroy();
+                    return false;
                 }
-                
-                ObjectBase* pObject = target.getObjPointer();
-                setHealth(0);
-                pObject->setHealth(0);
-                pObject->destroy();
             }
         }
     }
+    
+    return InfantryBase::update();
 }
 
 void Saboteur::deploy(const Coord& newLocation) {

@@ -1032,8 +1032,7 @@ void UnitBase::handleDamage(int damage, Uint32 damagerID, House* damagerOwner) {
 
     if(pDamager != nullptr){
 
-        // Units should retaliate when attacked in HUNT, GUARD, AREAGUARD, or AMBUSH modes
-        if((attackMode == HUNT || attackMode == GUARD || attackMode == AREAGUARD || attackMode == AMBUSH) && !forced) {
+        if(attackMode == HUNT && !forced) {
             ObjectBase* pDamager = currentGame->getObjectManager().getObject(damagerID);
             if(canAttack(pDamager)) {
                 if(!target || target.getObjPointer() == nullptr || !isInWeaponRange(target.getObjPointer())) {
@@ -1327,11 +1326,10 @@ void UnitBase::targeting() {
                !isInWeaponRange(target.getObjPointer())) {
                 enqueueTargetRequest(TargetRequestKind::Refresh);
             } else if(!target && !attackPos && !forced) {
-                // Utility units (harvesters, MCVs, sandworms), HUNT mode, GUARD, and AREAGUARD can acquire targets while moving
-                // AMBUSH mode only when stopped (it's a true ambush - wait for enemy to come close)
+                // Utility units (harvesters, MCVs, sandworms) and HUNT mode can acquire targets while moving
+                // Other attack modes only when stopped
                 const bool isUtilityUnit = (itemID == Unit_Harvester || itemID == Unit_MCV || itemID == Unit_Sandworm);
-                const bool canAcquireWhileMoving = isUtilityUnit || attackMode == HUNT || attackMode == GUARD || attackMode == AREAGUARD;
-                if(canAcquireWhileMoving || (!moving && !justStoppedMoving)) {
+                if(isUtilityUnit || attackMode == HUNT || (!moving && !justStoppedMoving)) {
                     enqueueTargetRequest(TargetRequestKind::Acquire);
                 }
             }
@@ -1370,7 +1368,9 @@ void UnitBase::resolvePendingTargetRequest() {
             const ObjectBase* pNewTarget = findTarget();
 
             if(pNewTarget != nullptr) {
-                doAttackObject(pNewTarget, false);
+                // Saboteurs need forced=true to pathfind onto occupied tiles (structures/vehicles)
+                bool forceAttack = (getItemID() == Unit_Saboteur);
+                doAttackObject(pNewTarget, forceAttack);
                 findTargetTimer = 500;
                 return;
             }
@@ -1416,7 +1416,9 @@ void UnitBase::resolvePendingTargetRequest() {
                     if(attackMode == AMBUSH && getItemID() != Unit_Sandworm) {
                         doSetAttackMode(HUNT);
                     }
-                    doAttackObject(pNewTarget, false);
+                    // Saboteurs need forced=true to pathfind onto occupied tiles (structures/vehicles)
+                    bool forceAttack = (getItemID() == Unit_Saboteur);
+                    doAttackObject(pNewTarget, forceAttack);
                 }
             }
 
