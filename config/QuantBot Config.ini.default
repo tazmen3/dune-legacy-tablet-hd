@@ -69,7 +69,7 @@ Defend_MilitaryValueLimitLargeMap=25000
 Easy_AttackEnabled=1
 Easy_OrnithopterAttackEnabled=0
 Easy_OrnithopterAttackThreshold=999
-Easy_AttackForceMilitaryValueRatio=0.25
+Easy_AttackForceMilitaryValueRatio=0.30
 # Campaign: 1 harvester per refinery, 2.0x initial military (minimum 2000 at mission 21+)
 Easy_HarvesterLimitMultiplier=1
 Easy_MilitaryValueMultiplier=2.0
@@ -87,9 +87,9 @@ Medium_AttackEnabled=1
 Medium_OrnithopterAttackEnabled=0
 Medium_OrnithopterAttackThreshold=999
 Medium_AttackForceMilitaryValueRatio=0.40
-# Campaign: 2 harvesters per refinery, 2.0x initial military (minimum 4000 at mission 21+)
+# Campaign: 2 harvesters per refinery, 2.5x initial military (minimum 4000 at mission 21+)
 Medium_HarvesterLimitMultiplier=2
-Medium_MilitaryValueMultiplier=2.0
+Medium_MilitaryValueMultiplier=2.5
 Medium_RefineryMinimum=0
 # Custom games: Small, Medium, Large map limits
 Medium_HarvesterLimitSmallMap=3
@@ -103,10 +103,10 @@ Medium_MilitaryValueLimitLargeMap=35000
 Hard_AttackEnabled=1
 Hard_OrnithopterAttackEnabled=1
 Hard_OrnithopterAttackThreshold=1
-Hard_AttackForceMilitaryValueRatio=0.50
-# Campaign: 2 harvesters per refinery, 2.5x initial military (fixed 10000 at mission 21+)
-Hard_HarvesterLimitMultiplier=2
-Hard_MilitaryValueMultiplier=2.5
+Hard_AttackForceMilitaryValueRatio=0.60
+# Campaign: 2.5 harvesters per refinery, 3.0x initial military (fixed 10000 at mission 21+)
+Hard_HarvesterLimitMultiplier=2.5
+Hard_MilitaryValueMultiplier=3.0
 Hard_RefineryMinimum=2
 # Custom games: Small, Medium, Large map limits
 Hard_HarvesterLimitSmallMap=4
@@ -120,11 +120,11 @@ Hard_MilitaryValueLimitLargeMap=50000
 Brutal_AttackEnabled=1
 Brutal_OrnithopterAttackEnabled=1
 Brutal_OrnithopterAttackThreshold=3
-Brutal_AttackForceMilitaryValueRatio=0.50
-# Campaign: 3 harvesters per refinery, 3.0x initial military
-Brutal_HarvesterLimitMultiplier=3
-Brutal_MilitaryValueMultiplier=3.0
-Brutal_RefineryMinimum=2
+Brutal_AttackForceMilitaryValueRatio=0.80
+# Campaign: Uses Custom map-size limits (ignores multiplier), 3.5x initial military
+Brutal_HarvesterLimitMultiplier=999
+Brutal_MilitaryValueMultiplier=3.5
+Brutal_RefineryMinimum=4
 # Custom games: Small, Medium, Large map limits
 Brutal_HarvesterLimitSmallMap=10
 Brutal_HarvesterLimitMediumMap=20

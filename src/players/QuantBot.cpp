@@ -525,14 +525,15 @@ void QuantBot::update() {
 		}
 	}
 
-	// Continuously adjust harvester limit based on remaining spice (Custom mode only)
+	// Continuously adjust harvester limit based on remaining spice (both Campaign and Custom modes)
 	// This runs every cycle to dynamically reduce harvester targets as spice depletes
+	const QuantBotConfig& config = getQuantBotConfig();
+	const QuantBotConfig::DifficultySettings& diffSettings = config.getSettings(static_cast<int>(difficulty));
+	
+	int baseHarvesterLimit = harvesterLimit;
+	
 	if (gameMode == GameMode::Custom) {
-		// Get the base harvester limit (from config/map size, not yet adjusted for spice)
-		const QuantBotConfig& config = getQuantBotConfig();
-		const QuantBotConfig::DifficultySettings& diffSettings = config.getSettings(static_cast<int>(difficulty));
-		
-		int baseHarvesterLimit = harvesterLimit;
+		// Custom mode: Get limit from config based on map size
 		const int mapsize = currentGameMap->getSizeX() * currentGameMap->getSizeY();
 		if (mapsize <= 1024) {
 			baseHarvesterLimit = diffSettings.harvesterLimitCustomSmallMap;
@@ -545,17 +546,36 @@ void QuantBot::update() {
 			double scaleFactor = sqrt(mapsize / 16384.0);
 			baseHarvesterLimit = diffSettings.harvesterLimitCustomLargeMap * scaleFactor;
 		}
-		
-		// Don't build more harvesters if total spice < 2000 * harvester count
-		int maxHarvestersForSpice = lastCalculatedSpice / 2000;
-		int oldLimit = harvesterLimit;
-		harvesterLimit = std::min(baseHarvesterLimit, std::max(1, maxHarvestersForSpice));
-		
-		// Log when the limit changes
-		if (oldLimit != harvesterLimit) {
-			logDebug("Harvester limit adjusted: %d -> %d (spice: %d, base: %d)", 
-				oldLimit, harvesterLimit, lastCalculatedSpice, baseHarvesterLimit);
+	} else if (gameMode == GameMode::Campaign) {
+		// Campaign mode: normally baseHarvesterLimit is from multiplier * refinery count
+		// BUT Brutal difficulty uses Custom game map-size-based limits instead
+		if (difficulty == Difficulty::Brutal) {
+			const int mapsize = currentGameMap->getSizeX() * currentGameMap->getSizeY();
+			if (mapsize <= 1024) {
+				baseHarvesterLimit = diffSettings.harvesterLimitCustomSmallMap;
+			} else if (mapsize <= 4096) {
+				baseHarvesterLimit = diffSettings.harvesterLimitCustomMediumMap;
+			} else if (mapsize <= 16384) {
+				baseHarvesterLimit = diffSettings.harvesterLimitCustomLargeMap;
+			} else {
+				// Huge maps (>128x128) - scale more slowly using square root
+				double scaleFactor = sqrt(mapsize / 16384.0);
+				baseHarvesterLimit = diffSettings.harvesterLimitCustomLargeMap * scaleFactor;
+			}
 		}
+		// Other difficulties keep baseHarvesterLimit from multiplier * refinery count
+	}
+	
+	// Apply spice-based reduction for all modes and difficulties
+	int maxHarvestersForSpice = lastCalculatedSpice / 2000;
+	int oldLimit = harvesterLimit;
+	harvesterLimit = std::min(baseHarvesterLimit, std::max(1, maxHarvestersForSpice));
+	
+	// Log when the limit changes
+	if (oldLimit != harvesterLimit) {
+		logDebug("Harvester limit adjusted: %d -> %d (spice: %d, base: %d, mode: %s, diff: %d)", 
+			oldLimit, harvesterLimit, lastCalculatedSpice, baseHarvesterLimit, 
+			(gameMode == GameMode::Campaign) ? "Campaign" : "Custom", static_cast<int>(difficulty));
 	}
 
 	if ((getGameCycleCount() + getHouse()->getHouseID()) % AIUPDATEINTERVAL != 0) {
