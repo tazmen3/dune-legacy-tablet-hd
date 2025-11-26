@@ -303,12 +303,28 @@ void Sandworm::setTarget(const ObjectBase* newTarget) {
 }
 
 void Sandworm::handleDamage(int damage, Uint32 damagerID, House* damagerOwner) {
-    // First call parent to handle counter-attack logic while still in current mode
-    GroundUnit::handleDamage(damage, damagerID, damagerOwner);
-    
-    // Then switch to HUNT mode if damaged
+    // Switch to HUNT mode BEFORE calling parent so counter-attack logic works
     if(damage > 0) {
         doSetAttackMode(HUNT);
+    }
+    
+    // Then call parent to handle counter-attack logic (now that we're in HUNT mode)
+    GroundUnit::handleDamage(damage, damagerID, damagerOwner);
+    
+    // Additionally, if we were damaged, directly attack the damager's location if they're on sand
+    if(damage > 0) {
+        ObjectBase* pDamager = currentGame->getObjectManager().getObject(damagerID);
+        if(pDamager != nullptr && pDamager->isAUnit()) {
+            const Coord damagerLoc = pDamager->getLocation();
+            if(currentGameMap->tileExists(damagerLoc)) {
+                const Tile* pTile = currentGameMap->getTile(damagerLoc);
+                // Only pursue if damager is on sand (sandworms can't go on rock)
+                if(!pTile->isMountain() && !pTile->isRock()) {
+                    // Force attack the damager to ensure we pursue even if out of search range
+                    doAttackObject(pDamager, true);
+                }
+            }
+        }
     }
 }
 

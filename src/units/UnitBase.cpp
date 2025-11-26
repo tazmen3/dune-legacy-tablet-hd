@@ -728,22 +728,8 @@ void UnitBase::navigate() {
             if(!pathList.empty() && !isCachedPathStillValid()) {
                 clearPath();
             }
-
-            // Check if we're "close enough" to destination (within 3 tiles for non-forced moves)
-            // This prevents traffic jams when many units try to reach the same rally point
-            // EXCLUDE utility units (harvesters, MCVs, sandworms) that need precise positioning
-            bool closeEnough = false;
-            const bool isUtilityUnit = (itemID == Unit_Harvester || itemID == Unit_MCV || itemID == Unit_Sandworm);
-            if(!forced && !isUtilityUnit && location != destination) {
-                FixPoint distToDest = blockDistance(location, destination);
-                if(distToDest <= 3) {
-                    closeEnough = true;
-                    // Clear path and stop trying to get closer
-                    clearPath();
-                }
-            }
             
-            if(location != destination && !closeEnough) {
+            if(location != destination) {
                 if(nextSpotFound == false)  {
 
                     if(pathList.empty() && (recalculatePathTimer == 0) && !pathRequestQueued) {
@@ -1042,20 +1028,31 @@ void UnitBase::handleDamage(int damage, Uint32 damagerID, House* damagerOwner) {
 
             }
         }
+        
+        // CRITICAL FIX: AMBUSH units switch to HUNT when damaged (Dynasty behavior, line 1930-1933)
+        // This allows them to pursue and counter-attack instead of sitting in their 1-tile view range
+        if(damage > 0 && attackMode == AMBUSH && getItemID() != Unit_Harvester) {
+            doSetAttackMode(HUNT);
+            findTargetTimer = 0;  // Allow immediate target search
+        }
+        
+        // Reset target timer when damaged so units can immediately look for their attacker
+        // Without this, GUARD units wait up to 2 seconds before noticing they're being shot
+        if(damage > 0 && canAttack(pDamager) && (attackMode == GUARD || attackMode == AREAGUARD || attackMode == HUNT)) {
+            findTargetTimer = 0;  // Allow immediate target search on next update
+        }
     }
 }
 
 bool UnitBase::isInGuardRange(const ObjectBase* pObject) const  {
     int checkRange;
+    
     switch(attackMode) {
         case GUARD: {
-            checkRange = (getItemID() == Unit_Sandworm) ? getViewRange() : getWeaponRange();
+            checkRange = getWeaponRange();
         } break;
 
         case AREAGUARD: {
-            if(getItemID() == Unit_Sandworm) {
-                return true;
-            }
             checkRange = getAreaGuardRange();
         } break;
 
@@ -1081,11 +1078,17 @@ bool UnitBase::isInGuardRange(const ObjectBase* pObject) const  {
         } break;
     }
 
+    if(getItemID() == Unit_Sandworm) {
+        checkRange = getViewRange();
+    }
+
+    // Check from guardPoint like 0.96.4 does
     return (blockDistance(guardPoint*TILESIZE + Coord(TILESIZE/2, TILESIZE/2), pObject->getCenterPoint()) <= checkRange*TILESIZE);
 }
 
 bool UnitBase::isInAttackRange(const ObjectBase* pObject) const {
     int checkRange;
+    
     switch(attackMode) {
         case GUARD: {
             checkRange = getWeaponRange();
@@ -1121,6 +1124,7 @@ bool UnitBase::isInAttackRange(const ObjectBase* pObject) const {
         checkRange = getViewRange() + 1;
     }
 
+    // Check from guardPoint like 0.96.4 does
     return (blockDistance(guardPoint*TILESIZE + Coord(TILESIZE/2, TILESIZE/2), pObject->getCenterPoint()) <= checkRange*TILESIZE);
 }
 
@@ -1319,19 +1323,61 @@ void UnitBase::enqueuePathRequest() {
 }
 
 void UnitBase::targeting() {
-    if(findTargetTimer == 0 && pendingTargetRequest == TargetRequestKind::None) {
+    if(findTargetTimer == 0) {
         if(attackMode != STOP && attackMode != CARRYALLREQUESTED) {
-            if(target && !attackPos && !forced &&
-               (attackMode == GUARD || attackMode == AREAGUARD || attackMode == AMBUSH || attackMode == HUNT) &&
-               !isInWeaponRange(target.getObjPointer())) {
-                enqueueTargetRequest(TargetRequestKind::Refresh);
-            } else if(!target && !attackPos && !forced) {
-                // Utility units (harvesters, MCVs, sandworms) and HUNT mode can acquire targets while moving
-                // Other attack modes only when stopped
-                const bool isUtilityUnit = (itemID == Unit_Harvester || itemID == Unit_MCV || itemID == Unit_Sandworm);
-                if(isUtilityUnit || attackMode == HUNT || (!moving && !justStoppedMoving)) {
-                    enqueueTargetRequest(TargetRequestKind::Acquire);
+            
+            // Refresh target if current one is out of weapon range
+            if(target && !attackPos && !forced && 
+               (attackMode == GUARD || attackMode == AREAGUARD || attackMode == AMBUSH || attackMode == HUNT)) {
+                if(!isInWeaponRange(target.getObjPointer())) {
+                    const ObjectBase* pNewTarget = findTarget();
+                    
+                    if(pNewTarget != nullptr) {
+                        // Saboteurs need forced=true to pathfind onto occupied tiles
+                        bool forceAttack = (getItemID() == Unit_Saboteur);
+                        doAttackObject(pNewTarget, forceAttack);
+                        findTargetTimer = 500;
+                    }
                 }
+            }
+            
+            // Acquire new target if we don't have one
+            if(!target && !attackPos && !moving && !justStoppedMoving && !forced) {
+                const ObjectBase* pNewTarget = findTarget();
+                
+                if(pNewTarget != nullptr) {
+                    bool inRange = isInGuardRange(pNewTarget);
+                    
+                    // Dynasty behavior: AMBUSH units switch to HUNT when they SEE an enemy
+                    // Check if enemy is within view range (not just guard/weapon range)
+                    if(attackMode == AMBUSH) {
+                        FixPoint distanceToTarget = blockDistance(location*TILESIZE + Coord(TILESIZE/2, TILESIZE/2), 
+                                                                   pNewTarget->getCenterPoint());
+                        if(distanceToTarget <= getViewRange()*TILESIZE) {
+                            doSetAttackMode(HUNT);
+                            inRange = true;  // Force acquisition after switching to HUNT
+                        }
+                    }
+                    
+                    if(inRange) {
+                        // Saboteurs need forced=true to pathfind onto occupied tiles
+                        bool forceAttack = (getItemID() == Unit_Saboteur);
+                        doAttackObject(pNewTarget, forceAttack);
+                        
+                        // Sandworms switch to HUNT after acquiring target
+                        if(getItemID() == Unit_Sandworm) {
+                            doSetAttackMode(HUNT);
+                        }
+                    }
+                } else if(attackMode == HUNT) {
+                    // HUNT units with no targets switch back to GUARD
+                    setGuardPoint(location);
+                    doSetAttackMode(GUARD);
+                }
+                
+                // 1 second for normal targeting (balance of performance and responsiveness)
+                // Units reset to 0 when damaged for instant response
+                findTargetTimer = MILLI2CYCLES(1*1000);
             }
         }
     }
@@ -1422,9 +1468,9 @@ void UnitBase::resolvePendingTargetRequest() {
                 }
             }
 
-            findTargetTimer = MILLI2CYCLES(2*1000);
+            findTargetTimer = MILLI2CYCLES(1*1000);
         } else {
-            findTargetTimer = MILLI2CYCLES(2*1000);
+            findTargetTimer = MILLI2CYCLES(1*1000);
         }
     }
 }
@@ -1663,9 +1709,22 @@ void UnitBase::updateVisibleUnits() {
             continue;
         }
 
-        if(pTile->isExploredByHouse(h) && (pHouse->getTeamID() != getOwner()->getTeamID()) && (pHouse != getOwner())) {
+        // Check if this unit is currently VISIBLE to this house (fog of war, not just explored)
+        if(isVisible(pHouse->getTeamID()) && (pHouse->getTeamID() != getOwner()->getTeamID()) && (pHouse != getOwner())) {
             pHouse->informDirectContactWithEnemy();
             getOwner()->informDirectContactWithEnemy();
+            
+            // TODO: Dynasty behavior (line 3188-3189): AMBUSH units switch to HUNT when spotted by enemy
+            // Disabled for now - visibility system triggers too early (units switch even in shroud)
+            // Damage-based AMBUSH->HUNT switching in handleDamage() is sufficient
+            /*
+            if(attackMode == AMBUSH) {
+                SDL_Log("Unit %d (%s) in AMBUSH spotted by enemy house %d - switching to HUNT",
+                        getObjectID(), resolveItemName(getItemID()).c_str(), h);
+                doSetAttackMode(HUNT);
+                findTargetTimer = 0;  // Allow immediate target search
+            }
+            */
             
             // ORIGINAL AI: Ground-only contact triggers mutual activation (unit.c:3111-3116)
             // Only ground units (not wingers/carryalls/ornithopters) activate AI
