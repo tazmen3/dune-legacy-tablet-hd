@@ -769,7 +769,6 @@ void QuantBot::onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID)
 		}
 		else if ((pGroundUnit->getItemID() == Unit_Launcher
 			|| pGroundUnit->getItemID() == Unit_Deviator)
-			&& (difficulty != Difficulty::Easy)
 			&& !supportMode) {
 			// Keep Launchers/Deviators away from harm when taking damage (not in support mode)
 			doSetAttackMode(pGroundUnit, AREAGUARD);
