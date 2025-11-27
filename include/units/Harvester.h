@@ -72,6 +72,7 @@ private:
     bool     returningToRefinery;    ///< currently on the way back to the refinery
     FixPoint spice;                  ///< loaded spice
     Uint32   spiceCheckCounter;      ///< Check for available spice on map to harvest
+    Uint8    pathFailCounter;        ///< Track failed path attempts to same destination
 };
 
 #endif // HARVESTER_H

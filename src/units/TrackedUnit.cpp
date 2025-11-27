@@ -73,6 +73,11 @@ bool TrackedUnit::canPass(int xPos, int yPos) const
     if(pTile->hasAGroundObject()) {
         ObjectBase *pObject = pTile->getGroundObject();
 
+        // Never block on our own tile – starting tile must stay passable
+        if(pObject != nullptr && pObject->getObjectID() == getObjectID()) {
+            return true;
+        }
+
         if( (pObject != nullptr)
             && (pObject->getObjectID() == target.getObjectID())
             && targetFriendly

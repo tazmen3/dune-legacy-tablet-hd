@@ -71,6 +71,12 @@ void GroundUnit::checkPos() {
         pTile->setTrack(drawnAngle);
     }
 
+    // Clear stale carryall bookings - harvester waiting for carryall that's gone
+    if(awaitingPickup && !hasBookedCarrier()) {
+        awaitingPickup = false;
+        bookedCarrier = NONE_ID;
+    }
+
     if(justStoppedMoving)
     {
         realX = location.x*TILESIZE + TILESIZE/2;

@@ -387,6 +387,33 @@ void QuantBot::update() {
 		logDebug("  FINAL: HarvesterLimit=%d, MilitaryValueLimit=%d", 
 			harvesterLimit, militaryValueLimit);
 
+		// Set initial unit position and group units at squad rally point (Hard and Brutal only)
+		if (difficulty == Difficulty::Hard || difficulty == Difficulty::Brutal) {
+			squadRallyLocation = findSquadRallyLocation();
+			
+			// Move all military units to the squad rally location at game start
+			if (squadRallyLocation.isValid()) {
+				logDebug("  Moving all units to squad rally point: (%d, %d)", 
+					squadRallyLocation.x, squadRallyLocation.y);
+				
+				int unitsMoved = 0;
+				for (const UnitBase* pUnit : getUnitList()) {
+					if (pUnit->getOwner() == getHouse()
+						&& pUnit->getItemID() != Unit_Carryall
+						&& pUnit->getItemID() != Unit_Sandworm
+						&& pUnit->getItemID() != Unit_Harvester
+						&& pUnit->getItemID() != Unit_MCV
+						&& pUnit->getItemID() != Unit_Frigate) {
+						
+						doMove2Pos(pUnit, squadRallyLocation.x, squadRallyLocation.y, true);
+						unitsMoved++;
+					}
+				}
+				
+				logDebug("  Moved %d units to rally point", unitsMoved);
+			}
+		}
+
 	} break;
 
 	case GameMode::Custom: {
@@ -743,10 +770,10 @@ void QuantBot::onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID)
 		else if ((pGroundUnit->getItemID() == Unit_Launcher
 			|| pGroundUnit->getItemID() == Unit_Deviator)
 			&& (difficulty != Difficulty::Easy)) {
-			// Always keep Launchers/Deviators away from harm
-			// Move to optimal position (closer of squad center or rally point)
+			// Keep Launchers/Deviators away from harm when taking damage
 			doSetAttackMode(pGroundUnit, AREAGUARD);
-			moveToOptimalSquadPosition(pGroundUnit, 6);  // 6 tile radius
+			int weaponRange = currentGame->objectData.data[pGroundUnit->getItemID()][getHouse()->getHouseID()].weaponrange;
+			kiteAwayFromThreat(pGroundUnit, pDamager, weaponRange);
 
 		}
 		else if ((currentGame->techLevel > 3)
@@ -3045,6 +3072,114 @@ Coord QuantBot::findSquadCenter(int houseID) {
 }
 
 /**
+ * Kite away from a threat while moving towards squad center.
+ * Calculates a retreat position that maintains weapon range from the threat
+ * while moving closer to the squad center.
+ * 
+ * @param pUnit The unit to move (must be non-null and respondable)
+ * @param pThreat The threatening unit to kite away from (must be non-null)
+ * @param desiredRange The desired distance to maintain from threat (typically weapon range)
+ */
+void QuantBot::kiteAwayFromThreat(const UnitBase* pUnit, const ObjectBase* pThreat, int desiredRange) {
+	// Safety checks
+	if (!pUnit || !pThreat || !pUnit->isRespondable() || !currentGameMap) {
+		return;
+	}
+
+	// Don't kite if pathfinding is overloaded
+	if (currentGame && currentGame->isPathQueueStressed()) {
+		return;
+	}
+
+	// CRITICAL: Prevent command spam - only issue kite commands if unit is not currently moving
+	// or if destination is significantly different (>2 tiles)
+	Coord unitLocation = pUnit->getLocation();
+	Coord unitDestination = pUnit->getDestination();
+	
+	if (unitDestination.isValid() && unitDestination != unitLocation) {
+		// Unit is already moving - check if it's moving away from the threat
+		Coord threatLocation = pThreat->getLocation();
+		FixPoint distDestToThreat = blockDistance(unitDestination, threatLocation);
+		FixPoint distCurrentToThreat = blockDistance(unitLocation, threatLocation);
+		
+		// If already moving away from threat, don't interrupt
+		if (distDestToThreat >= distCurrentToThreat) {
+			return;
+		}
+	}
+
+	Coord threatLocation = pThreat->getLocation();
+	
+	// Calculate current distance to threat
+	FixPoint distToThreat = blockDistance(unitLocation, threatLocation);
+	
+	// If already at or beyond desired range, no need to kite
+	if (distToThreat >= desiredRange) {
+		return;
+	}
+
+	// Find squad center (prefer rally location as it's more stable)
+	Coord squadCenter = squadRallyLocation.isValid() ? squadRallyLocation : findSquadCenter(getHouse()->getHouseID());
+	
+	// If no squad center, just move directly away from threat
+	if (!squadCenter.isValid()) {
+		squadCenter = unitLocation;
+	}
+
+	// Calculate direction vectors
+	FixPoint dx_threat = unitLocation.x - threatLocation.x;
+	FixPoint dy_threat = unitLocation.y - threatLocation.y;
+	FixPoint dx_squad = squadCenter.x - unitLocation.x;
+	FixPoint dy_squad = squadCenter.y - unitLocation.y;
+	
+	// Normalize threat direction (away from threat)
+	FixPoint threatDist = FixPoint::sqrt(dx_threat * dx_threat + dy_threat * dy_threat);
+	if (threatDist < 0.1_fix) {
+		threatDist = 0.1_fix;  // Avoid division by zero
+	}
+	FixPoint nx_away = dx_threat / threatDist;
+	FixPoint ny_away = dy_threat / threatDist;
+	
+	// Normalize squad direction (towards squad)
+	FixPoint squadDist = FixPoint::sqrt(dx_squad * dx_squad + dy_squad * dy_squad);
+	if (squadDist < 0.1_fix) {
+		squadDist = 0.1_fix;
+	}
+	FixPoint nx_squad = dx_squad / squadDist;
+	FixPoint ny_squad = dy_squad / squadDist;
+	
+	// Blend: 70% away from threat, 30% towards squad
+	// This prioritizes safety while still moving towards friendlies
+	FixPoint blend_x = nx_away * 0.7_fix + nx_squad * 0.3_fix;
+	FixPoint blend_y = ny_away * 0.7_fix + ny_squad * 0.3_fix;
+	
+	// Normalize blended direction
+	FixPoint blendDist = FixPoint::sqrt(blend_x * blend_x + blend_y * blend_y);
+	if (blendDist < 0.1_fix) {
+		blendDist = 0.1_fix;
+	}
+	blend_x /= blendDist;
+	blend_y /= blendDist;
+	
+	// Calculate retreat distance - use fixed small distance for incremental kiting
+	// Don't try to reach weapon range in one jump, just back up a bit
+	FixPoint retreatDistance = 3;  // Fixed 3-tile retreat for smooth kiting
+	
+	// Calculate target position
+	int targetX = lround(unitLocation.x + blend_x * retreatDistance);
+	int targetY = lround(unitLocation.y + blend_y * retreatDistance);
+	
+	// Clamp to map boundaries with 1-tile safety margin
+	int mapWidth = currentGameMap->getSizeX();
+	int mapHeight = currentGameMap->getSizeY();
+	targetX = std::max(1, std::min(mapWidth - 2, targetX));
+	targetY = std::max(1, std::min(mapHeight - 2, targetY));
+	
+	// Issue move command (forced so unit actually retreats instead of immediately canceling to attack)
+	doMove2Pos(pUnit, targetX, targetY, true);
+}
+
+/**
  * Move a unit to the optimal squad position.
  * Chooses between actual squad center and squad rally point based on which is closer.
  * Only moves if the unit is outside the radius of both positions.
@@ -3320,12 +3455,17 @@ void QuantBot::retreatAllUnits() {
 					else if ((pUnit->getItemID() == Unit_Launcher || pUnit->getItemID() == Unit_Deviator)
                         && pUnit->hasATarget() && (difficulty != Difficulty::Easy)) {
 					// Special logic to keep launchers/deviators away from harm
-					if (pUnit->getTarget() != nullptr) {
-						if (blockDistance(pUnit->getLocation(), pUnit->getTarget()->getLocation()) <= 6 && pUnit->getTarget()->getItemID() != Unit_Ornithopter) {
-							doSetAttackMode(pUnit, AREAGUARD); // Change mode to stop launchers freezing
-                                moveToOptimalSquadPosition(pUnit, 6);  // 6 tile radius
-                            }
+					const ObjectBase* pTarget = pUnit->getTarget();
+					if (pTarget != nullptr && pTarget->getItemID() != Unit_Ornithopter) {
+						FixPoint distToTarget = blockDistance(pUnit->getLocation(), pTarget->getLocation());
+						int weaponRange = currentGame->objectData.data[pUnit->getItemID()][getHouse()->getHouseID()].weaponrange;
+						
+						// Only kite if target is dangerously close (within 5 tiles)
+						if (distToTarget <= 5) {
+							doSetAttackMode(pUnit, AREAGUARD);
+							kiteAwayFromThreat(pUnit, pTarget, weaponRange);
                         }
+                    }
                     }
                     else if (pUnit->getItemID() != Unit_Ornithopter && pUnit->getItemID() != Unit_Saboteur && pUnit->getAttackMode() != HUNT && !pUnit->hasATarget() && !pUnit->wasForced()) {
                         if (pUnit->getAttackMode() == AREAGUARD && squadCenterLocation.isValid() && (gameMode != GameMode::Campaign)) {

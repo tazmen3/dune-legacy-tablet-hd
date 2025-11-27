@@ -22,6 +22,7 @@
 
 #include <GUI/StaticContainer.h>
 #include <GUI/VBox.h>
+#include <GUI/Label.h>
 #include <GUI/TextButton.h>
 #include <GUI/DropDownBox.h>
 #include <GUI/PictureButton.h>
@@ -31,6 +32,7 @@
 #include <GUI/dune/DigitsCounter.h>
 
 #include <misc/string_util.h>
+#include <DataTypes.h>
 
 class SinglePlayerSkirmishMenu : public MenuBase
 {
@@ -38,10 +40,18 @@ public:
     SinglePlayerSkirmishMenu();
     virtual ~SinglePlayerSkirmishMenu();
 
+    /**
+        This method is called, when the child window is about to be closed.
+        This child window will be closed after this method returns.
+        \param  pChildWindow    The child window that will be closed
+    */
+    void onChildWindowClose(Window* pChildWindow) override;
+
 private:
 
     void onStart();
     void onCancel();
+    void onGameOptions();
 
     void onSelectHouseButton(int button);
     void onHouseLeft();
@@ -53,6 +63,7 @@ private:
     void updateHouseChoice();
     void updateSupportBotLabel();
     void onSupportBotSelectionChanged(bool interactive);
+    void onEnemyAISelectionChanged(bool interactive);
 
     InvisibleButton house1Button;
     PictureLabel    house1Picture;
@@ -77,6 +88,8 @@ private:
 
     TextButton      startButton;
     DropDownBox     supportBotDropDown;
+    DropDownBox     enemyAIDropDown;
+    TextButton      gameOptionsButton;
     TextButton      backButton;
 
     PictureLabel    heraldPicture;
@@ -87,6 +100,9 @@ private:
     int selectedButton;
     int mission;
     int supportBotIndex;
+    int enemyAIIndex;
+    
+    SettingsClass::GameOptionsClass currentGameOptions;
 };
 
 #endif //SINGLEPLAYERSKIRMISHMENU_H

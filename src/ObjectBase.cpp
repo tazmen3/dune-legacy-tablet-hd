@@ -687,7 +687,8 @@ const ObjectBase* ObjectBase::findTarget() const {
         } break;
 
         case AREAGUARD: {
-            checkRange = getAreaGuardRange();
+            // Launchers get extended area guard range due to long weapon range
+            checkRange = (getItemID() == Unit_Launcher) ? 12 : 10;
         } break;
 
         case AMBUSH: {

@@ -112,16 +112,50 @@ void SinglePlayerMenu::onCampaign() {
         return;
     }
 
-    GameInitSettings init((HOUSETYPE) player, settings.gameOptions);
+    // Get AI settings from HouseChoiceMenu static storage
+    int supportBotIndex = HouseChoiceMenu::getSupportBotIndex();
+    int enemyAIIndex = HouseChoiceMenu::getEnemyAIIndex();
+    SettingsClass::GameOptionsClass gameOptions = HouseChoiceMenu::getGameOptions();
+
+    const char* const kSupportPlayerClasses[] = {
+        "",
+        "qBotSupportEasy",
+        "qBotSupportMedium",
+        "qBotSupportHard",
+        "qBotSupportBrutal"
+    };
+
+    const char* const kEnemyAIClasses[] = {
+        "CampaignAIPlayer",
+        "qBotEasy",
+        "qBotMedium",
+        "qBotHard",
+        "qBotBrutal"
+    };
+
+    const bool supportSelected = (supportBotIndex > 0);
+    const char* supportPlayerClass = supportSelected ? kSupportPlayerClasses[supportBotIndex] : nullptr;
+    const char* enemyAIClass = kEnemyAIClasses[enemyAIIndex];
+
+    GameInitSettings init((HOUSETYPE) player, gameOptions);
+    if(supportSelected) {
+        init.setMultiplePlayersPerHouse(true);
+    }
 
     for(int houseID = 0; houseID < NUM_HOUSES; houseID++) {
         if(houseID == player) {
             GameInitSettings::HouseInfo humanHouseInfo((HOUSETYPE) player, 1);
             humanHouseInfo.addPlayerInfo( GameInitSettings::PlayerInfo(settings.general.playerName, HUMANPLAYERCLASS) );
+
+            if(supportSelected && supportPlayerClass != nullptr && *supportPlayerClass != '\0') {
+                std::string allyName = getHouseNameByNumber((HOUSETYPE) houseID) + " " + _("(AI Support)");
+                humanHouseInfo.addPlayerInfo(GameInitSettings::PlayerInfo(allyName, supportPlayerClass));
+            }
+
             init.addHouseInfo(humanHouseInfo);
         } else {
             GameInitSettings::HouseInfo aiHouseInfo((HOUSETYPE) houseID, 2);
-            aiHouseInfo.addPlayerInfo( GameInitSettings::PlayerInfo(getHouseNameByNumber( (HOUSETYPE) houseID), settings.ai.campaignAI) );
+            aiHouseInfo.addPlayerInfo( GameInitSettings::PlayerInfo(getHouseNameByNumber( (HOUSETYPE) houseID), enemyAIClass) );
             init.addHouseInfo(aiHouseInfo);
         }
     }

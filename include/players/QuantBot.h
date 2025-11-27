@@ -111,6 +111,7 @@ private:
     Coord findSquadRallyLocation();
     Coord findSquadRetreatLocation();
     void moveToOptimalSquadPosition(const UnitBase* pUnit, FixPoint squadRadius);
+    void kiteAwayFromThreat(const UnitBase* pUnit, const ObjectBase* pThreat, int desiredRange);
 
     bool tryLaunchOrnithopterStrike(const QuantBotConfig::DifficultySettings& diffSettings,
                                     const QuantBotConfig& config);

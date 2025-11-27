@@ -20,13 +20,25 @@
 
 #include "MenuBase.h"
 #include <GUI/StaticContainer.h>
+#include <GUI/VBox.h>
+#include <GUI/Label.h>
+#include <GUI/TextButton.h>
+#include <GUI/DropDownBox.h>
 #include <GUI/PictureLabel.h>
 #include <GUI/PictureButton.h>
+#include <DataTypes.h>
 
 class HouseChoiceMenu : public MenuBase {
 public:
     HouseChoiceMenu();
     virtual ~HouseChoiceMenu();
+
+    void onChildWindowClose(Window* pChildWindow) override;
+
+    // Static accessors for AI settings (so SinglePlayerMenu can read them)
+    static int getSupportBotIndex() { return s_supportBotIndex; }
+    static int getEnemyAIIndex() { return s_enemyAIIndex; }
+    static const SettingsClass::GameOptionsClass& getGameOptions() { return s_currentGameOptions; }
 
 private:
     void onHouseButton(int button);
@@ -34,8 +46,13 @@ private:
 
     void onHouseLeft();
     void onHouseRight();
+    
+    void onGameOptions();
+    void onSupportBotSelectionChanged(bool interactive);
+    void onEnemyAISelectionChanged(bool interactive);
 
     StaticContainer windowWidget;
+    VBox            optionsVBox;
 
     PictureLabel    selectYourHouseLabel;
 
@@ -46,7 +63,16 @@ private:
     PictureButton   houseLeftButton;
     PictureButton   houseRightButton;
 
+    DropDownBox     supportBotDropDown;
+    DropDownBox     enemyAIDropDown;
+    TextButton      gameOptionsButton;
+
     int currentHouseChoiceScrollPos;
+
+    // Static storage for AI settings
+    static int s_supportBotIndex;
+    static int s_enemyAIIndex;
+    static SettingsClass::GameOptionsClass s_currentGameOptions;
 };
 
 #endif // HOUSECHOICEMENU_H

@@ -35,6 +35,8 @@
 #include <misc/draw_util.h>
 
 #include <algorithm>
+#include <map>
+#include <SDL_log.h>
 
 /* how often is the same sandframe redrawn */
 #define HARVESTERDELAY 30
@@ -58,6 +60,7 @@ Harvester::Harvester(House* newOwner) : TrackedUnit(newOwner)
     harvestingMode = false;
     returningToRefinery = false;
     spiceCheckCounter = 0;
+    pathFailCounter = 0;
 
     attackMode = GUARD;
 }
@@ -70,6 +73,7 @@ Harvester::Harvester(InputStream& stream) : TrackedUnit(stream)
     returningToRefinery = stream.readBool();
     spice = stream.readFixPoint();
     spiceCheckCounter = stream.readUint32();
+    pathFailCounter = 0;  // Runtime counter - not persisted
 }
 
 void Harvester::init()
@@ -95,6 +99,7 @@ void Harvester::save(OutputStream& stream) const
     stream.writeBool(returningToRefinery);
     stream.writeFixPoint(spice);
     stream.writeUint32(spiceCheckCounter);
+    // pathFailCounter is NOT saved - runtime counter only
 }
 
 void Harvester::blitToScreen()
@@ -145,6 +150,29 @@ void Harvester::blitToScreen()
 void Harvester::checkPos()
 {
     TrackedUnit::checkPos();
+
+    // Log LONG-TERM stuck harvesters (30+ seconds) - ANY harvester not moving
+    static std::map<Uint32, int> idleLogCounters;
+    
+    if(active && !moving && !justStoppedMoving) {
+        idleLogCounters[getObjectID()]++;
+        if(idleLogCounters[getObjectID()] == 1800) { // 30 seconds at 60fps - log once
+            SDL_Log("HARVESTER %d STUCK 30s: loc=(%d,%d) dest=(%d,%d) harvestMode=%d returning=%d awaiting=%d hasTarget=%d spice=%.1f respondable=%d attackMode=%d pathSize=%zu",
+                    getObjectID(),
+                    location.x, location.y,
+                    destination.x, destination.y,
+                    harvestingMode ? 1 : 0,
+                    returningToRefinery ? 1 : 0,
+                    awaitingPickup ? 1 : 0,
+                    (target.getObjPointer() != nullptr) ? 1 : 0,
+                    spice.toFloat(),
+                    respondable ? 1 : 0,
+                    attackMode,
+                    pathList.size());
+        }
+    } else {
+        idleLogCounters[getObjectID()] = 0;
+    }
 
     if(attackMode == STOP) {
         harvestingMode = false;
@@ -212,18 +240,38 @@ void Harvester::checkPos()
             }
         } else if (harvestingMode && !hasBookedCarrier() && destination.isValid() && (blockDistance(location, destination) >= MIN_CARRYALL_LIFT_DISTANCE)) {
             requestCarryall();
+        } else if(harvestingMode && destination != location && pathList.empty() && !moving) {
+            // Stuck in harvesting mode with unreachable destination
+            // Give pathfinding a few cycles to resolve, then give up
+            pathFailCounter++;
+            if(pathFailCounter >= 3) {
+                // Can't reach this spice after 3 attempts - give up
+                harvestingMode = false;
+                setDestination(location);
+                pathFailCounter = 0;
+            }
+        } else if(harvestingMode && (!pathList.empty() || moving)) {
+            // Successfully moving or have path - reset counter
+            pathFailCounter = 0;
         } else if(respondable && !harvestingMode && attackMode != STOP) {
             if(spiceCheckCounter == 0) {
+                // If stuck with unreachable destination, reset guardPoint to try new area
+                if(destination != location && pathList.empty()) {
+                    setGuardPoint(location);
+                }
+                
                 // Find harvest location nearest to our base
                 Coord newDestination;
                 if(currentGameMap->findSpice(newDestination, guardPoint)) {
                     setDestination(newDestination);
                     setGuardPoint(newDestination);
                     harvestingMode = true;
+                    pathFailCounter = 0;  // Reset for new destination
                 } else {
                     setDestination(location);
                     setGuardPoint(location);
                     harvestingMode = false;
+                    pathFailCounter = 0;
                 }
                 spiceCheckCounter = 100;
             } else {
@@ -416,9 +464,38 @@ void Harvester::setReturned()
 void Harvester::move()
 {
     TrackedUnit::move();
+    
+    // Log harvesters sitting on spice tiles
+    static std::map<Uint32, int> onSpiceCounter;
+    if(active && harvestingMode && location == destination && pathList.empty()) {
+        Tile* tile = currentGameMap->getTile(location);
+        if(tile->hasSpice()) {
+            onSpiceCounter[getObjectID()]++;
+            if(onSpiceCounter[getObjectID()] == 300) { // 5 seconds
+                SDL_Log("HARVEST: id=%d ON SPICE but moving=%d justStopped=%d", 
+                        getObjectID(), moving ? 1 : 0, justStoppedMoving ? 1 : 0);
+            }
+        }
+    } else {
+        onSpiceCounter[getObjectID()] = 0;
+    }
 
     if(active && !moving && !justStoppedMoving) {
         if(harvestingMode) {
+            // Track stuck harvesters in harvesting mode
+            static std::map<Uint32, int> harvestStuckCounter;
+            if(location == destination && pathList.empty()) {
+                harvestStuckCounter[getObjectID()]++;
+                if(harvestStuckCounter[getObjectID()] == 300) { // 5 seconds
+                    Tile* tile = currentGameMap->getTile(location);
+                    SDL_Log("HARVEST STUCK in move(): id=%d loc=(%d,%d) hasSpice=%d spice=%.1f active=%d moving=%d justStopped=%d",
+                            getObjectID(), location.x, location.y,
+                            tile->hasSpice() ? 1 : 0, spice.toFloat(),
+                            active ? 1 : 0, moving ? 1 : 0, justStoppedMoving ? 1 : 0);
+                }
+            } else {
+                harvestStuckCounter[getObjectID()] = 0;
+            }
 
             if(location == destination) {
                 if(spice < HARVESTERMAXSPICE) {
@@ -442,13 +519,21 @@ void Harvester::move()
                     } else if (!currentGameMap->findSpice(destination, location)) {
                         if(spice > 0) {
                             doReturn();
+                        } else {
+                            // No spice anywhere and we're empty - stop harvesting mode so checkPos can search again
+                            harvestingMode = false;
                         }
                     } else {
+                        // Found spice elsewhere, try to move there
                         doMove2Pos(destination, false);
                     }
                 } else {
                     doReturn();
                 }
+            } else if(pathList.empty()) {
+                // Stuck: in harvesting mode with a destination, but can't path there
+                // Clear harvesting mode so checkPos() can search for new spice
+                harvestingMode = false;
             }
         }
     }

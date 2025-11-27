@@ -1046,18 +1046,23 @@ void UnitBase::handleDamage(int damage, Uint32 damagerID, House* damagerOwner) {
 
 bool UnitBase::isInGuardRange(const ObjectBase* pObject) const  {
     int checkRange;
+    Coord checkFrom;
     
     switch(attackMode) {
         case GUARD: {
             checkRange = getWeaponRange();
+            checkFrom = guardPoint*TILESIZE + Coord(TILESIZE/2, TILESIZE/2);
         } break;
 
         case AREAGUARD: {
-            checkRange = getAreaGuardRange();
+            // Launchers get extended area guard range due to long weapon range
+            checkRange = (getItemID() == Unit_Launcher) ? 12 : 10;
+            checkFrom = getCenterPoint();  // Check from current location
         } break;
 
         case AMBUSH: {
             checkRange = getViewRange();
+            checkFrom = guardPoint*TILESIZE + Coord(TILESIZE/2, TILESIZE/2);
         } break;
 
         case HUNT: {
@@ -1082,24 +1087,28 @@ bool UnitBase::isInGuardRange(const ObjectBase* pObject) const  {
         checkRange = getViewRange();
     }
 
-    // Check from guardPoint like 0.96.4 does
-    return (blockDistance(guardPoint*TILESIZE + Coord(TILESIZE/2, TILESIZE/2), pObject->getCenterPoint()) <= checkRange*TILESIZE);
+    return (blockDistance(checkFrom, pObject->getCenterPoint()) <= checkRange*TILESIZE);
 }
 
 bool UnitBase::isInAttackRange(const ObjectBase* pObject) const {
     int checkRange;
+    Coord checkFrom;
     
     switch(attackMode) {
         case GUARD: {
             checkRange = getWeaponRange();
+            checkFrom = guardPoint*TILESIZE + Coord(TILESIZE/2, TILESIZE/2);
         } break;
 
         case AREAGUARD: {
-            checkRange = getAreaGuardRange() + getWeaponRange() + 1;
+            // Launchers get extended area guard range due to long weapon range
+            checkRange = (getItemID() == Unit_Launcher) ? 12 : 10;
+            checkFrom = getCenterPoint();  // Check from current location
         } break;
 
         case AMBUSH: {
             checkRange = getViewRange() + 1;
+            checkFrom = guardPoint*TILESIZE + Coord(TILESIZE/2, TILESIZE/2);
         } break;
 
         case HUNT: {
@@ -1124,8 +1133,7 @@ bool UnitBase::isInAttackRange(const ObjectBase* pObject) const {
         checkRange = getViewRange() + 1;
     }
 
-    // Check from guardPoint like 0.96.4 does
-    return (blockDistance(guardPoint*TILESIZE + Coord(TILESIZE/2, TILESIZE/2), pObject->getCenterPoint()) <= checkRange*TILESIZE);
+    return (blockDistance(checkFrom, pObject->getCenterPoint()) <= checkRange*TILESIZE);
 }
 
 bool UnitBase::isInWeaponRange(const ObjectBase* object) const {

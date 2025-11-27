@@ -30,6 +30,7 @@
 #include <structures/Refinery.h>
 #include <structures/ConstructionYard.h>
 #include <units/Harvester.h>
+#include <units/GroundUnit.h>
 
 Carryall::Carryall(House* newOwner) : AirUnit(newOwner)
 {
@@ -121,6 +122,28 @@ bool Carryall::update() {
         if(aDropOfferer && droppedOffCargo && (hasCargo() == false)
             && ((getRealX() < -TILESIZE) || (getRealX() > (currentGameMap->getSizeX()+1)*TILESIZE)
                 || (getRealY() < -TILESIZE) || (getRealY() > (currentGameMap->getSizeY()+1)*TILESIZE))) {
+            
+            // CRITICAL: Clear any bookings BEFORE leaving map
+            // Harvesters may have booked this delivery carryall while it was flying away
+            if(target.getObjPointer() != nullptr && target.getObjPointer()->getItemID() == Structure_Refinery) {
+                static_cast<Refinery*>(target.getObjPointer())->unBook();
+            }
+            if(targetFriendly && target.getObjPointer() && target.getObjPointer()->isAGroundUnit()) {
+                GroundUnit* ground = static_cast<GroundUnit*>(target.getObjPointer());
+                if(ground->getCarrier() == this) {
+                    ground->bookCarrier(nullptr);
+                }
+            }
+            // Also scan for any unit that may have booked us
+            for(UnitBase* pUnit : unitList) {
+                if(pUnit->isAGroundUnit()) {
+                    GroundUnit* ground = static_cast<GroundUnit*>(pUnit);
+                    if(ground->getCarrier() == this) {
+                        ground->bookCarrier(nullptr);
+                    }
+                }
+            }
+            
             setVisible(VIS_ALL, false);
             destroy();
             return false;
@@ -281,6 +304,17 @@ void Carryall::deployUnit(Uint32 unitID)
 
 void Carryall::destroy()
 {
+    // Clean up bookings to prevent stranded units/refineries
+    if(target.getObjPointer() != nullptr && target.getObjPointer()->getItemID() == Structure_Refinery) {
+        static_cast<Refinery*>(target.getObjPointer())->unBook();
+    }
+    if(targetFriendly && target.getObjPointer() && target.getObjPointer()->isAGroundUnit()) {
+        GroundUnit* ground = static_cast<GroundUnit*>(target.getObjPointer());
+        if(ground->getCarrier() == this) {
+            ground->bookCarrier(nullptr);
+        }
+    }
+
     // destroy cargo
     for(const Uint32& pickedUpUnitID : pickedUpUnitList) {
         UnitBase* pPickedUpUnit = static_cast<UnitBase*>(currentGame->getObjectManager().getObject(pickedUpUnitID));
