@@ -7,6 +7,14 @@
 
 ## 🤖 AI Improvements
 
+### Squad Rally Point System (Hard/Brutal)
+
+**Tactical Coordination:**
+- AI now establishes rally points for squad formations
+- Units group intelligently at game start for better positioning
+- Improved retreat mechanics based on weapon range
+- Prevents command spam during tactical maneuvers
+
 ### Enhanced Launcher & Deviator Kiting
 
 **Kiting Now Available on All Difficulties:**
@@ -33,6 +41,22 @@
 
 ## 🎯 Bug Fixes
 
+### Harvester Pathfinding & Stuck Recovery
+
+**Pathfinding Failure Detection:**
+- Added retry counter system to detect unreachable spice destinations
+- Harvesters now give up after 3 failed pathfinding attempts
+- Prevents infinite stuck loops trying to reach impossible destinations
+- Automatically searches for new spice fields when stuck
+
+**Stuck Harvester Recovery:**
+- Comprehensive logging for harvesters stuck 30+ seconds
+- Automatic detection of unreachable destinations
+- Improved spice field navigation logic
+- Better handling of blocked or inaccessible spice tiles
+
+**Result:** Harvesters no longer get permanently stuck and will self-recover when encountering pathfinding issues.
+
 ### Deviated Unit Positioning
 
 **Fixed Deviated Units Not Moving to Squad:**
@@ -40,6 +64,25 @@
 - Previously used large radius (squadRadius - 1), allowing units to stay at current position
 - Ensures deviated units actually move to squad center for protection and coordination
 - More aggressive positioning for units fighting for your side
+
+---
+
+## 🎮 Menu System Enhancements
+
+**Improved Game Setup:**
+- Added support bot difficulty selection in House Choice Menu
+- Added enemy AI difficulty selection options
+- Persistent game options across menu sessions
+- Expanded menu layout for better option visibility
+
+---
+
+## 🗺️ New Multiplayer Maps
+
+**Three New Maps Added:**
+- **4P Moshpit with Garbages** (128x128) - Intense 4-player combat arena
+- **6P Alkozeltser 2** (128x128) - Two variants for 6-player matches
+- **6P Full Wormage** (128x128) - Large-scale worm-infested battlefield
 
 ---
 
@@ -91,11 +134,14 @@ If you have 0.98.7.1 or earlier installed:
 - AI opponents now use long-range units more effectively at all difficulties
 - Launchers and Deviators are more survivable and tactically sound
 - Deviated units are more valuable (actually join your squad)
+- Harvesters no longer get stuck indefinitely, improving economy flow
+- Better AI squad coordination on Hard/Brutal difficulties
 
 **For AI-vs-AI Observers:**
 - More interesting tactical battles with proper kiting mechanics
 - Better positioning and unit preservation
 - More realistic military tactics
+- Smoother economic development without stuck harvesters
 
 ---
 
