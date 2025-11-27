@@ -769,8 +769,9 @@ void QuantBot::onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID)
 		}
 		else if ((pGroundUnit->getItemID() == Unit_Launcher
 			|| pGroundUnit->getItemID() == Unit_Deviator)
-			&& (difficulty != Difficulty::Easy)) {
-			// Keep Launchers/Deviators away from harm when taking damage
+			&& (difficulty != Difficulty::Easy)
+			&& !supportMode) {
+			// Keep Launchers/Deviators away from harm when taking damage (not in support mode)
 			doSetAttackMode(pGroundUnit, AREAGUARD);
 			int weaponRange = currentGame->objectData.data[pGroundUnit->getItemID()][getHouse()->getHouseID()].weaponrange;
 			kiteAwayFromThreat(pGroundUnit, pDamager, weaponRange);
@@ -3161,9 +3162,16 @@ void QuantBot::kiteAwayFromThreat(const UnitBase* pUnit, const ObjectBase* pThre
 	blend_x /= blendDist;
 	blend_y /= blendDist;
 	
-	// Calculate retreat distance - use fixed small distance for incremental kiting
-	// Don't try to reach weapon range in one jump, just back up a bit
-	FixPoint retreatDistance = 3;  // Fixed 3-tile retreat for smooth kiting
+	// Calculate retreat distance proportional to threat proximity
+	// Closer threats = longer retreat to reach weapon range edge
+	// Example: 1 tile away → retreat 8 tiles, 5 tiles away → retreat 4 tiles
+	FixPoint retreatDistance = desiredRange - distToThreat;
+	if (retreatDistance < 3) {
+		retreatDistance = 3;  // Minimum 3-tile retreat for meaningful movement
+	}
+	if (retreatDistance > 8) {
+		retreatDistance = 8;  // Maximum 8-tile retreat to prevent over-kiting
+	}
 	
 	// Calculate target position
 	int targetX = lround(unitLocation.x + blend_x * retreatDistance);
@@ -3443,13 +3451,13 @@ void QuantBot::retreatAllUnits() {
                             }
                         }
                         else {
-                            // Send deviated unit to squad centre
+                            // Send deviated unit to squad centre with tight radius (force movement)
                             if (pUnit->getAttackMode() != AREAGUARD) {
                                 doSetAttackMode(pUnit, AREAGUARD);
                             }
 
-                            // Move to optimal position (closer of squad center or rally point, only if outside radius)
-                            moveToOptimalSquadPosition(pUnit, squadRadius - 1);
+                            // Use small radius (2 tiles) to ensure deviated units actually move to squad
+                            moveToOptimalSquadPosition(pUnit, 2);
                         }
                     }
 					else if ((pUnit->getItemID() == Unit_Launcher || pUnit->getItemID() == Unit_Deviator)
