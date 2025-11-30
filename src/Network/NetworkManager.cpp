@@ -27,6 +27,8 @@
 #include <misc/FileSystem.h>
 #include <misc/fnkdat.h>
 
+#include <mod/ModManager.h>
+
 #include <globals.h>
 #include <players/QuantBotConfig.h>
 #include <mod/ModManager.h>
@@ -214,6 +216,15 @@ void NetworkManager::update()
                         changeEventList.save(packetOStream2);
 
                         sendPacketToPeer(pCurrentPeer, packetOStream2);
+                        
+                        // Send mod info to newly connected peer for mod sync
+                        if(ModManager::instance().isInitialized()) {
+                            std::string modName = ModManager::instance().getActiveModName();
+                            std::string modChecksum = ModManager::instance().getEffectiveChecksums().combined;
+                            SDL_Log("NetworkManager: Sending mod info to new peer - mod='%s', checksum=%s", 
+                                    modName.c_str(), modChecksum.c_str());
+                            sendModInfoToPeer(pCurrentPeer, modName, modChecksum);
+                        }
                     } else {
                         // instruct all connected peers to connect
 
@@ -500,6 +511,15 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                                 changeEventList.save(packetOStream2);
 
                                 sendPacketToPeer(pCurrentPeer, packetOStream2);
+                                
+                                // Send mod info to newly connected peer for mod sync
+                                if(ModManager::instance().isInitialized()) {
+                                    std::string modName = ModManager::instance().getActiveModName();
+                                    std::string modChecksum = ModManager::instance().getEffectiveChecksums().combined;
+                                    SDL_Log("NetworkManager: Sending mod info to new peer - mod='%s', checksum=%s", 
+                                            modName.c_str(), modChecksum.c_str());
+                                    sendModInfoToPeer(pCurrentPeer, modName, modChecksum);
+                                }
                             }
                         }
                     }
