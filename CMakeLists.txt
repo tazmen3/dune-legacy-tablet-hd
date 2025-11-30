@@ -137,10 +137,10 @@ endif()
 
 # Platform-specific install configuration
 if(WIN32)
-    # Windows: use share/DuneLegacy structure to match hardcoded paths in game
+    # Windows: install all files to root directory (not in a share subdirectory)
     set(DUNELEGACY_INSTALL_ROOT ".")
-    set(DUNELEGACY_DATA_DIR "share/${PROJECT_NAME}")
-    set(DUNELEGACY_CONFIG_DIR "share/${PROJECT_NAME}/config")
+    set(DUNELEGACY_DATA_DIR ".")
+    set(DUNELEGACY_CONFIG_DIR "config")
     set(DUNELEGACY_DOC_DIR ".")
 elseif(APPLE)
     # macOS already handled via bundle

@@ -448,35 +448,35 @@ if(WIN32)
     # Windows: install PAK files and data to share/DuneLegacy where game expects them
     # Use data directory which has all PAK files
     
-    # Install all PAK files from data directory to share/DuneLegacy
+    # Install all PAK files from data directory to root installation directory
     install(
         DIRECTORY ${DATA_DIR}/
-        DESTINATION share/${PROJECT_NAME}
+        DESTINATION .
         FILES_MATCHING PATTERN "*.PAK"
     )
     
     # Install locale files
     install(
         DIRECTORY ${DATA_DIR}/locale
-        DESTINATION share/${PROJECT_NAME}
+        DESTINATION .
     )
     
     # Install maps
     install(
         DIRECTORY ${DATA_DIR}/maps
-        DESTINATION share/${PROJECT_NAME}
+        DESTINATION .
     )
     
     # Install Dune2-Versions.txt
     install(
         FILES "${DATA_DIR}/Dune2-Versions.txt"
-        DESTINATION share/${PROJECT_NAME}
+        DESTINATION .
     )
     
-    # Install config files from config directory to share/DuneLegacy/config
+    # Install config files from config directory to root installation directory
     install(
         DIRECTORY ${CMAKE_SOURCE_DIR}/config
-        DESTINATION share/${PROJECT_NAME}
+        DESTINATION .
     )
 elseif(NOT APPLE)
     # Linux: use FHS structure
@@ -516,9 +516,16 @@ endif()
 # Define data directory path for runtime
 # On macOS bundles, don't define DUNELEGACY_DATADIR so SDL_GetBasePath() is used (points to Resources/)
 if(NOT APPLE)
-    target_compile_definitions(dunelegacy
-        PRIVATE
-            DATA_DIRECTORY="${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}"
-            DUNELEGACY_DATADIR="${CMAKE_INSTALL_FULL_DATADIR}/${PROJECT_NAME}"
-    )
+    if(WIN32)
+        # Windows: data files are in the same directory as the executable (root install dir)
+        # Don't define DUNELEGACY_DATADIR so it uses SDL_GetBasePath() which points to executable directory
+        # This matches the installation structure where PAK files are in root, not share/DuneLegacy
+    else()
+        # Linux: use FHS structure with share/DuneLegacy
+        target_compile_definitions(dunelegacy
+            PRIVATE
+                DATA_DIRECTORY="${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}"
+                DUNELEGACY_DATADIR="${CMAKE_INSTALL_FULL_DATADIR}/${PROJECT_NAME}"
+        )
+    endif()
 endif() 

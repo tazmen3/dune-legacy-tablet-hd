@@ -121,6 +121,65 @@ xcodebuild -project "Dune Legacy.xcodeproj" -configuration Release
 - Rebuild installers after significant changes
 - Consider PAK file compatibility with original Dune 2
 
+## Windows Installer Directory Structure (CRITICAL - DO NOT BREAK!)
+
+**IMPORTANT**: All game files must be installed to the ROOT directory of the Windows installation, NOT in a `share/DuneLegacy` subdirectory.
+
+### Correct Installation Structure
+```
+C:\Program Files\DuneLegacy\
+├── dunelegacy.exe          (executable in root)
+├── *.PAK                   (data files in root)
+├── *.dll                   (SDL2 DLLs in root)
+├── locale/                 (locale folder in root)
+├── maps/                   (maps folder in root)
+├── config/                 (config folder in root)
+├── AUTHORS, COPYING, etc.  (docs in root)
+```
+
+### WRONG Structure (DO NOT DO THIS!)
+```
+C:\Program Files\DuneLegacy\
+├── dunelegacy.exe
+├── share/DuneLegacy/       ❌ WRONG - no share subdirectory!
+    ├── *.PAK
+    ├── locale/
+    ├── maps/
+    └── config/
+```
+
+### Key CMake Configuration (CMakeLists.txt lines 139-144)
+```cmake
+if(WIN32)
+    set(DUNELEGACY_DATA_DIR ".")      # Root directory, NOT "share/${PROJECT_NAME}"
+    set(DUNELEGACY_CONFIG_DIR "config")  # NOT "share/${PROJECT_NAME}/config"
+```
+
+### Key Installation Commands (src/CMakeLists.txt lines 451-480)
+All Windows install commands must use `DESTINATION .` (root), never `DESTINATION share/${PROJECT_NAME}`.
+
+### CRITICAL: Compile-Time Data Path (src/CMakeLists.txt lines 516-524)
+**Windows MUST NOT define `DUNELEGACY_DATADIR`!**
+
+```cmake
+if(NOT APPLE)
+    if(WIN32)
+        # DON'T define DUNELEGACY_DATADIR - let SDL_GetBasePath() find executable directory
+    else()
+        # Linux: define DUNELEGACY_DATADIR for FHS structure
+        target_compile_definitions(dunelegacy PRIVATE DUNELEGACY_DATADIR="...")
+    endif()
+endif()
+```
+
+**Why This Matters**: 
+1. The game executable looks for data files relative to its own location using SDL_GetBasePath()
+2. If `DUNELEGACY_DATADIR` is defined, it overrides this and uses a hardcoded path
+3. If files are installed to root but the executable looks in `share/`, the game crashes with "Cannot find 'TEXTH.LanguageFileExtension'"
+4. Both installation paths AND compile-time definitions must match!
+
+**Testing**: After building installer, verify installation directory structure matches the "Correct" example above, then run the game to ensure it finds PAK files.
+
 ## Visual Studio Build Configuration (Fixed Issues)
 - **ToolsVersion**: Updated from `4.0` to `15.0` in all SDL project files
 - **PlatformToolset**: Set to `v143` for Visual Studio 2022 compatibility

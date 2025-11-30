@@ -269,6 +269,39 @@ mods/
 
 ---
 
+## 🎮 Cheat Codes & God Mode
+
+### Immortal Human Player (God Mode)
+
+**New Cheat Feature:**
+- Human-controlled units and structures become invulnerable to all damage
+- Available in single-player modes only (Campaign, Custom Game, Skirmish)
+- Does not work in multiplayer to prevent unfair gameplay
+
+**How to Enable:**
+1. **In-Game Toggle:** Type `muaddib` during gameplay to toggle on/off
+   - Shows message: "God mode: Immortality enabled" or "God mode: Immortality disabled"
+   - Can be toggled anytime during single-player games
+   - No cheat mode required for this feature
+
+2. **Game Options Menu:** Enable checkbox "Immortal Human Player"
+   - Found in Game Options → Immortal Human Player
+   - Checkbox available when starting new games
+
+**What It Does:**
+- Your units take no damage from any source (enemy fire, sandworms, etc.)
+- Your structures are invulnerable to all attacks
+- Special interactions:
+  - Infantry survive capture/sabotage attempts
+  - Sandworms die when trying to eat immortal units (choke on them)
+  - Units in destroyed Carryalls drop safely instead of dying
+  - Ground units survive being crushed
+
+**Why "muaddib"?** 
+Named after Paul Atreides' Fremen name from the Dune universe - a fitting god-mode reference!
+
+---
+
 ## 🗺️ New Multiplayer Maps
 
 **Four New Maps Added:**
@@ -367,6 +400,7 @@ If you have 0.98.x or earlier installed:
 - AI opponents use long-range units more effectively at all difficulties
 - Deviated units are more valuable (actually join your squad)
 - Harvesters no longer get stuck indefinitely
+- **NEW:** God mode available via "muaddib" cheat code for casual/practice play
 
 **For Multiplayer:**
 - Mods automatically synchronized between host and clients
