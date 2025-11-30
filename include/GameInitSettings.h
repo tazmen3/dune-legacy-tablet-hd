@@ -177,6 +177,7 @@ public:
     inline void setMultiplePlayersPerHouse(bool multiplePlayersPerHouse) { this->multiplePlayersPerHouse = multiplePlayersPerHouse; };
     inline const SettingsClass::GameOptionsClass& getGameOptions() const { return gameOptions; };
     inline void setGameSpeed(int gameSpeed) { gameOptions.gameSpeed = gameSpeed; };
+    inline void setImmortalHumanPlayer(bool immortal) { gameOptions.immortalHumanPlayer = immortal; };
 
     inline void addHouseInfo(const HouseInfo& newHouseInfo) { houseInfoList.push_back(newHouseInfo); };
     inline void clearHouseInfo() { houseInfoList.clear(); };
@@ -218,6 +219,9 @@ private:
 
     SettingsClass::GameOptionsClass gameOptions;
 
+    // Mod info for save/replay compatibility
+    std::string     modName = "vanilla";      ///< Name of active mod when game was started
+    std::string     modChecksum = "";         ///< Combined mod checksum for verification
 
     HouseInfoList   houseInfoList;
 };

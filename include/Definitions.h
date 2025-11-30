@@ -30,7 +30,7 @@
 #define DEFAULT_METASERVER  "https://dunelegacy.com/metaserver/metaserver.php"
 
 #define SAVEMAGIC           8675309
-#define SAVEGAMEVERSION     9805  // Incremented for UnitBase stuck-detection fields (lastDistanceToDestination, noProgressCount, lastDestination)
+#define SAVEGAMEVERSION     9806  // Incremented for mod tagging (modName, modChecksum in save header)
 
 #define MAX_PLAYERNAMELENGHT    24
 

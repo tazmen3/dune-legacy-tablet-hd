@@ -59,7 +59,7 @@ SettingsClass::GameOptionsClass HouseChoiceMenu::s_currentGameOptions;
 HouseChoiceMenu::HouseChoiceMenu() : MenuBase()
 {
     currentHouseChoiceScrollPos = 0;
-    s_currentGameOptions = settings.gameOptions;
+    s_currentGameOptions = effectiveGameOptions;  // Use mod-aware effective options
 
     // set up window
     int xpos = std::max(0,(getRendererWidth() - 640)/2);

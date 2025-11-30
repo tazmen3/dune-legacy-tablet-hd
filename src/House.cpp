@@ -49,7 +49,7 @@
 #include <algorithm>
 
 
-House::House(int newHouse, int newCredits, int maxUnits, Uint8 teamID, int quota) : choam(this) {
+House::House(int newHouse, int newCredits, int maxUnits, int maxHarvesters, Uint8 teamID, int quota) : choam(this) {
     House::init();
 
     houseID = ((newHouse >= 0) && (newHouse < NUM_HOUSES)) ? newHouse :  0;
@@ -60,6 +60,7 @@ House::House(int newHouse, int newCredits, int maxUnits, Uint8 teamID, int quota
     oldCredits = lround(storedCredits+startingCredits);
 
     this->maxUnits = maxUnits;
+    this->maxHarvesters = maxHarvesters;
     this->quota = quota;
 
     bHadContactWithEnemy = false;
@@ -95,6 +96,7 @@ House::House(InputStream& stream) : choam(this) {
     startingCredits = stream.readFixPoint();
     oldCredits = lround(storedCredits+startingCredits);
     maxUnits = stream.readSint32();
+    maxHarvesters = stream.readSint32();
     quota = stream.readSint32();
 
     // Backward compatibility: Old saves (< 9803) only have 2 bools, new saves have 4
@@ -180,6 +182,7 @@ void House::save(OutputStream& stream) const {
     stream.writeFixPoint(storedCredits);
     stream.writeFixPoint(startingCredits);
     stream.writeSint32(maxUnits);
+    stream.writeSint32(maxHarvesters);
     stream.writeSint32(quota);
 
     stream.writeBools(bHadContactWithEnemy, bHadDirectContactWithEnemy, isAIActive, doneFullScaleAttack);
@@ -621,6 +624,11 @@ void House::lose(bool bSilent) {
 
 
 void House::freeHarvester(int xPos, int yPos) {
+    // Don't spawn free harvester if at harvester limit
+    if(isHarvesterLimitReached()) {
+        return;
+    }
+
     if(currentGameMap->tileExists(xPos, yPos)
         && currentGameMap->getTile(xPos, yPos)->hasAGroundObject()
         && (currentGameMap->getTile(xPos, yPos)->getGroundObject()->getItemID() == Structure_Refinery))

@@ -58,7 +58,7 @@ SinglePlayerSkirmishMenu::SinglePlayerSkirmishMenu() : MenuBase()
     mission = 1;
     supportBotIndex = 0;
     enemyAIIndex = 0;  // Default to CampaignAIPlayer
-    currentGameOptions = settings.gameOptions;
+    currentGameOptions = effectiveGameOptions;  // Use mod-aware effective options
 
     // set up window
     SDL_Texture *pBackground = pGFXManager->getUIGraphic(UI_MenuBackground);

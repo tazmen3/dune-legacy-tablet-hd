@@ -24,12 +24,17 @@
 #include <GameInitSettings.h>
 
 #include <misc/exceptions.h>
+#include <misc/FileSystem.h>
+#include <misc/fnkdat.h>
 
 #include <globals.h>
 #include <players/QuantBotConfig.h>
+#include <mod/ModManager.h>
 
 #include <stdio.h>
 #include <algorithm>
+#include <fstream>
+#include <iterator>
 
 NetworkManager::NetworkManager(int port, const std::string& metaserver) {
 
@@ -76,7 +81,10 @@ void NetworkManager::startServer(bool bLANServer, const std::string& serverName,
         }
     } else {
         if(pMetaServerClient != nullptr) {
-            pMetaServerClient->startAnnounce(serverName, host->address.port, pGameInitSettings->getFilename(), numPlayers, maxPlayers);
+            // Get active mod info
+            ModInfo activeModInfo = ModManager::instance().getModInfo(ModManager::instance().getActiveModName());
+            pMetaServerClient->startAnnounce(serverName, host->address.port, pGameInitSettings->getFilename(), numPlayers, maxPlayers,
+                                             activeModInfo.name, activeModInfo.version);
         }
     }
 
@@ -534,6 +542,42 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                 GameInitSettings gameInitSettings(packetStream);
                 ChangeEventList changeEventList(packetStream);
 
+                // Save the received map to the user's maps/multiplayer directory
+                if(gameInitSettings.getGameType() == GameType::CustomMultiplayer && 
+                   !gameInitSettings.getFiledata().empty() &&
+                   !gameInitSettings.getFilename().empty()) {
+                    
+                    try {
+                        char tmp[FILENAME_MAX];
+                        if(fnkdat("maps/multiplayer/", tmp, FILENAME_MAX, FNKDAT_USER | FNKDAT_CREAT) >= 0) {
+                            std::string mapDirectory(tmp);
+                            std::string mapFilename = gameInitSettings.getFilename();
+                            
+                            // Ensure the filename has .ini extension
+                            if(mapFilename.length() < 4 || mapFilename.substr(mapFilename.length() - 4) != ".ini") {
+                                mapFilename += ".ini";
+                            }
+                            
+                            std::string fullPath = mapDirectory + mapFilename;
+                            
+                            // Only save if the file doesn't exist yet (avoid overwriting user-modified maps)
+                            if(!existsFile(fullPath)) {
+                                if(writeCompleteFile(fullPath, gameInitSettings.getFiledata())) {
+                                    SDL_Log("NetworkManager: Successfully saved received map to '%s'", fullPath.c_str());
+                                } else {
+                                    SDL_Log("NetworkManager: Failed to save received map to '%s'", fullPath.c_str());
+                                }
+                            } else {
+                                SDL_Log("NetworkManager: Map '%s' already exists locally, skipping save", fullPath.c_str());
+                            }
+                        } else {
+                            SDL_Log("NetworkManager: Failed to get maps/multiplayer directory path");
+                        }
+                    } catch(std::exception& e) {
+                        SDL_Log("NetworkManager: Error saving received map: %s", e.what());
+                    }
+                }
+
                 if(pOnReceiveGameInfo) {
                     pOnReceiveGameInfo(gameInitSettings, changeEventList);
                 }
@@ -842,6 +886,178 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                 }
             } break;
 
+            case NETWORKPACKET_MOD_INFO: {
+                // Client receives mod info from host
+                if(bIsServer) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Host received MOD_INFO packet (should only be sent to clients)");
+                    break;
+                }
+
+                std::string modName = packetStream.readString();
+                std::string modChecksum = packetStream.readString();
+
+                SDL_Log("NetworkManager: Received mod info from host - mod: '%s', checksum: %s", 
+                        modName.c_str(), modChecksum.c_str());
+
+                if(pOnReceiveModInfo) {
+                    pOnReceiveModInfo(modName, modChecksum);
+                }
+            } break;
+
+            case NETWORKPACKET_MOD_REQUEST: {
+                // Host receives mod download request from client
+                if(!bIsServer) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Client received MOD_REQUEST packet (should only be sent to host)");
+                    break;
+                }
+
+                std::string requestedModName = packetStream.readString();
+                SDL_Log("NetworkManager: Client requested mod download for '%s'", requestedModName.c_str());
+
+                // Use the peer that sent this request directly (the 'peer' parameter from handlePacket)
+                if(peer == nullptr) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: No peer context for mod request");
+                    break;
+                }
+
+                // Package and send the mod files to the requesting peer
+                sendModFilesToPeer(peer, requestedModName);
+            } break;
+
+            case NETWORKPACKET_MOD_CHUNK: {
+                // Client receives mod file chunk from host
+                if(bIsServer) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Host received MOD_CHUNK packet (should only be sent to clients)");
+                    break;
+                }
+
+                std::string modName = packetStream.readString();
+                Uint32 totalSize = packetStream.readUint32();
+                Uint32 chunkOffset = packetStream.readUint32();
+                std::string chunkData = packetStream.readString();
+
+                // Security: Validate totalSize against maximum allowed
+                if(totalSize > MAX_MOD_TRANSFER_SIZE) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, 
+                        "NetworkManager: Mod transfer size %u exceeds limit %d - aborting", 
+                        totalSize, MAX_MOD_TRANSFER_SIZE);
+                    modTransferState.inProgress = false;
+                    if(pOnModDownloadComplete) {
+                        pOnModDownloadComplete(false, "Mod exceeds size limit");
+                    }
+                    break;
+                }
+
+                // Initialize transfer state if this is the first chunk
+                if(!modTransferState.inProgress || modTransferState.modName != modName) {
+                    modTransferState.modName = modName;
+                    modTransferState.modData.clear();
+                    modTransferState.modData.reserve(totalSize);
+                    modTransferState.totalSize = totalSize;
+                    modTransferState.receivedSize = 0;
+                    modTransferState.inProgress = true;
+                }
+
+                // Security: Validate chunk offset matches expected position (enforce in-order)
+                if(chunkOffset != modTransferState.receivedSize) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, 
+                        "NetworkManager: Chunk offset mismatch - expected %zu, got %u. Aborting transfer.", 
+                        modTransferState.receivedSize, chunkOffset);
+                    modTransferState.inProgress = false;
+                    if(pOnModDownloadComplete) {
+                        pOnModDownloadComplete(false, "Out-of-order mod chunk");
+                    }
+                    modTransferState.modData.clear();
+                    modTransferState.modName.clear();
+                    modTransferState.totalSize = 0;
+                    modTransferState.receivedSize = 0;
+                    break;
+                }
+
+                // Security: Check that adding this chunk won't exceed totalSize
+                if(modTransferState.receivedSize + chunkData.size() > totalSize) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, 
+                        "NetworkManager: Chunk would exceed total size - aborting");
+                    modTransferState.inProgress = false;
+                    if(pOnModDownloadComplete) {
+                        pOnModDownloadComplete(false, "Invalid chunk size");
+                    }
+                    break;
+                }
+
+                // Append chunk data
+                modTransferState.modData.append(chunkData);
+                modTransferState.receivedSize += chunkData.size();
+
+                SDL_Log("NetworkManager: Received mod chunk %zu/%zu bytes", 
+                        modTransferState.receivedSize, modTransferState.totalSize);
+
+                if(pOnModDownloadProgress) {
+                    pOnModDownloadProgress(modTransferState.receivedSize, modTransferState.totalSize);
+                }
+            } break;
+
+            case NETWORKPACKET_MOD_COMPLETE: {
+                // Client receives mod transfer complete notification
+                if(bIsServer) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Host received MOD_COMPLETE packet (should only be sent to clients)");
+                    break;
+                }
+
+                bool success = packetStream.readBool();
+                std::string message = packetStream.readString();
+
+                SDL_Log("NetworkManager: Mod transfer complete - success: %s, message: %s", 
+                        success ? "yes" : "no", message.c_str());
+
+                modTransferState.inProgress = false;
+
+                if(pOnModDownloadComplete) {
+                    if(success) {
+                        // Pass the received mod data for saving
+                        pOnModDownloadComplete(true, modTransferState.modData);
+                    } else {
+                        pOnModDownloadComplete(false, message);
+                    }
+                }
+
+                // Clear transfer state
+                modTransferState.modData.clear();
+                modTransferState.modName.clear();
+                modTransferState.totalSize = 0;
+                modTransferState.receivedSize = 0;
+            } break;
+
+            case NETWORKPACKET_MOD_ACK: {
+                // Host receives mod sync acknowledgment from client
+                if(!bIsServer) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Client received MOD_ACK packet (should only be sent to host)");
+                    break;
+                }
+
+                bool success = packetStream.readBool();
+                std::string modChecksum = packetStream.readString();
+
+                // Find player name for this peer
+                std::string playerName = "Unknown";
+                if (peer != nullptr) {
+                    if (auto* peerData = static_cast<PeerData*>(peer->data)) {
+                        playerName = peerData->name;
+                    } else {
+                        char nameBuf[64];
+                        snprintf(nameBuf, sizeof(nameBuf), "%u:%u", peer->address.host, peer->address.port);
+                        playerName = nameBuf;
+                    }
+                }
+
+                SDL_Log("NetworkManager: Received mod ACK from '%s' - success: %s, checksum: %s",
+                        playerName.c_str(), success ? "yes" : "no", modChecksum.c_str());
+
+                if(pOnReceiveModAck) {
+                    pOnReceiveModAck(playerName, success, modChecksum);
+                }
+            } break;
+
             default: {
                 SDL_Log("NetworkManager: Unknown packet type %d", packetType);
             };
@@ -1034,4 +1250,193 @@ void NetworkManager::broadcastPathBudget(size_t newBudget, Uint32 applyCycle) {
     packetStream.writeUint32(applyCycle);
 
     sendPacketToAllConnectedPeers(packetStream);
+}
+
+void NetworkManager::sendModInfoToPeer(ENetPeer* peer, const std::string& modName, const std::string& modChecksum) {
+    // Host → Single Client: Send active mod info
+    if(!bIsServer) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Client trying to send mod info (only host can send)");
+        return;
+    }
+
+    SDL_Log("NetworkManager: Sending mod info to peer - mod: '%s', checksum: %s", 
+            modName.c_str(), modChecksum.c_str());
+
+    ENetPacketOStream packetStream(ENET_PACKET_FLAG_RELIABLE);
+    packetStream.writeUint32(NETWORKPACKET_MOD_INFO);
+    packetStream.writeString(modName);
+    packetStream.writeString(modChecksum);
+
+    sendPacketToPeer(peer, packetStream);
+}
+
+void NetworkManager::sendModInfo(const std::string& modName, const std::string& modChecksum) {
+    // Host → All Clients: Send active mod info for verification
+    if(!bIsServer) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Client trying to send mod info (only host can send)");
+        return;
+    }
+
+    SDL_Log("NetworkManager: Broadcasting mod info to all clients - mod: '%s', checksum: %s", 
+            modName.c_str(), modChecksum.c_str());
+
+    ENetPacketOStream packetStream(ENET_PACKET_FLAG_RELIABLE);
+    packetStream.writeUint32(NETWORKPACKET_MOD_INFO);
+    packetStream.writeString(modName);
+    packetStream.writeString(modChecksum);
+
+    sendPacketToAllConnectedPeers(packetStream);
+}
+
+void NetworkManager::requestModDownload(const std::string& modName) {
+    // Client → Host: Request mod files because of checksum mismatch
+    if(bIsServer) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Host trying to request mod download (only clients can request)");
+        return;
+    }
+
+    SDL_Log("NetworkManager: Requesting mod '%s' from host", modName.c_str());
+
+    ENetPacketOStream packetStream(ENET_PACKET_FLAG_RELIABLE);
+    packetStream.writeUint32(NETWORKPACKET_MOD_REQUEST);
+    packetStream.writeString(modName);
+
+    sendPacketToHost(packetStream);
+}
+
+void NetworkManager::sendModFilesToPeer(ENetPeer* peer, const std::string& modName) {
+    // Host: Package and send mod files to requesting client
+    
+    // Get mod path from ModManager
+    std::string modPath = ModManager::instance().getModPath(modName);
+    if(modPath.empty() || !existsFile(modPath)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Mod '%s' not found at path: %s", 
+                    modName.c_str(), modPath.c_str());
+        
+        // Send failure notification
+        ENetPacketOStream completePacket(ENET_PACKET_FLAG_RELIABLE);
+        completePacket.writeUint32(NETWORKPACKET_MOD_COMPLETE);
+        completePacket.writeBool(false);
+        completePacket.writeString("Mod not found on server");
+        sendPacketToPeer(peer, completePacket);
+        return;
+    }
+
+    SDL_Log("NetworkManager: Packaging mod '%s' from path: %s", modName.c_str(), modPath.c_str());
+
+    // Package mod files into a simple format:
+    // [num_files:uint32][file1_name:string][file1_data:string][file2_name:string][file2_data:string]...
+    std::string packagedData;
+    
+    // Write number of files placeholder (we'll update this)
+    uint32_t numFiles = 0;
+    
+    // List of files to include
+    std::vector<std::string> filesToInclude = {"ObjectData.ini", "QuantBot Config.ini", "GameOptions.ini", "mod.json"};
+    std::vector<std::pair<std::string, std::string>> fileData;  // name -> content pairs
+    
+    for(const std::string& filename : filesToInclude) {
+        std::string filePath = modPath + "/" + filename;
+        if(existsFile(filePath)) {
+            std::ifstream file(filePath, std::ios::binary);
+            if(file.is_open()) {
+                std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+                file.close();
+                fileData.push_back({filename, content});
+                numFiles++;
+                SDL_Log("NetworkManager: Including file '%s' (%zu bytes)", filename.c_str(), content.size());
+            }
+        }
+    }
+
+    if(numFiles == 0) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: No files found in mod '%s'", modName.c_str());
+        
+        ENetPacketOStream completePacket(ENET_PACKET_FLAG_RELIABLE);
+        completePacket.writeUint32(NETWORKPACKET_MOD_COMPLETE);
+        completePacket.writeBool(false);
+        completePacket.writeString("No mod files found");
+        sendPacketToPeer(peer, completePacket);
+        return;
+    }
+
+    // Build the package
+    // Format: numFiles (4 bytes) + [nameLen (4 bytes) + name + dataLen (4 bytes) + data] * numFiles
+    packagedData.reserve(1024 * 1024);  // Reserve 1MB initially
+    
+    // Write number of files
+    packagedData.append(reinterpret_cast<const char*>(&numFiles), sizeof(numFiles));
+    
+    for(const auto& [name, content] : fileData) {
+        uint32_t nameLen = static_cast<uint32_t>(name.size());
+        uint32_t dataLen = static_cast<uint32_t>(content.size());
+        
+        packagedData.append(reinterpret_cast<const char*>(&nameLen), sizeof(nameLen));
+        packagedData.append(name);
+        packagedData.append(reinterpret_cast<const char*>(&dataLen), sizeof(dataLen));
+        packagedData.append(content);
+    }
+
+    // Check size limit
+    if(packagedData.size() > MAX_MOD_TRANSFER_SIZE) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Mod '%s' exceeds size limit (%zu > %d)", 
+                    modName.c_str(), packagedData.size(), MAX_MOD_TRANSFER_SIZE);
+        
+        ENetPacketOStream completePacket(ENET_PACKET_FLAG_RELIABLE);
+        completePacket.writeUint32(NETWORKPACKET_MOD_COMPLETE);
+        completePacket.writeBool(false);
+        completePacket.writeString("Mod exceeds size limit");
+        sendPacketToPeer(peer, completePacket);
+        return;
+    }
+
+    SDL_Log("NetworkManager: Sending mod '%s' (%zu bytes total, %u files) in chunks", 
+            modName.c_str(), packagedData.size(), numFiles);
+
+    // Send in chunks
+    size_t totalSize = packagedData.size();
+    size_t offset = 0;
+    
+    while(offset < totalSize) {
+        size_t chunkSize = std::min(static_cast<size_t>(MOD_CHUNK_SIZE), totalSize - offset);
+        std::string chunk = packagedData.substr(offset, chunkSize);
+        
+        ENetPacketOStream chunkPacket(ENET_PACKET_FLAG_RELIABLE);
+        chunkPacket.writeUint32(NETWORKPACKET_MOD_CHUNK);
+        chunkPacket.writeString(modName);
+        chunkPacket.writeUint32(static_cast<Uint32>(totalSize));
+        chunkPacket.writeUint32(static_cast<Uint32>(offset));
+        chunkPacket.writeString(chunk);
+        
+        sendPacketToPeer(peer, chunkPacket);
+        
+        offset += chunkSize;
+    }
+
+    // Send completion notification
+    ENetPacketOStream completePacket(ENET_PACKET_FLAG_RELIABLE);
+    completePacket.writeUint32(NETWORKPACKET_MOD_COMPLETE);
+    completePacket.writeBool(true);
+    completePacket.writeString("Transfer complete");
+    sendPacketToPeer(peer, completePacket);
+    
+    SDL_Log("NetworkManager: Mod transfer complete for '%s'", modName.c_str());
+}
+
+void NetworkManager::sendModAck(bool success, const std::string& modChecksum) {
+    // Client → Host: Acknowledge mod sync complete
+    if(bIsServer) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Host trying to send mod ACK (only clients can send)");
+        return;
+    }
+
+    SDL_Log("NetworkManager: Sending mod ACK to host - success: %s, checksum: %s", 
+            success ? "yes" : "no", modChecksum.c_str());
+
+    ENetPacketOStream packetStream(ENET_PACKET_FLAG_RELIABLE);
+    packetStream.writeUint32(NETWORKPACKET_MOD_ACK);
+    packetStream.writeBool(success);
+    packetStream.writeString(modChecksum);
+
+    sendPacketToHost(packetStream);
 }

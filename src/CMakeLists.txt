@@ -190,6 +190,8 @@ target_sources(dunelegacy
         Menu/MentatHelp.cpp
         Menu/MapChoice.cpp
         Menu/CampaignStatsMenu.cpp
+        Menu/ModMenu.cpp
+        Menu/ModEditorMenu.cpp
 
         # Network
         Network/LANGameFinderAndAnnouncer.cpp
@@ -206,6 +208,9 @@ target_sources(dunelegacy
         players/QuantBot.cpp
         players/QuantBotConfig.cpp
         players/SmartBot.cpp
+
+        # Mod System
+        mod/ModManager.cpp
 
         # Structures
         structures/StructureBase.cpp

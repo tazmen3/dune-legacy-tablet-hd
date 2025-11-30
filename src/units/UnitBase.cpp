@@ -349,9 +349,19 @@ void UnitBase::deploy(const Coord& newLocation) {
 
         if(isAGroundUnit() && (getItemID() != Unit_Sandworm)) {
             if(currentGameMap->getTile(location)->isSpiceBloom()) {
-                setHealth(0);
-                setVisible(VIS_ALL, false);
                 currentGameMap->getTile(location)->triggerSpiceBloom(getOwner());
+                
+                // Check if unit should be destroyed by the bloom
+                GameType gameType = currentGame->getGameInitSettings().getGameType();
+                bool isImmortal = (gameType != GameType::CustomMultiplayer 
+                                  && gameType != GameType::LoadMultiplayer
+                                  && currentGame->getGameInitSettings().getGameOptions().immortalHumanPlayer
+                                  && getOwner() == pLocalHouse);
+                
+                if(!isImmortal) {
+                    setHealth(0);
+                    setVisible(VIS_ALL, false);
+                }
             } else if(currentGameMap->getTile(location)->isSpecialBloom()){
                 currentGameMap->getTile(location)->triggerSpecialBloom(getOwner());
             }

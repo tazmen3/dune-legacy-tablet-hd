@@ -163,6 +163,7 @@ private:
     sdl2::texture_ptr    pPlaceItTextTexture;
     sdl2::texture_ptr    pOnHoldTextTexture;
     sdl2::texture_ptr    pUnitLimitReachedTextTexture;
+    sdl2::texture_ptr    pHarvesterLimitReachedTextTexture;
 
     sdl2::texture_ptr    pLastTooltip;
     std::string     tooltipText;

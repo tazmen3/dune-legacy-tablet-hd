@@ -56,7 +56,8 @@ public:
         this->pOnMetaServerError = pOnMetaServerError;
     }
 
-    void startAnnounce(const std::string& serverName, int serverPort, const std::string& mapName, Uint8 numPlayers, Uint8 maxPlayers);
+    void startAnnounce(const std::string& serverName, int serverPort, const std::string& mapName, Uint8 numPlayers, Uint8 maxPlayers,
+                       const std::string& modName = "vanilla", const std::string& modVersion = "");
 
     void updateAnnounce(Uint8 numPlayers);
 
@@ -127,6 +128,8 @@ private:
     std::string mapName = "";                                                   ///< The name of the map for which a game is currently set up
     Uint8 numPlayers = 0;                                                       ///< The current number of players in the currently set up game
     Uint8 maxPlayers = 0;                                                       ///< The maximum number of players in the currently set up game
+    std::string modName = "vanilla";                                            ///< The active mod name
+    std::string modVersion = "";                                                ///< The active mod version
 
     Uint32 lastAnnounceUpdate = 0;                                              ///< The last time the game was announced
     Uint32 lastServerInfoListUpdate = 0;                                        ///< The last time the server list was updated by a request to the metaserver

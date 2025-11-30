@@ -84,9 +84,21 @@ void GroundUnit::checkPos() {
         //findTargetTimer = 0;  //allow a scan for new targets now
 
         if(pTile->isSpiceBloom()) {
-            setHealth(0);
-            setVisible(VIS_ALL, false);
+            // Trigger the bloom explosion (creates spice)
             pTile->triggerSpiceBloom(getOwner());
+            
+            // Check if unit should be destroyed by the bloom
+            GameType gameType = currentGame->getGameInitSettings().getGameType();
+            bool isImmortal = (gameType != GameType::CustomMultiplayer 
+                              && gameType != GameType::LoadMultiplayer
+                              && currentGame->getGameInitSettings().getGameOptions().immortalHumanPlayer
+                              && getOwner() == pLocalHouse);
+            
+            if(!isImmortal) {
+                // Normal behavior: unit is destroyed by spice bloom
+                setHealth(0);
+                setVisible(VIS_ALL, false);
+            }
         } else if(pTile->isSpecialBloom()){
             pTile->triggerSpecialBloom(getOwner());
         }

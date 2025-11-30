@@ -126,8 +126,8 @@ Brutal_HarvesterLimitMultiplier=999
 Brutal_MilitaryValueMultiplier=3.5
 Brutal_RefineryMinimum=4
 # Custom games: Small, Medium, Large map limits
-Brutal_HarvesterLimitSmallMap=10
-Brutal_HarvesterLimitMediumMap=20
+Brutal_HarvesterLimitSmallMap=6
+Brutal_HarvesterLimitMediumMap=10
 Brutal_HarvesterLimitLargeMap=100
 Brutal_MilitaryValueLimitSmallMap=20000
 Brutal_MilitaryValueLimitMediumMap=40000

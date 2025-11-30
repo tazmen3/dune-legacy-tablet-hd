@@ -24,6 +24,8 @@
 // Libraries
 #include <string>
 #include <array>
+#include <cstdint>
+#include <cstdio>
 
 
 typedef std::array<SDL_Texture*, NUM_ZOOMLEVEL> zoomable_texture;
@@ -207,7 +209,8 @@ public:
         GameOptionsClass()
          : gameSpeed(GAMESPEED_DEFAULT), concreteRequired(true), structuresDegradeOnConcrete(true), fogOfWar(false),
            startWithExploredMap(false), instantBuild(false), onlyOnePalace(false), rocketTurretsNeedPower(false),
-           sandwormsRespawn(false), killedSandwormsDropSpice(false), manualCarryallDrops(false), maximumNumberOfUnitsOverride(-1)  {
+           sandwormsRespawn(false), killedSandwormsDropSpice(false), manualCarryallDrops(false), maximumNumberOfUnitsOverride(-1),
+           maximumNumberOfHarvestersOverride(-1), immortalHumanPlayer(false)  {
         }
 
 
@@ -223,11 +226,48 @@ public:
                     && (sandwormsRespawn == goc.sandwormsRespawn)
                     && (killedSandwormsDropSpice == goc.killedSandwormsDropSpice)
                     && (manualCarryallDrops == goc.manualCarryallDrops)
-                    && (maximumNumberOfUnitsOverride == goc.maximumNumberOfUnitsOverride);
+                    && (maximumNumberOfUnitsOverride == goc.maximumNumberOfUnitsOverride)
+                    && (maximumNumberOfHarvestersOverride == goc.maximumNumberOfHarvestersOverride)
+                    && (immortalHumanPlayer == goc.immortalHumanPlayer);
         }
 
         bool operator!=(const GameOptionsClass& goc) const {
             return !this->operator==(goc);
+        }
+
+        /**
+            Returns a hash of all game options for multiplayer verification.
+            \return 16-character hex string (FNV-1a hash)
+        */
+        std::string getHash() const {
+            // Build string from all gameplay-affecting values
+            std::string optStr;
+            optStr += std::to_string(gameSpeed);
+            optStr += std::to_string(concreteRequired);
+            optStr += std::to_string(structuresDegradeOnConcrete);
+            optStr += std::to_string(fogOfWar);
+            optStr += std::to_string(startWithExploredMap);
+            optStr += std::to_string(instantBuild);
+            optStr += std::to_string(onlyOnePalace);
+            optStr += std::to_string(rocketTurretsNeedPower);
+            optStr += std::to_string(sandwormsRespawn);
+            optStr += std::to_string(killedSandwormsDropSpice);
+            optStr += std::to_string(manualCarryallDrops);
+            optStr += std::to_string(maximumNumberOfUnitsOverride);
+            optStr += std::to_string(maximumNumberOfHarvestersOverride);
+            // Note: immortalHumanPlayer is intentionally excluded as it's a per-player setting
+            
+            // FNV-1a hash
+            uint64_t hash = 14695981039346656037ULL;
+            const uint64_t prime = 1099511628211ULL;
+            for (char c : optStr) {
+                hash ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
+                hash *= prime;
+            }
+            
+            char hashStr[17];
+            snprintf(hashStr, sizeof(hashStr), "%016llx", (unsigned long long)hash);
+            return std::string(hashStr);
         }
 
         int         gameSpeed;
@@ -242,6 +282,8 @@ public:
         bool        killedSandwormsDropSpice;
         bool        manualCarryallDrops;
         int         maximumNumberOfUnitsOverride;
+        int         maximumNumberOfHarvestersOverride;
+        bool        immortalHumanPlayer;
     } gameOptions;
 };
 

@@ -48,6 +48,7 @@
 #include <misc/md5.h>
 
 #include <players/QuantBotConfig.h>
+#include <mod/ModManager.h>
 
 #include <CrashHandler.h>
 #include <SoundPlayer.h>
@@ -294,7 +295,13 @@ std::string getPerformanceLogFilepath()
 
 std::string getObjectDataConfigFilepath()
 {
-    // User ObjectData.ini is stored in user directory (AppData on Windows, ~/.config on Linux, etc.)
+    // If ModManager is initialized and a non-vanilla mod is active, use mod path
+    if (ModManager::instance().isInitialized() && 
+        ModManager::instance().getActiveModName() != "vanilla") {
+        return ModManager::instance().getActiveObjectDataPath();
+    }
+    
+    // Default: user config directory (preserves existing user customizations)
     char tmp[FILENAME_MAX];
     if(fnkdat("config/ObjectData.ini", tmp, FILENAME_MAX, FNKDAT_USER | FNKDAT_CREAT) < 0) {
         THROW(std::runtime_error, "fnkdat() failed for ObjectData.ini!");
@@ -478,60 +485,10 @@ bool restoreDefaultConfigs() {
 
 static bool promptToRestoreOutOfSyncConfigurations()
 {
-    bool objectDataOutOfSync = false;
-    bool quantBotOutOfSync = false;
-
-    if(!areConfigFilesOutOfSync(objectDataOutOfSync, quantBotOutOfSync)) {
-        return false;
-    }
-
-    std::string message = "Your game and AI configuration files are not in line with the latest app version.\n"
-                          "This can cause instability or multiplayer desyncs.\n\n"
-                          "Out of sync:\n";
-    if(objectDataOutOfSync) {
-        message += " • ObjectData.ini\n";
-    }
-    if(quantBotOutOfSync) {
-        message += " • QuantBot Config.ini\n";
-    }
-    message += "\nRestore the default configuration now? The game will restart afterwards.";
-
-    SDL_MessageBoxButtonData buttons[] = {
-        { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Yes" },
-        { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "No" }
-    };
-
-    SDL_MessageBoxData messageBoxData = {};
-    messageBoxData.flags = SDL_MESSAGEBOX_WARNING;
-    messageBoxData.window = window;
-    messageBoxData.title = "Dune Legacy";
-    messageBoxData.message = message.c_str();
-    messageBoxData.numbuttons = static_cast<int>(sizeof(buttons) / sizeof(buttons[0]));
-    messageBoxData.buttons = buttons;
-    messageBoxData.colorScheme = nullptr;
-
-    int buttonId = -1;
-    if(SDL_ShowMessageBox(&messageBoxData, &buttonId) < 0) {
-        SDL_Log("Warning: SDL_ShowMessageBox failed while prompting for configuration restore: %s", SDL_GetError());
-        return false;
-    }
-
-    if(buttonId != 1) {
-        SDL_Log("Player opted to keep existing configuration files.");
-        return false;
-    }
-
-    SDL_Log("Player confirmed configuration restore. Copying default files.");
-    const bool restored = restoreDefaultConfigs();
-
-    const Uint32 promptFlag = restored ? SDL_MESSAGEBOX_INFORMATION : SDL_MESSAGEBOX_ERROR;
-    const char* promptText = restored
-        ? "Configuration restored. Please restart Dune Legacy."
-        : "Configuration could not be restored automatically. Please check your installation.";
-
-    SDL_ShowSimpleMessageBox(promptFlag, "Dune Legacy", promptText, window);
-
-    return true;
+    // With the mod system, vanilla mod is automatically seeded from templates
+    // by ModManager::initialize() -> vanillaNeedsReseed() -> seedVanillaFromDefaults()
+    // This legacy check is no longer needed.
+    return false;
 }
 
 void createDefaultConfigFile(const std::string& configfilepath, const std::string& language) {
@@ -618,7 +575,8 @@ void createDefaultConfigFile(const std::string& configfilepath, const std::strin
                                 "Sandworms Respawn = false               # If true, killed sandworms respawn after some time\n"
                                 "Killed Sandworms Drop Spice = false     # If true, killed sandworms drop some spice\n"
                                 "Manual Carryall Drops = false           # If true, player can request carryall to transport units\n"
-                                "Maximum Number of Units Override = 0    # Override the maximum number of units each house is allowed to build (-1 = use map default, 0 = unlimited, >0 = specific limit)\n";
+                                "Maximum Number of Units Override = 0    # Override the maximum number of units each house is allowed to build (-1 = use map default, 0 = unlimited, >0 = specific limit)\n"
+                                "Maximum Number of Harvesters Override = -1  # Override the maximum number of harvesters each house is allowed to build (-1 = use map size defaults from ObjectData.ini, >=0 = specific limit)\n";
 
     // replace player name, language, server port and metaserver
     std::string playername = getDefaultPlayerName();
@@ -890,6 +848,8 @@ int main(int argc, char *argv[]) {
             settings.gameOptions.killedSandwormsDropSpice = myINIFile.getBoolValue("Game Options","Killed Sandworms Drop Spice",false);
             settings.gameOptions.manualCarryallDrops = myINIFile.getBoolValue("Game Options","Manual Carryall Drops",false);
             settings.gameOptions.maximumNumberOfUnitsOverride = myINIFile.getIntValue("Game Options","Maximum Number of Units Override",0);
+            settings.gameOptions.maximumNumberOfHarvestersOverride = myINIFile.getIntValue("Game Options","Maximum Number of Harvesters Override",-1);
+            settings.gameOptions.immortalHumanPlayer = myINIFile.getBoolValue("Game Options","Immortal Human Player",false);
 
             pTextManager = std::make_unique<TextManager>();
 
@@ -998,6 +958,15 @@ int main(int argc, char *argv[]) {
             }
 
             pFileManager = std::make_unique<FileManager>();
+
+            // Initialize the mod system (seeds vanilla mod from install defaults if needed)
+            SDL_Log("Initializing mod system...");
+            ModManager::instance().initialize();
+
+            // Initialize effective game options (base settings + mod overrides)
+            effectiveGameOptions = ModManager::instance().loadEffectiveGameOptions(settings.gameOptions);
+            SDL_Log("Effective game options initialized (active mod: %s)", 
+                    ModManager::instance().getActiveModName().c_str());
 
             // Create user config files if they don't exist
             // Check and copy ObjectData.ini

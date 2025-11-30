@@ -37,12 +37,13 @@
 #include <GameInitSettings.h>
 
 #include <globals.h>
+#include <mod/ModManager.h>
 
 #include <memory>
 
 
 CustomGameMenu::CustomGameMenu(bool multiplayer, bool LANServer)
- : MenuBase(), bMultiplayer(multiplayer), bLANServer(LANServer), currentGameOptions(settings.gameOptions) {
+ : MenuBase(), bMultiplayer(multiplayer), bLANServer(LANServer), currentGameOptions(effectiveGameOptions) {
     // set up window
     SDL_Texture *pBackground = pGFXManager->getUIGraphic(UI_MenuBackground);
     setBackground(pBackground);
@@ -126,6 +127,30 @@ CustomGameMenu::CustomGameMenu(bool multiplayer, bool LANServer)
     mapPropertyValuesVBox.addWidget(&mapPropertyAuthors);
     mapPropertyNamesVBox.addWidget(Label::create(_("License") + ":"));
     mapPropertyValuesVBox.addWidget(&mapPropertyLicense);
+    
+    rightVBox.addWidget(VSpacer::create(15));
+    
+    // Mod selection
+    rightVBox.addWidget(&modHBox, 25);
+    modLabel.setText(_("Mod:"));
+    modHBox.addWidget(&modLabel, 40);
+    modHBox.addWidget(HSpacer::create(5));
+    modHBox.addWidget(&modDropDown, 130);
+    
+    // Populate mod dropdown
+    availableMods = ModManager::instance().listMods();
+    std::string activeModName = ModManager::instance().getActiveModName();
+    int activeIndex = 0;
+    for (size_t i = 0; i < availableMods.size(); i++) {
+        modDropDown.addEntry(availableMods[i].displayName);
+        if (availableMods[i].name == activeModName) {
+            activeIndex = static_cast<int>(i);
+        }
+    }
+    if (!availableMods.empty()) {
+        modDropDown.setSelectedItem(activeIndex);
+    }
+    
     rightVBox.addWidget(Spacer::create());
 
     mainVBox.addWidget(Spacer::create(), 0.05);
@@ -193,6 +218,14 @@ void CustomGameMenu::onNext()
 {
     if(mapList.getSelectedIndex() < 0) {
         return;
+    }
+
+    // Activate selected mod
+    int modIndex = modDropDown.getSelectedIndex();
+    if (modIndex >= 0 && modIndex < static_cast<int>(availableMods.size())) {
+        ModManager::instance().setActiveMod(availableMods[modIndex].name);
+        // Reload effective game options with new mod
+        effectiveGameOptions = ModManager::instance().loadEffectiveGameOptions(settings.gameOptions);
     }
 
     std::string mapFilename = currentMapDirectory + mapList.getSelectedEntry() + ".ini";

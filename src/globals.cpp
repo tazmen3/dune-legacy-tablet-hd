@@ -59,4 +59,5 @@ RobustList<Bullet*>         bulletList;
 
 // misc
 SettingsClass    settings;
+SettingsClass::GameOptionsClass effectiveGameOptions;
 bool debug = false;

@@ -94,6 +94,7 @@ EXTERN RobustList<Bullet*>         bulletList;          ///< the list of all bul
 
 // misc
 EXTERN SettingsClass    settings;                       ///< the settings read from the settings file
+EXTERN SettingsClass::GameOptionsClass effectiveGameOptions;  ///< effective game options (settings + mod overrides)
 
 EXTERN bool debug;                                      ///< is set for debugging purposes
 

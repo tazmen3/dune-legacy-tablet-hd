@@ -235,6 +235,10 @@ void QuantBot::init() {
 	// This will create the config file with defaults if it doesn't exist
 	getQuantBotConfig();
 	
+	// Clear idle harvester counters (important for loading saved games)
+    idleHarvesterCounters.clear();
+    harvesterMovingCounters.clear();
+	
 	SDL_Log("QuantBot initialized with external configuration");
 }
 
@@ -296,7 +300,9 @@ void QuantBot::update() {
 			logDebug("Initial: Item: %d  Count: %d", i, initialItemCount[i]);
 		}
 
-		if ((initialItemCount[Structure_RepairYard] == 0) && gameMode == GameMode::Campaign && currentGame && currentGame->techLevel > 4) {
+		// Allow Campaign AI (including support mode) one Repair Yard
+		// Note: supportMode sets gameMode to Custom, so check currentGame->gameType instead
+		if ((initialItemCount[Structure_RepairYard] == 0) && currentGame && currentGame->gameType == GameType::Campaign && currentGame->techLevel > 4) {
 			initialItemCount[Structure_RepairYard] = 1;
 			if (initialItemCount[Structure_Radar] == 0) {
 				initialItemCount[Structure_Radar] = 1;
@@ -306,7 +312,7 @@ void QuantBot::update() {
 				initialItemCount[Structure_LightFactory] = 1;
 			}
 
-			logDebug("Allow Campaign AI one Repair Yard");
+			logDebug("Allow Campaign AI one Repair Yard (support: %s)", supportMode ? "yes" : "no");
 		}
 
 		// Calculate the total military value of the player
@@ -382,6 +388,13 @@ void QuantBot::update() {
 		} else if (diffSettings.refineryMinimum > 0) {
 			logDebug("  Refinery check: Has %d (minimum %d already met, no top-up needed)", 
 				initialItemCount[Structure_Refinery], diffSettings.refineryMinimum);
+		}
+		
+		// Apply game options harvester override if set and lower than calculated limit
+		int harvesterOverride = currentGame->getGameInitSettings().getGameOptions().maximumNumberOfHarvestersOverride;
+		if (harvesterOverride >= 0 && harvesterOverride < harvesterLimit) {
+			logDebug("  Game Options Override: Reducing harvester limit from %d to %d", harvesterLimit, harvesterOverride);
+			harvesterLimit = harvesterOverride;
 		}
 		
 		logDebug("  FINAL: HarvesterLimit=%d, MilitaryValueLimit=%d", 
@@ -469,18 +482,18 @@ void QuantBot::update() {
 			harvesterLimit = diffSettings.harvesterLimitCustomMediumMap;
 			militaryValueLimit = diffSettings.militaryValueLimitCustomMediumMap;
 			logDebug("  Map Category: Medium (64x64)");
-		} else if (mapsize <= 16384) {
-			// Large map (128x128)
+		} else if (mapsize < 16384) {
+			// Large map (< 128x128)
 			harvesterLimit = diffSettings.harvesterLimitCustomLargeMap;
 			militaryValueLimit = diffSettings.militaryValueLimitCustomLargeMap;
-			logDebug("  Map Category: Large (128x128)");
+			logDebug("  Map Category: Large (< 128x128)");
 		} else {
-			// Huge maps (>128x128) - scale more slowly using square root
+			// Huge maps (>= 128x128) - scale more slowly using square root
 			// 256x256 (4x tiles) gets 2x harvesters/military, 512x512 (16x tiles) gets 4x, etc.
 			double scaleFactor = sqrt(mapsize / 16384.0);
 			harvesterLimit = diffSettings.harvesterLimitCustomLargeMap * scaleFactor;
 			militaryValueLimit = diffSettings.militaryValueLimitCustomLargeMap * scaleFactor;
-			logDebug("  Map Category: Huge (>128x128, scaled from Large)");
+			logDebug("  Map Category: Huge (>= 128x128, scaled from Large)");
 			logDebug("  Scale Factor: %.2fx (sqrt-based)", scaleFactor);
 		}
 		
@@ -488,6 +501,14 @@ void QuantBot::update() {
 			diffSettings.harvesterLimitCustomSmallMap, diffSettings.militaryValueLimitCustomSmallMap,
 			diffSettings.harvesterLimitCustomMediumMap, diffSettings.militaryValueLimitCustomMediumMap,
 			diffSettings.harvesterLimitCustomLargeMap, diffSettings.militaryValueLimitCustomLargeMap);
+		
+		// Apply game options harvester override if set and lower than calculated limit
+		int harvesterOverride = currentGame->getGameInitSettings().getGameOptions().maximumNumberOfHarvestersOverride;
+		if (harvesterOverride >= 0 && harvesterOverride < harvesterLimit) {
+			logDebug("  Game Options Override: Reducing harvester limit from %d to %d", harvesterLimit, harvesterOverride);
+			harvesterLimit = harvesterOverride;
+		}
+		
 		logDebug("  FINAL: HarvesterLimit=%d, MilitaryValueLimit=%d", 
 			harvesterLimit, militaryValueLimit);
 
@@ -559,35 +580,37 @@ void QuantBot::update() {
 	
 	int baseHarvesterLimit = harvesterLimit;
 	
-	if (gameMode == GameMode::Custom) {
-		// Custom mode: Get limit from config based on map size
+	// Check if harvester override is set in game options
+	int harvesterOverride = currentGame->getGameInitSettings().getGameOptions().maximumNumberOfHarvestersOverride;
+	
+	if (harvesterOverride >= 0) {
+		// Use the game options override
+		baseHarvesterLimit = harvesterOverride;
+	} else if (gameMode == GameMode::Custom) {
+		// Custom mode: Use map size defaults from ObjectData.ini
 		const int mapsize = currentGameMap->getSizeX() * currentGameMap->getSizeY();
-		if (mapsize <= 1024) {
-			baseHarvesterLimit = diffSettings.harvesterLimitCustomSmallMap;
-		} else if (mapsize <= 4096) {
-			baseHarvesterLimit = diffSettings.harvesterLimitCustomMediumMap;
-		} else if (mapsize <= 16384) {
-			baseHarvesterLimit = diffSettings.harvesterLimitCustomLargeMap;
-		} else {
-			// Huge maps (>128x128) - scale more slowly using square root
-			double scaleFactor = sqrt(mapsize / 16384.0);
-			baseHarvesterLimit = diffSettings.harvesterLimitCustomLargeMap * scaleFactor;
+		if (mapsize < 1024) {  // < 32x32
+			baseHarvesterLimit = currentGame->objectData.harvesterLimitSmallMap;
+		} else if (mapsize < 4096) {  // < 64x64
+			baseHarvesterLimit = currentGame->objectData.harvesterLimitMediumMap;
+		} else if (mapsize < 16384) {  // < 128x128
+			baseHarvesterLimit = currentGame->objectData.harvesterLimitLargeMap;
+		} else {  // >= 128x128 (Huge)
+			baseHarvesterLimit = currentGame->objectData.harvesterLimitHugeMap;
 		}
 	} else if (gameMode == GameMode::Campaign) {
 		// Campaign mode: normally baseHarvesterLimit is from multiplier * refinery count
-		// BUT Brutal difficulty uses Custom game map-size-based limits instead
+		// BUT Brutal difficulty uses map size defaults from ObjectData.ini instead
 		if (difficulty == Difficulty::Brutal) {
 			const int mapsize = currentGameMap->getSizeX() * currentGameMap->getSizeY();
-			if (mapsize <= 1024) {
-				baseHarvesterLimit = diffSettings.harvesterLimitCustomSmallMap;
-			} else if (mapsize <= 4096) {
-				baseHarvesterLimit = diffSettings.harvesterLimitCustomMediumMap;
-			} else if (mapsize <= 16384) {
-				baseHarvesterLimit = diffSettings.harvesterLimitCustomLargeMap;
-			} else {
-				// Huge maps (>128x128) - scale more slowly using square root
-				double scaleFactor = sqrt(mapsize / 16384.0);
-				baseHarvesterLimit = diffSettings.harvesterLimitCustomLargeMap * scaleFactor;
+			if (mapsize < 1024) {  // < 32x32
+				baseHarvesterLimit = currentGame->objectData.harvesterLimitSmallMap;
+			} else if (mapsize < 4096) {  // < 64x64
+				baseHarvesterLimit = currentGame->objectData.harvesterLimitMediumMap;
+			} else if (mapsize < 16384) {  // < 128x128
+				baseHarvesterLimit = currentGame->objectData.harvesterLimitLargeMap;
+			} else {  // >= 128x128 (Huge)
+				baseHarvesterLimit = currentGame->objectData.harvesterLimitHugeMap;
 			}
 		}
 		// Other difficulties keep baseHarvesterLimit from multiplier * refinery count
@@ -1744,38 +1767,14 @@ void QuantBot::build(int militaryValue) {
 			} break;
 
 		case Structure_WOR: {
-			if (!pBuilder->isUpgrading()
-				&& pBuilder->isAvailableToBuild(Unit_Trooper)
-				&& gameMode == GameMode::Campaign
-				&& (currentGame == nullptr || currentGame->techLevel <= 5)  // Only produce at lower tech
-				&& money > 1000
-				&& itemCount[Structure_HeavyFactory] == 0  // Only produce from WOR if no Heavy Factory exists
-				&& pBuilder->getProductionQueueSize() < 1
-				&& pBuilder->getBuildListSize() > 0
-				&& !getHouse()->isInfantryUnitLimitReached()
-				&& militaryValue < militaryValueLimit) {
-
-				produceItemWithLogging(Unit_Trooper);
-				itemCount[Unit_Trooper]++;
-			}
+			// QuantBot does not produce infantry from WOR - disabled
+			// Units will not be produced even if WOR exists
 		} break;
 
-			case Structure_Barracks: {
-				if (!pBuilder->isUpgrading()
-					&& pBuilder->isAvailableToBuild(Unit_Soldier)
-					&& gameMode == GameMode::Campaign
-					&& itemCount[Structure_HeavyFactory] == 0  // Only produce before heavy factory (early game)
-					&& itemCount[Structure_WOR] == 0
-					&& money > 1000
-					&& pBuilder->getProductionQueueSize() < 1
-					&& pBuilder->getBuildListSize() > 0
-					&& !getHouse()->isInfantryUnitLimitReached()
-					&& militaryValue < militaryValueLimit) {
-
-					produceItemWithLogging(Unit_Soldier);
-					itemCount[Unit_Soldier]++;
-				}
-			} break;
+		case Structure_Barracks: {
+			// QuantBot does not produce infantry from Barracks - disabled
+			// Units will not be produced even if Barracks exists
+		} break;
 
 				case Structure_HighTechFactory: {
 					int ornithopterValue = data[Unit_Ornithopter][houseID].price * itemCount[Unit_Ornithopter];
@@ -2006,10 +2005,22 @@ void QuantBot::build(int militaryValue) {
 						rocketTurretValue = 1000000; // If rocket turrets need power we don't want to build them
 					}
 
-					const ConstructionYard* pConstYard = static_cast<const ConstructionYard*>(pBuilder);
+				const ConstructionYard* pConstYard = static_cast<const ConstructionYard*>(pBuilder);
 
+				// Only log production status when something changes (not every cycle)
+				static int lastQueueSize = -1;
+				static bool lastUpgrading = false;
+				static int lastBuildListSize = -1;
+				
+				if(pBuilder->getProductionQueueSize() != lastQueueSize || 
+				   pBuilder->isUpgrading() != lastUpgrading || 
+				   pBuilder->getBuildListSize() != lastBuildListSize) {
 					logDebug("PRODUCTION: CY Status - Upgrading:%d Queue:%d Credits:%d BuildList:%d", 
 						pBuilder->isUpgrading(), pBuilder->getProductionQueueSize(), money, pBuilder->getBuildListSize());
+					lastQueueSize = pBuilder->getProductionQueueSize();
+					lastUpgrading = pBuilder->isUpgrading();
+					lastBuildListSize = pBuilder->getBuildListSize();
+				}
 
 					if (!pBuilder->isUpgrading() && getHouse()->getCredits() > 100 && (pBuilder->getProductionQueueSize() < 1) && pBuilder->getBuildListSize()) {
 
@@ -2100,17 +2111,20 @@ void QuantBot::build(int militaryValue) {
 
 									heavyFactoryRushActive = true;
 
-									auto attemptBuild = [&](Uint32 structureID, const char* logLabel, bool incrementHarvester = false) -> bool {
-										if (!pBuilder->isAvailableToBuild(structureID)) {
-											return false;
-										}
-										if (structureID == Structure_Refinery && incrementHarvester) {
+								auto attemptBuild = [&](Uint32 structureID, const char* logLabel, bool incrementHarvester = false) -> bool {
+									if (!pBuilder->isAvailableToBuild(structureID)) {
+										return false;
+									}
+									if (structureID == Structure_Refinery && incrementHarvester) {
+										// Only increment if below limit (free harvester will only spawn if below limit)
+										if (itemCount[Unit_Harvester] < harvesterLimit) {
 											itemCount[Unit_Harvester]++;
 										}
-										itemID = structureID;
-										logDebug("HEAVY-FACTORY PUSH: %s (credits: %d)", logLabel, money);
-										return true;
-									};
+									}
+									itemID = structureID;
+									logDebug("HEAVY-FACTORY PUSH: %s (credits: %d)", logLabel, money);
+									return true;
+								};
 
 									auto ensureConstructionYardReady = [&]() {
 										if (pBuilder->getHealth() < pBuilder->getMaxHealth() && !pBuilder->isRepairing()) {
@@ -2236,103 +2250,104 @@ void QuantBot::build(int militaryValue) {
 				logDebug("INSURANCE: Building baseline rocket turret (%d/2) for ornithopter defense", itemCount[Structure_RocketTurret] + 1);
 				}
 					
-					// Essential infrastructure
-					else if (!skipRemainingStructureLogic
-						&& itemCount[Structure_WindTrap] == 0 && pBuilder->isAvailableToBuild(Structure_WindTrap)) {
-							itemID = Structure_WindTrap;
-						}
-						else if (!skipRemainingStructureLogic
-						&& (itemCount[Structure_Refinery] == 0 || itemCount[Structure_Refinery] < itemCount[Unit_Harvester] / 3) 
-						&& pBuilder->isAvailableToBuild(Structure_Refinery)) {
-									itemID = Structure_Refinery;
-									itemCount[Unit_Harvester]++;
-								}
-								else if (!skipRemainingStructureLogic
-								&& itemCount[Structure_Refinery] < 4 
-								&& pBuilder->isAvailableToBuild(Structure_Refinery) 
-								&& money < 4000) {
-									itemID = Structure_Refinery;
-									itemCount[Unit_Harvester]++;
-								}
-						else if (!skipRemainingStructureLogic
-							&& itemCount[Structure_StarPort] == 0 && pBuilder->isAvailableToBuild(Structure_StarPort) && findPlaceLocation(Structure_StarPort).isValid()) {
-							itemID = Structure_StarPort;
-						}
-						// PROACTIVE: Upgrade CY to level 2 early (required for rocket turrets)
-						// Do this AFTER Starport, BEFORE Heavy Factory for earlier ornithopter defense
-						else if (!skipRemainingStructureLogic
-							&& pBuilder->getCurrentUpgradeLevel() < 2 
-							&& itemCount[Structure_StarPort] > 0
-							&& money > 1000) {
-							if (pBuilder->getHealth() < pBuilder->getMaxHealth() && !pBuilder->isRepairing()) {
-								doRepair(pBuilder);
-								logDebug("PROACTIVE: Repairing CY before upgrade (level %d, need level 2 for rocket turrets)", pBuilder->getCurrentUpgradeLevel());
-						}
-						else if (!pBuilder->isUpgrading() && pBuilder->getHealth() >= pBuilder->getMaxHealth()) {
-							doUpgrade(pBuilder);
-							logDebug("PROACTIVE: Upgrading CY to level %d (need level 2 for rocket turrets)", pBuilder->getCurrentUpgradeLevel() + 1);
-							}
-							// else: already upgrading, just wait
-						}
-					else if (!skipRemainingStructureLogic
-						&& itemCount[Structure_Radar] == 0 && pBuilder->isAvailableToBuild(Structure_Radar) && money > 500) {
-						itemID = Structure_Radar;
+				// Essential infrastructure
+				else if (!skipRemainingStructureLogic
+					&& itemCount[Structure_WindTrap] == 0 && pBuilder->isAvailableToBuild(Structure_WindTrap)) {
+						itemID = Structure_WindTrap;
 					}
+			// Build Repair Yard FIRST (immediately after WindTrap, before refineries)
+			else if (!skipRemainingStructureLogic
+				&& itemCount[Structure_RepairYard] == 0 
+				&& pBuilder->isAvailableToBuild(Structure_RepairYard)) {
+				itemID = Structure_RepairYard; // First repair yard (TOP PRIORITY)
+				logDebug("Build first Repair Yard (TOP PRIORITY after windtrap)... money: %d", money);
+			}
+			else if (!skipRemainingStructureLogic
+			&& (itemCount[Structure_Refinery] == 0 || itemCount[Structure_Refinery] < itemCount[Unit_Harvester] / 3) 
+			&& pBuilder->isAvailableToBuild(Structure_Refinery)
+			&& !(gameMode == GameMode::Campaign && itemCount[Structure_Refinery] >= 2 && itemCount[Structure_RepairYard] == 0 && currentGame && currentGame->techLevel >= 5)) {
+						itemID = Structure_Refinery;
+						// Only increment if below limit (free harvester will only spawn if below limit)
+						if (itemCount[Unit_Harvester] < harvesterLimit) {
+							itemCount[Unit_Harvester]++;
+						}
+					}
+				else if (!skipRemainingStructureLogic
+				&& gameMode != GameMode::Campaign
+				&& itemCount[Structure_Refinery] < 4 
+				&& pBuilder->isAvailableToBuild(Structure_Refinery) 
+				&& money < 4000) {
+					itemID = Structure_Refinery;
+					// Only increment if below limit (free harvester will only spawn if below limit)
+					if (itemCount[Unit_Harvester] < harvesterLimit) {
+						itemCount[Unit_Harvester]++;
+					}
+				}
+			else if (!skipRemainingStructureLogic
+				&& itemCount[Structure_Radar] == 0 && pBuilder->isAvailableToBuild(Structure_Radar) && money > 500) {
+				itemID = Structure_Radar;
+			}
+				else if (!skipRemainingStructureLogic
+					&& pBuilder->isAvailableToBuild(Structure_LightFactory)
+					&& itemCount[Structure_LightFactory] == 0 && money > 500) {
+					itemID = Structure_LightFactory; // Essential for basic units
+				}
+				else if (!skipRemainingStructureLogic
+					&& itemCount[Structure_StarPort] == 0 && pBuilder->isAvailableToBuild(Structure_StarPort) && findPlaceLocation(Structure_StarPort).isValid()
+					&& (gameMode != GameMode::Campaign || money > 1000)) {
+					itemID = Structure_StarPort;
+				}
+					// PROACTIVE: Upgrade CY to level 2 early (required for rocket turrets)
+					// Do this AFTER Starport, BEFORE Heavy Factory for earlier ornithopter defense
+					else if (!skipRemainingStructureLogic
+						&& pBuilder->getCurrentUpgradeLevel() < 2 
+						&& itemCount[Structure_StarPort] > 0
+						&& money > 1000) {
+						if (pBuilder->getHealth() < pBuilder->getMaxHealth() && !pBuilder->isRepairing()) {
+							doRepair(pBuilder);
+							logDebug("PROACTIVE: Repairing CY before upgrade (level %d, need level 2 for rocket turrets)", pBuilder->getCurrentUpgradeLevel());
+					}
+					else if (!pBuilder->isUpgrading() && pBuilder->getHealth() >= pBuilder->getMaxHealth()) {
+						doUpgrade(pBuilder);
+						logDebug("PROACTIVE: Upgrading CY to level %d (need level 2 for rocket turrets)", pBuilder->getCurrentUpgradeLevel() + 1);
+						}
+						// else: already upgrading, just wait
+					}
+				// Build Repair Yard BEFORE Heavy Factory (if we have StarPort and don't have repair yard yet)
+				else if (!skipRemainingStructureLogic
+					&& itemCount[Structure_StarPort] > 0
+					&& itemCount[Structure_RepairYard] == 0
+					&& pBuilder->isAvailableToBuild(Structure_RepairYard)) {
+					itemID = Structure_RepairYard;
+					logDebug("PRIORITY: Build Repair Yard (have StarPort, before Heavy Factory)... money: %d", money);
+				}
+				else if (!skipRemainingStructureLogic
+					&& pBuilder->isAvailableToBuild(Structure_HeavyFactory)
+					&& itemCount[Structure_HeavyFactory] == 0 && money > 1000) {
+					itemID = Structure_HeavyFactory; // First heavy factory
+					logDebug("Build first Heavy Factory... money: %d", money);
+				}
 							else if (!skipRemainingStructureLogic
-								&& pBuilder->isAvailableToBuild(Structure_LightFactory)
-								&& itemCount[Structure_LightFactory] == 0 && money > 500) {
-								itemID = Structure_LightFactory; // Essential for basic units
-							}
-					else if (!skipRemainingStructureLogic
-						&& pBuilder->isAvailableToBuild(Structure_Barracks)
-						&& itemCount[Structure_Barracks] == 0 
-						&& itemCount[Structure_LightFactory] > 0
-						&& itemCount[Structure_HeavyFactory] == 0  // Only build before heavy factory (low tech)
-						&& money > 500) {
-						itemID = Structure_Barracks; // Infantry production (early game only)
-						logDebug("Build Barracks for infantry production (early game)... money: %d", money);
-					}
-						else if (!skipRemainingStructureLogic
-							&& itemCount[Structure_RepairYard] == 0 
-							&& pBuilder->isAvailableToBuild(Structure_RepairYard) 
-							&& itemCount[Structure_HeavyFactory] == 0
-							&& itemCount[Structure_StarPort] > 0  // Only prioritize if we have starport
-							&& money < 6000  // And limited funds
-							&& money > 700) {
-							itemID = Structure_RepairYard; // Repair yard before heavy factory (when starport exists + low funds)
-							logDebug("Build first Repair Yard (starport exists, limited funds)... money: %d", money);
-						}
-						else if (!skipRemainingStructureLogic
-							&& pBuilder->isAvailableToBuild(Structure_HeavyFactory)
-							&& itemCount[Structure_HeavyFactory] == 0 && money > 1000) {
-							itemID = Structure_HeavyFactory; // First heavy factory
-							logDebug("Build first Heavy Factory... money: %d", money);
-						}
-						else if (!skipRemainingStructureLogic
-							&& itemCount[Structure_RepairYard] == 0 
-							&& pBuilder->isAvailableToBuild(Structure_RepairYard) 
-							&& money > 1000) {
-							itemID = Structure_RepairYard; // First repair yard (after heavy factory, or if conditions not met)
-							logDebug("Build first Repair Yard (after heavy factory)... money: %d", money);
-						}
-						else if (!skipRemainingStructureLogic
-							&& pBuilder->isAvailableToBuild(Structure_WOR)
-							&& itemCount[Structure_WOR] == 0
-							&& itemCount[Structure_HeavyFactory] > 0
-							&& (currentGame == nullptr || currentGame->techLevel <= 5)  // Only at lower tech levels
-							&& money > 800) {
-							itemID = Structure_WOR; // Trooper production (low-mid tech only)
-							logDebug("Build WOR for trooper production (tech <= 5)... money: %d", money);
-						}
-								else if (!skipRemainingStructureLogic
+									&& gameMode != GameMode::Campaign
+									&& itemCount[Unit_Harvester] < harvesterLimit
 									&& pBuilder->isAvailableToBuild(Structure_Refinery)
-									&& money < 4000
-									&& itemCount[Unit_Harvester] < harvesterLimit) {
+									&& money < 4000) {
 									itemID = Structure_Refinery;
-								itemCount[Unit_Harvester]++;
+								// Only increment if below limit (free harvester will only spawn if below limit)
+								if (itemCount[Unit_Harvester] < harvesterLimit) {
+									itemCount[Unit_Harvester]++;
+								}
 														}
 					// Note: CY upgrade is done proactively (after Starport, before Heavy Factory) and reactively (ornithopter counter)
 					// Rocket turrets: 2 insurance turrets built after CY level 2, then scaled up reactively if needed
+					// Build Repair Yard BEFORE High Tech (if we have Heavy Factory but no repair yard)
+					else if (!skipRemainingStructureLogic
+						&& itemCount[Structure_HeavyFactory] > 0
+						&& itemCount[Structure_RepairYard] == 0
+						&& pBuilder->isAvailableToBuild(Structure_RepairYard)) {
+						itemID = Structure_RepairYard;
+						logDebug("PRIORITY: Build Repair Yard (have Heavy Factory, before High Tech)... money: %d", money);
+					}
                         else if (itemCount[Structure_HighTechFactory] == 0
                                  && itemCount[Structure_HeavyFactory] > 0
                                  && money > 1000) {
@@ -2340,14 +2355,18 @@ void QuantBot::build(int militaryValue) {
                                     itemID = Structure_HighTechFactory;
                                 }
 							}
-							// If we need more refinerys for our harvesters or we don't have a heavy factory
-							else if (((itemCount[Structure_Refinery] * 3 < itemCount[Unit_Harvester])
-								|| (currentGame && currentGame->techLevel < 4 && itemCount[Unit_Harvester] < harvesterLimit))
-									&& pBuilder->isAvailableToBuild(Structure_Refinery)) {
-								itemID = Structure_Refinery;
+						// If we need more refinerys for our harvesters or we don't have a heavy factory
+						else if (((itemCount[Structure_Refinery] * 3 < itemCount[Unit_Harvester])
+							|| (currentGame && currentGame->techLevel < 4))
+								&& pBuilder->isAvailableToBuild(Structure_Refinery)
+								&& !(gameMode == GameMode::Campaign && itemCount[Structure_Refinery] >= 2 && itemCount[Structure_RepairYard] == 0 && currentGame && currentGame->techLevel >= 5)) {
+							itemID = Structure_Refinery;
+							// Only increment if below limit (free harvester will only spawn if below limit)
+							if (itemCount[Unit_Harvester] < harvesterLimit) {
 								itemCount[Unit_Harvester]++;
-					
 							}
+				
+						}
 							else if (itemCount[Structure_IX] == 0 && pBuilder->isAvailableToBuild(Structure_IX) && money > 1000) {
 								itemID = Structure_IX; // House of IX for special units (after essential production buildings)
 							}
@@ -2382,15 +2401,19 @@ void QuantBot::build(int militaryValue) {
 										activeHeavyFactoryCount, getHouse()->getNumItems(Structure_HeavyFactory), money, money / 4000, techLevel);
 								}
 							}
-							// If we need more refinerys for our harvesters or we don't have a heavy factory
-							else if (!skipRemainingStructureLogic
-								&& ((itemCount[Structure_Refinery] * 3.5_fix < itemCount[Unit_Harvester])
-							|| (currentGame && currentGame->techLevel < 4 && itemCount[Unit_Harvester] < harvesterLimit))
-								&& pBuilder->isAvailableToBuild(Structure_Refinery)) {
-								itemID = Structure_Refinery;
-								itemCount[Unit_Harvester]++;
-				
-							}
+					// If we need more refinerys for our harvesters or we don't have a heavy factory
+					else if (!skipRemainingStructureLogic
+						&& ((itemCount[Structure_Refinery] * 3.5_fix < itemCount[Unit_Harvester])
+					|| (currentGame && currentGame->techLevel < 4))
+						&& pBuilder->isAvailableToBuild(Structure_Refinery)
+						&& !(gameMode == GameMode::Campaign && itemCount[Structure_Refinery] >= 2 && itemCount[Structure_RepairYard] == 0 && currentGame && currentGame->techLevel >= 5)) {
+						itemID = Structure_Refinery;
+						// Only increment if below limit (free harvester will only spawn if below limit)
+						if (itemCount[Unit_Harvester] < harvesterLimit) {
+							itemCount[Unit_Harvester]++;
+						}
+		
+					}
 						else if (!skipRemainingStructureLogic
 							&& pBuilder->isAvailableToBuild(Structure_RepairYard) && money > 2000
 							&& itemCount[Structure_RepairYard] * 6000 < militaryValue) {
@@ -2769,11 +2792,17 @@ void QuantBot::attack(int militaryValue) {
 
     tryLaunchOrnithopterStrike(diffSettings, config);
 
-	// Main attack loop - check military strength threshold from config
-	FixPoint attackThreshold = FixPoint(static_cast<int>(config.attackThresholdPercent * 100)) / 100;
+	// Main attack loop - check military strength threshold
+	// Campaign mode: Use difficulty-specific threshold from config
+	// Custom mode: Use global config threshold (same for all difficulties)
+	float attackThresholdPercent = (gameMode == GameMode::Campaign) 
+		? diffSettings.attackThresholdPercent 
+		: config.attackThresholdPercent;
+	
+	FixPoint attackThreshold = FixPoint(static_cast<int>(attackThresholdPercent * 100)) / 100;
 	if (militaryValue < militaryValueLimit * attackThreshold) {
 		logDebug("Don't attack. Not enough troops: house: %d  dif: %d  mStr: %d  mLim: %d (need %.1f%%)",
-			getHouse()->getHouseID(), static_cast<Uint8>(difficulty), militaryValue, militaryValueLimit, config.attackThresholdPercent * 100.0f);
+			getHouse()->getHouseID(), static_cast<Uint8>(difficulty), militaryValue, militaryValueLimit, attackThresholdPercent * 100.0f);
 		return;
 	}
 
@@ -3370,11 +3399,45 @@ void QuantBot::retreatAllUnits() {
                             doReturn(pHarvester);
                         }
                         
-                        /* this needs to be fixed to make better, currently if they are trying to move somewhere it will trigger
-                        // Check for idle harvesters
-                        if(!pHarvester->isMoving() && !pHarvester->isHarvesting()) {
-                            doSetAttackMode(pHarvester, GUARD);
-                        }*/
+                        // Check if harvester is stuck: not moving for extended period
+                        // (Regardless of what it THINKS it's doing - harvesting/returning/idle)
+                        bool isMoving = pHarvester->isMoving();
+                        
+                        if(!isMoving) {
+                            // Harvester is not moving - increment stuck counter
+                            idleHarvesterCounters[pHarvester->getObjectID()]++;
+                            harvesterMovingCounters[pHarvester->getObjectID()] = 0; // Reset moving counter
+                            
+                            // 10 seconds at 60 fps = 600 game cycles
+                            if(idleHarvesterCounters[pHarvester->getObjectID()] >= 600) {
+                                // Harvester has been stuck for 10 seconds - take action based on spice level
+                                FixPoint spiceAmount = pHarvester->getAmountOfSpice();
+                                
+                                // If harvester has significant spice (>300 or >40% full), tell it to return
+                                if(spiceAmount > 300 || spiceAmount > (HARVESTERMAXSPICE * 2) / 5) {
+                                    SDL_Log("RESETTING STUCK HARVESTER: id=%d stuck for 10s with spice=%.1f - forcing RETURN", 
+                                        pHarvester->getObjectID(), spiceAmount.toFloat());
+                                    doReturn(pHarvester);
+                                } else {
+                                    // Low/no spice - reset to harvest mode
+                                    SDL_Log("RESETTING STUCK HARVESTER: id=%d stuck for 10s with spice=%.1f - resetting to HARVEST", 
+                                        pHarvester->getObjectID(), spiceAmount.toFloat());
+                                    doSetAttackMode(pHarvester, HARVEST);
+                                }
+                                idleHarvesterCounters[pHarvester->getObjectID()] = 0; // Reset counter
+                            }
+                        } else {
+                            // Harvester is moving - increment moving counter
+                            harvesterMovingCounters[pHarvester->getObjectID()]++;
+                            
+                            // Only reset stuck counter if continuously moving for 30+ cycles (0.5 seconds)
+                            // This ignores brief jitter/animation frames
+                            if(harvesterMovingCounters[pHarvester->getObjectID()] >= 30) {
+                                if(idleHarvesterCounters[pHarvester->getObjectID()] > 0) {
+                                    idleHarvesterCounters[pHarvester->getObjectID()] = 0;
+                                }
+                            }
+                        }
                     }
                 } break;
 

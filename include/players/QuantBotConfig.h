@@ -40,6 +40,7 @@ struct QuantBotConfig {
     struct DifficultySettings {
         // Attack behavior
         bool attackEnabled;                     // Can this difficulty attack at all?
+        float attackThresholdPercent;           // Attack when military >= X% of limit (0.0-1.0)
         bool ornithopterAttackEnabled;          // Can ornithopters attack?
         int ornithopterAttackThreshold;         // Minimum ornithopters needed to attack
         float attackForceMilitaryValueRatio;    // Max % of military value to send per attack (0.0-1.0)

@@ -92,6 +92,15 @@ std::string readCompleteFile(const std::string& filename);
 
 
 /**
+    Writes a complete string to a file.
+    \param  filename    the path to the file to write
+    \param  content     the string content to write to the file
+    \return true on success, false on failure
+*/
+bool writeCompleteFile(const std::string& filename, const std::string& content);
+
+
+/**
     Returns the base name of a file without the leading path and if specified without the trailing extension.
     e.g. "/home/user/test.txt" -> "test.txt" or "test"
     \param  filepath        the pathname of the file
@@ -113,5 +122,34 @@ std::string getDirname(const std::string& filepath);
     \return the data directory
 */
 std::string getDuneLegacyDataDir();
+
+/**
+    Creates a directory (and any parent directories needed).
+    \param path the directory path to create
+    \return true if created successfully or already exists
+*/
+bool createDir(const std::string& path);
+
+/**
+    Copies a file from source to destination.
+    \param src source file path
+    \param dst destination file path
+    \return true on success
+*/
+bool copyFile(const std::string& src, const std::string& dst);
+
+/**
+    Deletes a file.
+    \param path file path to delete
+    \return true on success
+*/
+bool deleteFile(const std::string& path);
+
+/**
+    Returns a list of subdirectory names in the given directory.
+    \param directory the directory to list
+    \return list of subdirectory names (not full paths)
+*/
+std::list<std::string> getDirectoryList(const std::string& directory);
 
 #endif //FILESYSTEM_H

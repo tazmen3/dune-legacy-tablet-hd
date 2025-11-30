@@ -79,6 +79,7 @@ private:
     Checkbox sandwormsRespawnCheckbox;              ///< If checked killed sandworms respawn after some time
     Checkbox killedSandwormsDropSpiceCheckbox;      ///< If checked killed sandworms drop some spice
     Checkbox manualCarryallDropsCheckbox;           ///< If checked player can request carryall to transport units
+    Checkbox immortalHumanPlayerCheckbox;           ///< If checked human-controlled units and structures are invulnerable (god mode / cheat)
     HBox            gameSpeedHBox;                  ///< The HBox containing the game speed selection
     PictureButton   gameSpeedPlus;                  ///< The button for increasing the game speed
     PictureButton   gameSpeedMinus;                 ///< The button for decreasing the game speed
@@ -86,6 +87,9 @@ private:
     HBox            maxUnitsOverrideHBox;           ///< The HBox containing the override option for the maximum number of units
     Checkbox        maxUnitsOverrideCheckbox;       ///< If checked the maximum number of units is set directly, otherwise it is determined by the map
     DigitsTextBox   maxUnitsOverrideTextBox;        ///< The maximum number of units
+    HBox            maxHarvestersOverrideHBox;      ///< The HBox containing the override option for the maximum number of harvesters
+    Checkbox        maxHarvestersOverrideCheckbox;  ///< If checked the maximum number of harvesters is set directly, otherwise it is determined by map size from ObjectData.ini
+    DigitsTextBox   maxHarvestersOverrideTextBox;   ///< The maximum number of harvesters
     TextButton okbutton;                            ///< the ok button
 };
 

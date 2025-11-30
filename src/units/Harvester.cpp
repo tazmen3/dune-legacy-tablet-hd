@@ -467,36 +467,11 @@ void Harvester::move()
     
     // Log harvesters sitting on spice tiles
     static std::map<Uint32, int> onSpiceCounter;
-    if(active && harvestingMode && location == destination && pathList.empty()) {
-        Tile* tile = currentGameMap->getTile(location);
-        if(tile->hasSpice()) {
-            onSpiceCounter[getObjectID()]++;
-            if(onSpiceCounter[getObjectID()] == 300) { // 5 seconds
-                SDL_Log("HARVEST: id=%d ON SPICE but moving=%d justStopped=%d", 
-                        getObjectID(), moving ? 1 : 0, justStoppedMoving ? 1 : 0);
-            }
-        }
-    } else {
-        onSpiceCounter[getObjectID()] = 0;
-    }
+    // Track if harvester is on spice but not moving (removed spammy logging)
 
     if(active && !moving && !justStoppedMoving) {
         if(harvestingMode) {
-            // Track stuck harvesters in harvesting mode
-            static std::map<Uint32, int> harvestStuckCounter;
-            if(location == destination && pathList.empty()) {
-                harvestStuckCounter[getObjectID()]++;
-                if(harvestStuckCounter[getObjectID()] == 300) { // 5 seconds
-                    Tile* tile = currentGameMap->getTile(location);
-                    SDL_Log("HARVEST STUCK in move(): id=%d loc=(%d,%d) hasSpice=%d spice=%.1f active=%d moving=%d justStopped=%d",
-                            getObjectID(), location.x, location.y,
-                            tile->hasSpice() ? 1 : 0, spice.toFloat(),
-                            active ? 1 : 0, moving ? 1 : 0, justStoppedMoving ? 1 : 0);
-                }
-            } else {
-                harvestStuckCounter[getObjectID()] = 0;
-            }
-
+            // Track stuck harvesters (removed spammy 5-second logging)
             if(location == destination) {
                 if(spice < HARVESTERMAXSPICE) {
 

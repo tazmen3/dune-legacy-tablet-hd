@@ -349,6 +349,28 @@ std::string readCompleteFile(const std::string& filename) {
     return retValue;
 }
 
+bool writeCompleteFile(const std::string& filename, const std::string& content) {
+    auto RWopsFile = sdl2::RWops_ptr{ SDL_RWFromFile(filename.c_str(),"wb") };
+
+    if(!RWopsFile) {
+        SDL_Log("writeCompleteFile: Failed to open file '%s' for writing: %s", filename.c_str(), SDL_GetError());
+        return false;
+    }
+
+    if(content.empty()) {
+        // Empty file is still valid
+        return true;
+    }
+
+    size_t bytesWritten = SDL_RWwrite(RWopsFile.get(), content.c_str(), 1, content.size());
+    if(bytesWritten != content.size()) {
+        SDL_Log("writeCompleteFile: Failed to write complete file '%s': %s", filename.c_str(), SDL_GetError());
+        return false;
+    }
+
+    return true;
+}
+
 std::string getBasename(const std::string& filepath, bool bStripExtension) {
 
     if(filepath == "/") {
@@ -402,6 +424,174 @@ std::string getDirname(const std::string& filepath) {
     return filepath.substr(0, dirEndPos+1);
 }
 
+bool createDir(const std::string& path) {
+    if(path.empty()) {
+        return false;
+    }
+
+#ifdef _WIN32
+    // Convert UTF-8 to wide string for Windows
+    WCHAR wszPath[MAX_PATH];
+    if(MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wszPath, MAX_PATH) == 0) {
+        SDL_Log("createDir: Failed to convert path to wide string");
+        return false;
+    }
+    
+    // Try to create the directory
+    if(CreateDirectoryW(wszPath, nullptr)) {
+        return true;
+    }
+    
+    DWORD error = GetLastError();
+    if(error == ERROR_ALREADY_EXISTS) {
+        return true;  // Directory already exists
+    }
+    
+    if(error == ERROR_PATH_NOT_FOUND) {
+        // Need to create parent directories
+        std::string parentPath = getDirname(path);
+        if(!parentPath.empty() && parentPath != path) {
+            if(createDir(parentPath)) {
+                // Now try again
+                if(CreateDirectoryW(wszPath, nullptr)) {
+                    return true;
+                }
+                if(GetLastError() == ERROR_ALREADY_EXISTS) {
+                    return true;
+                }
+            }
+        }
+    }
+    
+    SDL_Log("createDir: Failed to create directory '%s': error %lu", path.c_str(), error);
+    return false;
+#else
+    // POSIX - try mkdir, recursively create parents if needed
+    if(mkdir(path.c_str(), 0755) == 0) {
+        return true;
+    }
+    
+    if(errno == EEXIST) {
+        // Check if it's actually a directory
+        struct stat st;
+        if(stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+            return true;
+        }
+        return false;  // Exists but not a directory
+    }
+    
+    if(errno == ENOENT) {
+        // Parent doesn't exist, create it
+        std::string parentPath = getDirname(path);
+        if(!parentPath.empty() && parentPath != path && parentPath != ".") {
+            if(createDir(parentPath)) {
+                // Try again
+                if(mkdir(path.c_str(), 0755) == 0) {
+                    return true;
+                }
+                if(errno == EEXIST) {
+                    return true;
+                }
+            }
+        }
+    }
+    
+    SDL_Log("createDir: Failed to create directory '%s': %s", path.c_str(), strerror(errno));
+    return false;
+#endif
+}
+
+bool copyFile(const std::string& src, const std::string& dst) {
+    // Read source file
+    std::string content = readCompleteFile(src);
+    if(content.empty() && !existsFile(src)) {
+        SDL_Log("copyFile: Source file '%s' does not exist or is empty", src.c_str());
+        return false;
+    }
+    
+    // Write to destination
+    return writeCompleteFile(dst, content);
+}
+
+bool deleteFile(const std::string& path) {
+    if(remove(path.c_str()) == 0) {
+        return true;
+    }
+    
+    if(errno == ENOENT) {
+        return true;  // Already doesn't exist
+    }
+    
+    SDL_Log("deleteFile: Failed to delete '%s': %s", path.c_str(), strerror(errno));
+    return false;
+}
+
+std::list<std::string> getDirectoryList(const std::string& directory) {
+    std::list<std::string> dirs;
+    
+    SDL_Log("getDirectoryList: scanning '%s'", directory.c_str());
+
+#ifdef _WIN32
+    WCHAR wszPath[MAX_PATH];
+    if(MultiByteToWideChar(CP_UTF8, 0, directory.c_str(), -1, wszPath, MAX_PATH) == 0) {
+        SDL_Log("getDirectoryList: Conversion from utf-8 to utf-16 failed!");
+        return dirs;
+    }
+
+    char szPath[MAX_PATH];
+    if(WideCharToMultiByte(CP_ACP, 0, wszPath, -1, szPath, MAX_PATH, nullptr, nullptr) == 0) {
+        SDL_Log("getDirectoryList: Conversion from utf-16 to ansi failed!");
+        return dirs;
+    }
+
+    _finddata_t fdata;
+    std::string searchString = std::string(szPath) + "/*";
+    intptr_t hFile = (intptr_t)_findfirst(searchString.c_str(), &fdata);
+    
+    if(hFile != -1L) {
+        do {
+            if(fdata.attrib & _A_SUBDIR) {
+                std::string name = fdata.name;
+                if(name != "." && name != "..") {
+                    // Convert ansi to utf-8
+                    WCHAR wszName[MAX_PATH];
+                    char szName[MAX_PATH];
+                    if(MultiByteToWideChar(CP_ACP, 0, name.c_str(), -1, wszName, MAX_PATH) != 0 &&
+                       WideCharToMultiByte(CP_UTF8, 0, wszName, -1, szName, MAX_PATH, nullptr, nullptr) != 0) {
+                        dirs.push_back(szName);
+                    }
+                }
+            }
+        } while(_findnext(hFile, &fdata) == 0);
+        _findclose(hFile);
+    }
+#else
+    DIR* dir = opendir(directory.c_str());
+    if(dir == nullptr) {
+        return dirs;
+    }
+
+    dirent* entry;
+    while((entry = readdir(dir)) != nullptr) {
+        std::string name = entry->d_name;
+        if(name == "." || name == "..") {
+            continue;
+        }
+        
+        // Check if it's a directory
+        std::string fullPath = directory + "/" + name;
+        struct stat st;
+        if(stat(fullPath.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+            dirs.push_back(name);
+        }
+    }
+    closedir(dir);
+#endif
+
+    SDL_Log("getDirectoryList: found %zu directories", dirs.size());
+    return dirs;
+}
+
 static std::string duneLegacyDataDir;
 
 std::string getDuneLegacyDataDir() {
@@ -419,6 +609,24 @@ std::string getDuneLegacyDataDir() {
             }
             dataDir = std::string(basePath);
             SDL_free(basePath);
+            
+#ifdef __APPLE__
+            // On macOS app bundles, SDL_GetBasePath() returns Contents/MacOS/
+            // but data files are in Contents/Resources/
+            // Check if we're in an app bundle and adjust path
+            if(dataDir.find(".app/Contents/MacOS") != std::string::npos) {
+                // Remove trailing slash if present
+                if(!dataDir.empty() && dataDir.back() == '/') {
+                    dataDir.pop_back();
+                }
+                // Go up from MacOS and into Resources
+                size_t pos = dataDir.rfind("/MacOS");
+                if(pos != std::string::npos) {
+                    dataDir = dataDir.substr(0, pos) + "/Resources/";
+                    SDL_Log("Adjusted data dir for macOS app bundle: %s", dataDir.c_str());
+                }
+            }
+#endif
         }
 
         duneLegacyDataDir = dataDir;

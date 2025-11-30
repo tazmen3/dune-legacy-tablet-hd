@@ -38,6 +38,7 @@
 
 #include <string>
 #include <list>
+#include <set>
 
 #include "MenuBase.h"
 
@@ -62,6 +63,10 @@ private:
 
     void onReceiveChatMessage(const std::string& name, const std::string& message);
     void onConfigMismatch(const std::string& errorMessage);
+    void onReceiveModInfo(const std::string& modName, const std::string& modChecksum);
+    void onModDownloadComplete(bool success, const std::string& data);
+    void onReceiveModAck(const std::string& playerName, bool success, const std::string& modChecksum);
+    void checkAllClientsReady();
     void onPeerDisconnected(const std::string& playername, bool bHost, int cause);
 
     void extractMapInfo(INIFile* pMap);
@@ -116,6 +121,7 @@ private:
     Label           mapPropertyPlayers;
     Label           mapPropertyAuthors;
     Label           mapPropertyLicense;
+    Label           mapPropertyMod;
 
     // bottom row of buttons
     HBox            buttonHBox;
@@ -149,6 +155,11 @@ private:
     std::list<HOUSETYPE>    boundHousesOnMap;
     Uint32                  startGameTime;
     bool                    bConfigMismatchDetected;
+    std::string             hostModName;                ///< The mod name sent by the host
+    std::string             hostModChecksum;            ///< The mod checksum sent by the host
+    bool                    bModDownloadInProgress;     ///< Whether mod download is in progress
+    std::set<std::string>   clientsAckedMod;            ///< Clients that have acknowledged mod sync (host only)
+    bool                    bWaitingForModAcks;         ///< Whether host is waiting for mod ACKs
     int                     brainEqHumanSlot;           ///< If we have an old map with Brain=Human and Brain=CPU, store index of Brain=Human here
     int                     slotToTeam[NUM_HOUSES];     ///< Maps the slot number to a team number (both zero-based indices)
 };

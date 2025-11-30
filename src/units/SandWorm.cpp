@@ -115,6 +115,24 @@ void Sandworm::assignToMap(const Coord& pos) {
 bool Sandworm::attack() {
     if(primaryWeaponTimer == 0) {
         if(target) {
+            // Check if target is an immortal human-controlled unit
+            ObjectBase* pTarget = target.getObjPointer();
+            if(pTarget) {
+                GameType gameType = currentGame->getGameInitSettings().getGameType();
+                bool targetIsImmortal = (gameType != GameType::CustomMultiplayer 
+                                        && gameType != GameType::LoadMultiplayer
+                                        && currentGame->getGameInitSettings().getGameOptions().immortalHumanPlayer
+                                        && pTarget->getOwner() == pLocalHouse);
+                
+                if(targetIsImmortal) {
+                    // Sandworm dies trying to eat an immortal unit (chokes on it)
+                    // Skip attack animation and immediately trigger sleep/die
+                    kills = 3; // Set to max so it triggers death/sleep
+                    sleepOrDie();
+                    return false;
+                }
+            }
+            
             soundPlayer->playSoundAt(Sound_WormAttack, location);
             drawnFrame = 0;
             attackFrameTimer = SANDWORM_ATTACKFRAMETIME;

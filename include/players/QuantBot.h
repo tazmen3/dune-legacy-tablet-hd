@@ -24,6 +24,7 @@
 
 #include <DataTypes.h>
 #include <set>
+#include <map>
 
 class QuantBot : public Player
 {
@@ -95,6 +96,9 @@ private:
     bool heavyFactoryRushActive = false;
     bool supportMode = false;
     Uint32 lastStatsLogCycle = 0;
+    
+    std::map<Uint32, int> idleHarvesterCounters; ///< Track idle time for each harvester (objectID -> cycle count)
+    std::map<Uint32, int> harvesterMovingCounters; ///< Track continuous movement time (objectID -> cycle count)
 
     void scrambleUnitsAndDefend(const ObjectBase* pIntruder, int numUnits = std::numeric_limits<int>::max());
 

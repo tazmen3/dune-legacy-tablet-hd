@@ -93,6 +93,13 @@ public:
     */
     void logSettings() const;
 
+    /**
+        Returns a hash of all object data for multiplayer verification.
+        This hashes the in-memory loaded values, not the raw file text.
+        \return 16-character hex string (FNV-1a hash)
+    */
+    std::string getEffectiveHash() const;
+
     struct ObjectDataStruct {
         bool     enabled;                                             ///< is this unit/structure available?
         Sint32   hitpoints;                                           ///< what is the maximum health of this unit/structure?
@@ -114,6 +121,12 @@ public:
     };
 
     ObjectDataStruct data[Num_ItemID][NUM_HOUSES];      ///< here is all the data stored. It is public for easy and fast access. Use only read-only.
+
+    // Map settings
+    int harvesterLimitSmallMap;      ///< Max harvesters for small maps (32x32 or smaller)
+    int harvesterLimitMediumMap;     ///< Max harvesters for medium maps (64x64 or smaller)
+    int harvesterLimitLargeMap;      ///< Max harvesters for large maps (between 64x64 and 128x128)
+    int harvesterLimitHugeMap;       ///< Max harvesters for huge maps (128x128 or larger)
 
 private:
 

@@ -27,6 +27,9 @@
 #include <misc/FileSystem.h>
 #include <main.h>
 
+#include <cstdint>
+#include <cstdio>
+
 ObjectData::ObjectData()
 {
     // set default values
@@ -51,6 +54,12 @@ ObjectData::ObjectData()
             data[i][h].upgradeLevel = 0;
         }
     }
+    
+    // Initialize map settings with defaults
+    harvesterLimitSmallMap = 5;
+    harvesterLimitMediumMap = 10;
+    harvesterLimitLargeMap = 15;
+    harvesterLimitHugeMap = 40;
 }
 
 ObjectData::~ObjectData() = default;
@@ -157,6 +166,16 @@ void ObjectData::loadFromINIFile(const std::string& filename)
     }
     
     std::string loadedPath = loadedFrom;
+
+    // Load map settings
+    if (objectDataFile->hasSection("Map Settings")) {
+        harvesterLimitSmallMap = objectDataFile->getIntValue("Map Settings", "HarvesterLimitSmallMap", 5);
+        harvesterLimitMediumMap = objectDataFile->getIntValue("Map Settings", "HarvesterLimitMediumMap", 10);
+        harvesterLimitLargeMap = objectDataFile->getIntValue("Map Settings", "HarvesterLimitLargeMap", 15);
+        harvesterLimitHugeMap = objectDataFile->getIntValue("Map Settings", "HarvesterLimitHugeMap", 40);
+        SDL_Log("[ObjectData] Harvester limits: Small=%d, Medium=%d, Large=%d, Huge=%d", 
+                harvesterLimitSmallMap, harvesterLimitMediumMap, harvesterLimitLargeMap, harvesterLimitHugeMap);
+    }
 
     // load default structure values
     ObjectDataStruct structureDefaultData[NUM_HOUSES];
@@ -280,6 +299,12 @@ void ObjectData::save(OutputStream& stream) const
             stream.writeSint8(data[i][h].upgradeLevel);
         }
     }
+    
+    // Save map settings
+    stream.writeSint32(harvesterLimitSmallMap);
+    stream.writeSint32(harvesterLimitMediumMap);
+    stream.writeSint32(harvesterLimitLargeMap);
+    stream.writeSint32(harvesterLimitHugeMap);
 }
 
 void ObjectData::load(InputStream& stream)
@@ -305,6 +330,12 @@ void ObjectData::load(InputStream& stream)
             data[i][h].upgradeLevel = stream.readSint8();
         }
     }
+    
+    // Load map settings
+    harvesterLimitSmallMap = stream.readSint32();
+    harvesterLimitMediumMap = stream.readSint32();
+    harvesterLimitLargeMap = stream.readSint32();
+    harvesterLimitHugeMap = stream.readSint32();
 }
 
 int ObjectData::loadIntValue(const INIFile& objectDataFile, const std::string& section, const std::string& key, char houseChar, int defaultValue) {
@@ -389,4 +420,56 @@ std::bitset<Structure_LastID + 1> ObjectData::loadPrerequisiteStructuresSet(cons
     }
 
     return resultSet;
+}
+
+std::string ObjectData::getEffectiveHash() const {
+    // Build a string from all gameplay-affecting in-memory values
+    std::string dataStr;
+    
+    // Hash all unit/structure data for all houses
+    for (int itemID = 0; itemID < Num_ItemID; itemID++) {
+        for (int houseID = 0; houseID < NUM_HOUSES; houseID++) {
+            const ObjectDataStruct& obj = data[itemID][houseID];
+            
+            // Add all gameplay-affecting fields
+            dataStr += std::to_string(itemID);
+            dataStr += std::to_string(houseID);
+            dataStr += std::to_string(obj.enabled);
+            dataStr += std::to_string(obj.hitpoints);
+            dataStr += std::to_string(obj.price);
+            dataStr += std::to_string(obj.power);
+            dataStr += std::to_string(obj.viewrange);
+            dataStr += std::to_string(obj.capacity);
+            dataStr += std::to_string(obj.weapondamage);
+            dataStr += std::to_string(obj.weaponrange);
+            dataStr += std::to_string(obj.weaponreloadtime);
+            dataStr += std::to_string(obj.maxspeed.getRawValue());
+            dataStr += std::to_string(obj.turnspeed.getRawValue());
+            dataStr += std::to_string(obj.buildtime);
+            dataStr += std::to_string(obj.infspawnprop);
+            dataStr += std::to_string(obj.builder);
+            dataStr += obj.prerequisiteStructuresSet.to_string();
+            dataStr += std::to_string(obj.techLevel);
+            dataStr += std::to_string(obj.upgradeLevel);
+        }
+    }
+    
+    // Also hash map settings
+    dataStr += std::to_string(harvesterLimitSmallMap);
+    dataStr += std::to_string(harvesterLimitMediumMap);
+    dataStr += std::to_string(harvesterLimitLargeMap);
+    dataStr += std::to_string(harvesterLimitHugeMap);
+    
+    // FNV-1a hash (consistent across platforms)
+    uint64_t hash = 14695981039346656037ULL;
+    const uint64_t prime = 1099511628211ULL;
+    
+    for (char c : dataStr) {
+        hash ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
+        hash *= prime;
+    }
+    
+    char hashStr[17];
+    snprintf(hashStr, sizeof(hashStr), "%016llx", (unsigned long long)hash);
+    return std::string(hashStr);
 }

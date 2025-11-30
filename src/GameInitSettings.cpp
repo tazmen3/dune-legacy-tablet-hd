@@ -19,20 +19,35 @@
 
 #include <misc/IFileStream.h>
 #include <misc/IMemoryStream.h>
+#include <misc/InputStream.h>
 #include <misc/string_util.h>
 #include <misc/exceptions.h>
 #include <mmath.h>
 
 #include <globals.h>
+#include <mod/ModManager.h>
+
+// Helper to capture current mod info
+static void setModInfo(std::string& modName, std::string& modChecksum) {
+    if (ModManager::instance().isInitialized()) {
+        modName = ModManager::instance().getActiveModName();
+        modChecksum = ModManager::instance().getEffectiveChecksums().combined;
+    } else {
+        modName = "vanilla";
+        modChecksum = "";
+    }
+}
 
 GameInitSettings::GameInitSettings() {
     randomSeed = getRandomInt();
+    setModInfo(modName, modChecksum);
 }
 
 GameInitSettings::GameInitSettings(HOUSETYPE newHouseID, const SettingsClass::GameOptionsClass& gameOptions)
  : gameType(GameType::Campaign), houseID(newHouseID), mission(1), alreadyShownTutorialHints(0), gameOptions(gameOptions) {
     filename = getScenarioFilename(houseID, mission);
     randomSeed = getRandomInt();
+    setModInfo(modName, modChecksum);
 }
 
 GameInitSettings::GameInitSettings(const GameInitSettings& prevGameInitInfoClass, int nextMission, Uint32 alreadyPlayedRegions, Uint32 alreadyShownTutorialHints) {
@@ -48,16 +63,19 @@ GameInitSettings::GameInitSettings(HOUSETYPE newHouseID, int newMission, const S
  : gameType(GameType::Skirmish), houseID(newHouseID), mission(newMission), gameOptions(gameOptions) {
     filename = getScenarioFilename(houseID, mission);
     randomSeed = getRandomInt();
+    setModInfo(modName, modChecksum);
 }
 
 GameInitSettings::GameInitSettings(const std::string& mapfile, const std::string& filedata, bool multiplePlayersPerHouse, const SettingsClass::GameOptionsClass& gameOptions)
  : gameType(GameType::CustomGame), filename(mapfile), filedata(filedata), multiplePlayersPerHouse(multiplePlayersPerHouse), gameOptions(gameOptions) {
     randomSeed = getRandomInt();
+    setModInfo(modName, modChecksum);
 }
 
 GameInitSettings::GameInitSettings(const std::string& mapfile, const std::string& filedata, const std::string& serverName, bool multiplePlayersPerHouse, const SettingsClass::GameOptionsClass& gameOptions)
  : gameType(GameType::CustomMultiplayer), filename(mapfile), filedata(filedata), servername(serverName), multiplePlayersPerHouse(multiplePlayersPerHouse), gameOptions(gameOptions) {
     randomSeed = getRandomInt();
+    setModInfo(modName, modChecksum);
 }
 
 GameInitSettings::GameInitSettings(const std::string& savegame)
@@ -97,10 +115,26 @@ GameInitSettings::GameInitSettings(InputStream& stream) {
     gameOptions.killedSandwormsDropSpice = stream.readBool();
     gameOptions.manualCarryallDrops = stream.readBool();
     gameOptions.maximumNumberOfUnitsOverride = stream.readSint32();
+    gameOptions.maximumNumberOfHarvestersOverride = stream.readSint32();
+    gameOptions.immortalHumanPlayer = stream.readBool();
 
     Uint32 numHouseInfo = stream.readUint32();
     for(Uint32 i=0;i<numHouseInfo;i++) {
         houseInfoList.push_back(HouseInfo(stream));
+    }
+    
+    // Read mod info (added in version with mod system)
+    // Use marker to detect presence for backward compatibility
+    try {
+        Uint32 modMarker = stream.readUint32();
+        if (modMarker == 0x4D4F4421) {  // "MOD!" marker
+            modName = stream.readString();
+            modChecksum = stream.readString();
+        }
+    } catch (InputStream::eof&) {
+        // Old format without mod info - use defaults
+        modName = "vanilla";
+        modChecksum = "";
     }
 }
 
@@ -132,11 +166,18 @@ void GameInitSettings::save(OutputStream& stream) const {
     stream.writeBool(gameOptions.killedSandwormsDropSpice);
     stream.writeBool(gameOptions.manualCarryallDrops);
     stream.writeSint32(gameOptions.maximumNumberOfUnitsOverride);
+    stream.writeSint32(gameOptions.maximumNumberOfHarvestersOverride);
+    stream.writeBool(gameOptions.immortalHumanPlayer);
 
     stream.writeUint32(houseInfoList.size());
     for(const HouseInfo& houseInfo : houseInfoList) {
         houseInfo.save(stream);
     }
+    
+    // Write mod info with marker for forward compatibility
+    stream.writeUint32(0x4D4F4421);  // "MOD!" marker
+    stream.writeString(modName);
+    stream.writeString(modChecksum);
 }
 
 

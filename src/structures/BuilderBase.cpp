@@ -198,6 +198,11 @@ bool BuilderBase::isUnitLimitReached(Uint32 itemID) const {
         return false;
     }
 
+    // Check harvester-specific limit first
+    if(itemID == Unit_Harvester) {
+        return getOwner()->isHarvesterLimitReached();
+    }
+
     if(isInfantryUnit(itemID)) {
         return getOwner()->isInfantryUnitLimitReached();
     } else if(isFlyingUnit(itemID)) {

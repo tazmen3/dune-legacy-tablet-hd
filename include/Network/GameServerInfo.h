@@ -29,6 +29,8 @@ public:
     std::string serverName;
     std::string serverVersion;
     std::string mapName;
+    std::string modName;          // Active mod name (e.g., "vanilla", "balanced-warfare")
+    std::string modVersion;       // Active mod version (user-defined)
     int numPlayers;
     int maxPlayers;
     bool bPasswordProtected;

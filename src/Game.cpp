@@ -50,6 +50,7 @@ std::mutex Game::performanceLogMutex;
 #include <players/HumanPlayer.h>
 
 #include <Network/NetworkManager.h>
+#include <mod/ModManager.h>
 
 #include <GUI/dune/InGameMenu.h>
 #include <GUI/dune/WaitingForOtherPlayers.h>
@@ -2789,6 +2790,34 @@ bool Game::loadSaveGame(InputStream& stream) {
 
     std::string duneVersion = stream.readString();
 
+    // Read mod info (version 9806+)
+    std::string savedModName = "vanilla";
+    std::string savedModChecksum = "";
+    if (savegameVersion >= 9806) {
+        savedModName = stream.readString();
+        savedModChecksum = stream.readString();
+        
+        // Check if save was created with a different mod
+        std::string currentModName = ModManager::instance().getActiveModName();
+        std::string currentChecksum = ModManager::instance().getEffectiveChecksums().combined;
+        
+        if (savedModChecksum != currentChecksum) {
+            SDL_Log("Game::loadSaveGame(): Save mod mismatch detected");
+            SDL_Log("  Save mod: %s (checksum: %s)", savedModName.c_str(), savedModChecksum.c_str());
+            SDL_Log("  Current mod: %s (checksum: %s)", currentModName.c_str(), currentChecksum.c_str());
+            
+            // Check if the required mod exists
+            if (!ModManager::instance().modExists(savedModName)) {
+                SDL_Log("Game::loadSaveGame(): Required mod '%s' not found!", savedModName.c_str());
+                // For now, log warning and continue - full enforcement would require UI dialog
+                SDL_Log("Game::loadSaveGame(): WARNING - Loading with different mod may cause issues");
+            } else {
+                SDL_Log("Game::loadSaveGame(): WARNING - Save uses mod '%s' but '%s' is active", 
+                        savedModName.c_str(), currentModName.c_str());
+            }
+        }
+    }
+
     // if this is a multiplayer load we need to save some information before we overwrite gameInitSettings with the settings saved in the savegame
     bool bMultiplayerLoad = (gameInitSettings.getGameType() == GameType::LoadMultiplayer);
     GameInitSettings::HouseInfoList oldHouseInfoList = gameInitSettings.getHouseInfoList();
@@ -2936,6 +2965,10 @@ bool Game::saveGame(const std::string& filename)
     fs.writeUint32(SAVEGAMEVERSION);
 
     fs.writeString(VERSIONSTRING);
+
+    // Write mod info for save compatibility (version 9806+)
+    fs.writeString(ModManager::instance().getActiveModName());
+    fs.writeString(ModManager::instance().getEffectiveChecksums().combined);
 
     // write gameInitSettings
     gameInitSettings.save(fs);
@@ -3264,6 +3297,17 @@ void Game::handleChatInput(SDL_KeyboardEvent& keyboardEvent) {
                 if (gameType != GameType::CustomMultiplayer) {
                     pInterface->getChatManager().addInfoMessage("You got some credits");
                     pLocalHouse->returnCredits(10000);
+                }
+            } else if(md5string == "0x05362BF626E467A93FFE6FF0D8A899E3") {
+                // Toggle immortality cheat (muaddib) - works in single-player only, no cheat mode required
+                if (gameType != GameType::CustomMultiplayer && gameType != GameType::LoadMultiplayer) {
+                    bool currentState = gameInitSettings.getGameOptions().immortalHumanPlayer;
+                    gameInitSettings.setImmortalHumanPlayer(!currentState);
+                    if(!currentState) {
+                        pInterface->getChatManager().addInfoMessage("God mode: Immortality enabled");
+                    } else {
+                        pInterface->getChatManager().addInfoMessage("God mode: Immortality disabled");
+                    }
                 }
             } else {
                 if(pNetworkManager != nullptr) {

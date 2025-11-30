@@ -434,9 +434,26 @@ void INIMapLoader::loadHouses()
             maxUnits = inifile->getIntValue(houseName,"MaxUnits",maxUnit);
         }
 
+        int maxHarvesters = 0;
+        if(currentGame->getGameInitSettings().getGameOptions().maximumNumberOfHarvestersOverride >= 0) {
+            maxHarvesters = currentGame->getGameInitSettings().getGameOptions().maximumNumberOfHarvestersOverride;
+        } else {
+            // Use map size defaults from ObjectData.ini
+            const int mapsize = currentGameMap->getSizeX() * currentGameMap->getSizeY();
+            if (mapsize <= 1024) {
+                maxHarvesters = currentGame->objectData.harvesterLimitSmallMap;
+            } else if (mapsize < 4096) {
+                maxHarvesters = currentGame->objectData.harvesterLimitMediumMap;
+            } else if (mapsize < 16384) {
+                maxHarvesters = currentGame->objectData.harvesterLimitLargeMap;
+            } else {
+                maxHarvesters = currentGame->objectData.harvesterLimitHugeMap;
+            }
+        }
+
         int quota = inifile->getIntValue(houseName,"Quota",0);
 
-        pGame->house[houseID] = std::make_unique<House>(houseID, startingCredits, maxUnits, houseInfo.team, quota);
+        pGame->house[houseID] = std::make_unique<House>(houseID, startingCredits, maxUnits, maxHarvesters, houseInfo.team, quota);
         House* pNewHouse = pGame->house[houseID].get();
 
         // add players
@@ -921,7 +938,24 @@ House* INIMapLoader::getOrCreateHouse(int houseID) {
         } else {
             maxUnits = std::min(40, 20 * (currentGameMap->getSizeX() * currentGameMap->getSizeY()) / (32 * 32));
         }
-        auto pNewHouse = std::make_unique<House>(houseID, 0, maxUnits, team, 0);
+
+        int maxHarvesters = 0;
+        if(currentGame->getGameInitSettings().getGameOptions().maximumNumberOfHarvestersOverride >= 0) {
+            maxHarvesters = currentGame->getGameInitSettings().getGameOptions().maximumNumberOfHarvestersOverride;
+        } else {
+            // Use map size defaults from ObjectData.ini
+            const int mapsize = currentGameMap->getSizeX() * currentGameMap->getSizeY();
+            if (mapsize <= 1024) {
+                maxHarvesters = currentGame->objectData.harvesterLimitSmallMap;
+            } else if (mapsize < 4096) {
+                maxHarvesters = currentGame->objectData.harvesterLimitMediumMap;
+            } else if (mapsize < 16384) {
+                maxHarvesters = currentGame->objectData.harvesterLimitLargeMap;
+            } else {
+                maxHarvesters = currentGame->objectData.harvesterLimitHugeMap;
+            }
+        }
+        auto pNewHouse = std::make_unique<House>(houseID, 0, maxUnits, maxHarvesters, team, 0);
 
         const GameInitSettings::HouseInfoList& houseInfoList = pGame->getGameInitSettings().getHouseInfoList();
 

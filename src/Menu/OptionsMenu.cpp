@@ -48,7 +48,7 @@ OptionsMenu::OptionsMenu() : MenuBase()
     std::list<std::string> languagesList = getFileNamesList(getDuneLegacyDataDir() + "/locale", "po", true, FileListOrder_Name_Asc);
     availLanguages = std::vector<std::string>(languagesList.begin(), languagesList.end());
 
-    currentGameOptions = settings.gameOptions;
+    currentGameOptions = effectiveGameOptions;  // Use mod-aware effective options
 
     // set up window
     SDL_Texture *pBackground = pGFXManager->getUIGraphic(UI_MenuBackground);
@@ -464,6 +464,8 @@ void OptionsMenu::saveConfiguration2File() {
     myINIFile.setBoolValue("Game Options","Killed Sandworms Drop Spice",settings.gameOptions.killedSandwormsDropSpice);
     myINIFile.setBoolValue("Game Options","Manual Carryall Drops",settings.gameOptions.manualCarryallDrops);
     myINIFile.setIntValue("Game Options","Maximum Number of Units Override",settings.gameOptions.maximumNumberOfUnitsOverride);
+    myINIFile.setIntValue("Game Options","Maximum Number of Harvesters Override",settings.gameOptions.maximumNumberOfHarvestersOverride);
+    myINIFile.setBoolValue("Game Options","Immortal Human Player",settings.gameOptions.immortalHumanPlayer);
 
     myINIFile.setIntValue("Network","ServerPort",settings.network.serverPort);
     myINIFile.setStringValue("Network","MetaServer",settings.network.metaServer);

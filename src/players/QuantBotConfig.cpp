@@ -18,6 +18,7 @@
 #include <players/QuantBotConfig.h>
 #include <FileClasses/FileManager.h>
 #include <FileClasses/INIFile.h>
+#include <mod/ModManager.h>
 #include <misc/fnkdat.h>
 #include <misc/FileSystem.h>
 #include <misc/exceptions.h>
@@ -37,6 +38,7 @@ QuantBotConfig::QuantBotConfig() {
     
     // === DEFEND DIFFICULTY (Very Easy) ===
     defend.attackEnabled = false;                           // Never attacks
+    defend.attackThresholdPercent = 0.90f;                  // 90% - very defensive (rarely used since attackEnabled=false)
     defend.ornithopterAttackEnabled = false;                // No ornithopter attacks
     defend.ornithopterAttackThreshold = 999;                // Effectively disabled
     defend.attackForceMilitaryValueRatio = 0.0f;            // N/A (doesn't attack)
@@ -52,6 +54,7 @@ QuantBotConfig::QuantBotConfig() {
     
     // === EASY DIFFICULTY ===
     easy.attackEnabled = true;                              // Can attack
+    easy.attackThresholdPercent = 0.50f;                    // 50% - attack when half ready
     easy.ornithopterAttackEnabled = false;                  // NO ornithopter attacks
     easy.ornithopterAttackThreshold = 999;                  // Disabled
     easy.attackForceMilitaryValueRatio = 0.25f;             // 25% of military value per attack
@@ -67,6 +70,7 @@ QuantBotConfig::QuantBotConfig() {
     
     // === MEDIUM DIFFICULTY ===
     medium.attackEnabled = true;
+    medium.attackThresholdPercent = 0.40f;                  // 40%
     medium.ornithopterAttackEnabled = false;                // NO ornithopter attacks
     medium.ornithopterAttackThreshold = 999;                // Disabled
     medium.attackForceMilitaryValueRatio = 0.40f;           // 40% of military value per attack
@@ -82,6 +86,7 @@ QuantBotConfig::QuantBotConfig() {
     
     // === HARD DIFFICULTY ===
     hard.attackEnabled = true;
+    hard.attackThresholdPercent = 0.30f;                    // 30% - aggressive
     hard.ornithopterAttackEnabled = true;
     hard.ornithopterAttackThreshold = 1;                    // Attack as soon as 1 ornithopter is ready
     hard.attackForceMilitaryValueRatio = 0.50f;             // 50% of military value per attack
@@ -97,14 +102,15 @@ QuantBotConfig::QuantBotConfig() {
     
     // === BRUTAL DIFFICULTY ===
     brutal.attackEnabled = true;
+    brutal.attackThresholdPercent = 0.20f;                  // 20% - very aggressive
     brutal.ornithopterAttackEnabled = true;
     brutal.ornithopterAttackThreshold = 3;                  // Attack as soon as 3 ornithopters are ready
     brutal.attackForceMilitaryValueRatio = 0.50f;           // 50% of military value per attack
     brutal.harvesterLimitPerRefineryMultiplier = 3;         // Campaign: 3 harvesters per refinery
     brutal.militaryValueMultiplier = 3.0f;                  // Campaign: 3.0x initial military
     brutal.refineryMinimum = 2;                             // Campaign: Guaranteed 2 refineries (tops up if needed)
-    brutal.harvesterLimitCustomSmallMap = 10;
-    brutal.harvesterLimitCustomMediumMap = 20;
+    brutal.harvesterLimitCustomSmallMap = 6;
+    brutal.harvesterLimitCustomMediumMap = 10;
     brutal.harvesterLimitCustomLargeMap = 100;
     brutal.militaryValueLimitCustomSmallMap = 20000;
     brutal.militaryValueLimitCustomMediumMap = 40000;
@@ -209,6 +215,7 @@ QuantBotConfig::QuantBotConfig() {
 static void saveDifficultySettings(INIFile& iniFile, const std::string& section, const std::string& prefix, 
                                    const QuantBotConfig::DifficultySettings& settings) {
     iniFile.setBoolValue(section, prefix + "_AttackEnabled", settings.attackEnabled);
+    iniFile.setDoubleValue(section, prefix + "_AttackThresholdPercent", settings.attackThresholdPercent);
     iniFile.setBoolValue(section, prefix + "_OrnithopterAttackEnabled", settings.ornithopterAttackEnabled);
     iniFile.setIntValue(section, prefix + "_OrnithopterAttackThreshold", settings.ornithopterAttackThreshold);
     iniFile.setDoubleValue(section, prefix + "_AttackForceMilitaryValueRatio", settings.attackForceMilitaryValueRatio);
@@ -227,6 +234,7 @@ static void saveDifficultySettings(INIFile& iniFile, const std::string& section,
 static void loadDifficultySettings(const INIFile& iniFile, const std::string& section, 
                                    const std::string& prefix, QuantBotConfig::DifficultySettings& settings) {
     settings.attackEnabled = iniFile.getBoolValue(section, prefix + "_AttackEnabled", settings.attackEnabled);
+    settings.attackThresholdPercent = static_cast<float>(iniFile.getDoubleValue(section, prefix + "_AttackThresholdPercent", settings.attackThresholdPercent));
     settings.ornithopterAttackEnabled = iniFile.getBoolValue(section, prefix + "_OrnithopterAttackEnabled", settings.ornithopterAttackEnabled);
     settings.ornithopterAttackThreshold = iniFile.getIntValue(section, prefix + "_OrnithopterAttackThreshold", settings.ornithopterAttackThreshold);
     settings.attackForceMilitaryValueRatio = static_cast<float>(iniFile.getDoubleValue(section, prefix + "_AttackForceMilitaryValueRatio", settings.attackForceMilitaryValueRatio));
@@ -553,7 +561,13 @@ QuantBotConfig& getQuantBotConfig() {
 }
 
 std::string getQuantBotConfigFilepath() {
-    // User config file is stored in user directory (AppData on Windows, ~/.config on Linux, etc.)
+    // If ModManager is initialized and a non-vanilla mod is active, use mod path
+    if (ModManager::instance().isInitialized() && 
+        ModManager::instance().getActiveModName() != "vanilla") {
+        return ModManager::instance().getActiveQuantBotConfigPath();
+    }
+    
+    // Default: user config directory (preserves existing user customizations)
     char tmp[FILENAME_MAX];
     if(fnkdat("config/QuantBot Config.ini", tmp, FILENAME_MAX, FNKDAT_USER | FNKDAT_CREAT) < 0) {
         THROW(std::runtime_error, "fnkdat() failed for QuantBot Config.ini!");
@@ -562,7 +576,13 @@ std::string getQuantBotConfigFilepath() {
 }
 
 std::string getObjectDataFilepath() {
-    // ObjectData.ini is also in user directory
+    // If ModManager is initialized and a non-vanilla mod is active, use mod path
+    if (ModManager::instance().isInitialized() && 
+        ModManager::instance().getActiveModName() != "vanilla") {
+        return ModManager::instance().getActiveObjectDataPath();
+    }
+    
+    // Default: user config directory (preserves existing user customizations)
     char tmp[FILENAME_MAX];
     if(fnkdat("config/ObjectData.ini", tmp, FILENAME_MAX, FNKDAT_USER | FNKDAT_CREAT) < 0) {
         THROW(std::runtime_error, "fnkdat() failed for ObjectData.ini!");
@@ -571,52 +591,69 @@ std::string getObjectDataFilepath() {
 }
 
 std::string getObjectDataHash() {
+    // Use the cached hash from ModManager which covers ObjectData.ini
+    // This ensures consistency with mod system and avoids re-reading files
+    if (ModManager::instance().isInitialized()) {
+        return ModManager::instance().getEffectiveChecksums().objectData;
+    }
+    
+    // Fallback: canonical hash of file if ModManager not ready
     std::string filePath = getObjectDataFilepath();
     
-    // Open and read the file (text mode to handle line endings)
     std::ifstream file(filePath);
     if (!file.is_open()) {
         SDL_Log("Warning: Could not open ObjectData.ini for hashing: %s", filePath.c_str());
         return "ERROR_FILE_NOT_FOUND";
     }
     
-    // Read file contents line by line and normalize line endings
-    // This ensures Windows (CRLF) and Mac/Linux (LF) produce the same hash
+    // Read and canonicalize: skip comments, skip empty lines, trim whitespace
     std::string contents;
     std::string line;
     while (std::getline(file, line)) {
-        // Remove any trailing \r (in case of CRLF on Windows)
+        // Remove trailing \r if present
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();
         }
-        contents += line;
-        contents += '\n';  // Use consistent LF line ending
+        
+        // Trim leading/trailing whitespace
+        size_t start = line.find_first_not_of(" \t");
+        if (start == std::string::npos) {
+            continue;  // Empty or whitespace-only line
+        }
+        size_t end = line.find_last_not_of(" \t");
+        line = line.substr(start, end - start + 1);
+        
+        // Skip comment lines
+        if (line.empty() || line[0] == ';' || line[0] == '#') {
+            continue;
+        }
+        
+        // Strip inline comments
+        size_t commentPos = line.find(" ;");
+        if (commentPos != std::string::npos) {
+            line = line.substr(0, commentPos);
+            end = line.find_last_not_of(" \t");
+            if (end != std::string::npos) {
+                line = line.substr(0, end + 1);
+            }
+        }
+        
+        if (!line.empty()) {
+            contents += line + '\n';
+        }
     }
     file.close();
     
-    // MULTIPLAYER FIX (Issue #5): FNV-1a deterministic hash
-    // Simple but deterministic hash using FNV-1a algorithm (64-bit)
-    // This is consistent across platforms and compilers
-    // 
-    // Config Coverage (Validated as Complete):
-    // ✅ ObjectData.ini - Unit/structure stats (gameplay-critical)
-    // ✅ QuantBot Config.ini - AI behavior (gameplay-critical)
-    // ❌ Dune Legacy.ini - UI/Audio settings (NOT gameplay-critical, client-side only)
-    //
-    // Rationale: Dune Legacy.ini contains only client-side preferences (resolution,
-    // scroll speed, audio volume, player name) that do not affect game synchronization.
-    uint64_t hash = 14695981039346656037ULL; // FNV offset basis
-    const uint64_t prime = 1099511628211ULL;  // FNV prime
-    
+    // FNV-1a hash
+    uint64_t hash = 14695981039346656037ULL;
+    const uint64_t prime = 1099511628211ULL;
     for (char c : contents) {
         hash ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
         hash *= prime;
     }
     
-    // Convert to hex string (16 characters)
     char hashStr[17];
     snprintf(hashStr, sizeof(hashStr), "%016llx", (unsigned long long)hash);
-    
     return std::string(hashStr);
 }
 

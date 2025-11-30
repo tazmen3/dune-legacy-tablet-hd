@@ -24,9 +24,11 @@
 #include <GUI/Label.h>
 #include <GUI/TextButton.h>
 #include <GUI/ListBox.h>
+#include <GUI/DropDownBox.h>
 #include <GUI/PictureLabel.h>
 #include <GUI/Checkbox.h>
 
+#include <mod/ModInfo.h>
 #include <DataTypes.h>
 
 #include <string>
@@ -91,6 +93,12 @@ private:
     Label           mapPropertyPlayers;
     Label           mapPropertyAuthors;
     Label           mapPropertyLicense;
+    
+    // Mod selection
+    HBox            modHBox;
+    Label           modLabel;
+    DropDownBox     modDropDown;
+    std::vector<ModInfo> availableMods;
 
     // bottom row of buttons
     HBox            buttonHBox;

@@ -54,10 +54,20 @@
 #define NETWORKPACKET_CONFIG_HASH           11
 #define NETWORKPACKET_SETPATHBUDGET         12  // Phase 1.4: Budget negotiation
 #define NETWORKPACKET_CLIENTSTATS           13  // Multiplayer: Client performance stats
+#define NETWORKPACKET_MOD_INFO              14  // Host -> Client: mod name + checksums
+#define NETWORKPACKET_MOD_REQUEST           15  // Client -> Host: request mod files
+#define NETWORKPACKET_MOD_CHUNK             16  // Host -> Client: mod file chunk
+#define NETWORKPACKET_MOD_COMPLETE          17  // Host -> Client: transfer complete
+#define NETWORKPACKET_MOD_ACK               18  // Client -> Host: acknowledge mod sync complete
 
 // Network protocol version - increment when packet formats change
 // Version 2: Added simMsAvg to NETWORKPACKET_CLIENTSTATS (5 fields instead of 4)
-#define NETWORK_PROTOCOL_VERSION            2
+// Version 3: Added mod transfer packets (MOD_INFO, MOD_REQUEST, MOD_CHUNK, MOD_COMPLETE)
+#define NETWORK_PROTOCOL_VERSION            3
+
+// Mod transfer limits
+#define MAX_MOD_TRANSFER_SIZE   (10 * 1024 * 1024)  // 10MB max mod size
+#define MOD_CHUNK_SIZE          (64 * 1024)          // 64KB per chunk
 
 #define AWAITING_CONNECTION_TIMEOUT     5000
 
@@ -225,12 +235,82 @@ public:
     */
     void broadcastPathBudget(size_t newBudget, Uint32 applyCycle);
 
+    // === Mod Transfer Methods ===
+
+    /**
+        Send mod info to a specific peer (host only).
+        Called when a new client connects to inform them of the active mod.
+        \param  peer            The peer to send to
+        \param  modName         Name of the active mod
+        \param  modChecksum     Combined mod checksum
+    */
+    void sendModInfoToPeer(ENetPeer* peer, const std::string& modName, const std::string& modChecksum);
+
+    /**
+        Send mod info to all connected clients (host only).
+        \param  modName         Name of the active mod
+        \param  modChecksum     Combined mod checksum
+    */
+    void sendModInfo(const std::string& modName, const std::string& modChecksum);
+
+    /**
+        Request mod files from host (client only).
+        \param  modName         Name of the mod to download
+    */
+    void requestModDownload(const std::string& modName);
+
+    /**
+        Send mod sync acknowledgment to host (client only).
+        \param  success         Whether mod sync was successful
+        \param  modChecksum     The client's mod checksum after sync
+    */
+    void sendModAck(bool success, const std::string& modChecksum);
+
+    /**
+        Sets the function that should be called when mod info is received.
+        \param  pOnReceiveModInfo   function(modName, modChecksum) to call
+    */
+    inline void setOnReceiveModInfo(std::function<void (const std::string&, const std::string&)> pOnReceiveModInfo) {
+        this->pOnReceiveModInfo = pOnReceiveModInfo;
+    }
+
+    /**
+        Sets the function that should be called when mod download progress updates.
+        \param  pOnModDownloadProgress  function(bytesReceived, totalBytes) to call
+    */
+    inline void setOnModDownloadProgress(std::function<void (size_t, size_t)> pOnModDownloadProgress) {
+        this->pOnModDownloadProgress = pOnModDownloadProgress;
+    }
+
+    /**
+        Sets the function that should be called when mod download completes.
+        \param  pOnModDownloadComplete  function(success, errorMsg) to call
+    */
+    inline void setOnModDownloadComplete(std::function<void (bool, const std::string&)> pOnModDownloadComplete) {
+        this->pOnModDownloadComplete = pOnModDownloadComplete;
+    }
+
+    /**
+        Sets the function that should be called when host receives mod ACK from client.
+        \param  pOnReceiveModAck  function(playerName, success, modChecksum) to call
+    */
+    inline void setOnReceiveModAck(std::function<void (const std::string&, bool, const std::string&)> pOnReceiveModAck) {
+        this->pOnReceiveModAck = pOnReceiveModAck;
+    }
+
 private:
     static void debugNetwork(PRINTF_FORMAT_STRING const char* fmt, ...) PRINTF_VARARG_FUNC(1);
 
     void sendPacketToHost(ENetPacketOStream& packetStream, int channel = 0);
 
     void sendPacketToPeer(ENetPeer* peer, ENetPacketOStream& packetStream, int channel = 0);
+    
+    /**
+        Package and send mod files to a peer in chunks.
+        \param  peer        The peer to send to
+        \param  modName     Name of the mod to send
+    */
+    void sendModFilesToPeer(ENetPeer* peer, const std::string& modName);
 
     void sendPacketToAllConnectedPeers(ENetPacketOStream& packetStream, int channel = 0);
 
@@ -290,6 +370,20 @@ private:
     std::function<void (const std::string&)>                                 pOnConfigMismatch;
     std::function<void (Uint32, Uint32, float, float, Uint32, Uint32)>     pOnReceiveClientStats;      // Host: (clientId, gameCycle, avgFps, simMsAvg, queueDepth, currentBudget)
     std::function<void (size_t, Uint32)>                                     pOnReceiveSetPathBudget;    // Client: (newBudget, applyCycle)
+    std::function<void (const std::string&, const std::string&)>            pOnReceiveModInfo;          // Client: (modName, modChecksum)
+    std::function<void (size_t, size_t)>                                     pOnModDownloadProgress;     // Client: (bytesReceived, totalBytes)
+    std::function<void (bool, const std::string&)>                          pOnModDownloadComplete;     // Client: (success, errorMsg)
+    std::function<void (const std::string&, bool, const std::string&)>      pOnReceiveModAck;           // Host: (playerName, success, modChecksum)
+
+    // Mod transfer state (for chunked transfer)
+    struct ModTransferState {
+        std::string modName;
+        std::string modData;
+        size_t totalSize = 0;
+        size_t receivedSize = 0;
+        bool inProgress = false;
+    };
+    ModTransferState modTransferState;
 
     std::unique_ptr<LANGameFinderAndAnnouncer>  pLANGameFinderAndAnnouncer = nullptr;
     std::unique_ptr<MetaServerClient>           pMetaServerClient = nullptr;

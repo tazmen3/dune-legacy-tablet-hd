@@ -46,9 +46,10 @@ public:
 
 class MetaServerAdd : public MetaServerCommand {
 public:
-    MetaServerAdd(const std::string& serverName, int serverPort, const std::string& secret, const std::string& mapName, Uint8 numPlayers, Uint8 maxPlayers)
+    MetaServerAdd(const std::string& serverName, int serverPort, const std::string& secret, const std::string& mapName, 
+                  Uint8 numPlayers, Uint8 maxPlayers, const std::string& modName = "vanilla", const std::string& modVersion = "")
      : MetaServerCommand(METASERVERCOMMAND_ADD), serverName(serverName), serverPort(serverPort), secret(secret),
-       mapName(mapName), numPlayers(numPlayers), maxPlayers(maxPlayers) {
+       mapName(mapName), numPlayers(numPlayers), maxPlayers(maxPlayers), modName(modName), modVersion(modVersion) {
     }
 
     bool operator==(const MetaServerCommand& metaServerCommand) const override
@@ -63,7 +64,9 @@ public:
                      && (secret == pMetaServerAdd->secret)
                      && (mapName == pMetaServerAdd->mapName)
                      && (numPlayers == pMetaServerAdd->numPlayers)
-                     && (maxPlayers == pMetaServerAdd->maxPlayers));
+                     && (maxPlayers == pMetaServerAdd->maxPlayers)
+                     && (modName == pMetaServerAdd->modName)
+                     && (modVersion == pMetaServerAdd->modVersion));
         }
     }
 
@@ -73,13 +76,16 @@ public:
     std::string mapName;
     Uint8 numPlayers;
     Uint8 maxPlayers;
+    std::string modName;
+    std::string modVersion;
 };
 
 class MetaServerUpdate : public MetaServerCommand {
 public:
-    MetaServerUpdate(const std::string& serverName, int serverPort, const std::string& secret, const std::string& mapName, Uint8 numPlayers, Uint8 maxPlayers)
+    MetaServerUpdate(const std::string& serverName, int serverPort, const std::string& secret, const std::string& mapName, 
+                     Uint8 numPlayers, Uint8 maxPlayers, const std::string& modName = "vanilla", const std::string& modVersion = "")
      : MetaServerCommand(METASERVERCOMMAND_UPDATE), serverName(serverName), serverPort(serverPort), secret(secret),
-       mapName(mapName), numPlayers(numPlayers), maxPlayers(maxPlayers) {
+       mapName(mapName), numPlayers(numPlayers), maxPlayers(maxPlayers), modName(modName), modVersion(modVersion) {
     }
 
     bool operator==(const MetaServerCommand& metaServerCommand) const override
@@ -94,7 +100,9 @@ public:
                      && (secret == pMetaServerUpdate->secret)
                      && (mapName == pMetaServerUpdate->mapName)
                      && (numPlayers == pMetaServerUpdate->numPlayers)
-                     && (maxPlayers == pMetaServerUpdate->maxPlayers));
+                     && (maxPlayers == pMetaServerUpdate->maxPlayers)
+                     && (modName == pMetaServerUpdate->modName)
+                     && (modVersion == pMetaServerUpdate->modVersion));
         }
     }
 
@@ -104,6 +112,8 @@ public:
     std::string mapName;
     Uint8 numPlayers;
     Uint8 maxPlayers;
+    std::string modName;
+    std::string modVersion;
 };
 
 class MetaServerRemove : public MetaServerCommand {

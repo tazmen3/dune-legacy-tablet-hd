@@ -28,6 +28,7 @@
 #include <Menu/SinglePlayerMenu.h>
 #include <Menu/MultiPlayerMenu.h>
 #include <Menu/OptionsMenu.h>
+#include <Menu/ModMenu.h>
 #include <Menu/AboutMenu.h>
 
 MainMenu::MainMenu()
@@ -82,6 +83,12 @@ MainMenu::MainMenu()
 
     MenuButtons.addWidget(VSpacer::create(3));
 
+    modsButton.setText(_("MODS"));
+    modsButton.setOnClick(std::bind(&MainMenu::onMods, this));
+    MenuButtons.addWidget(&modsButton);
+
+    MenuButtons.addWidget(VSpacer::create(3));
+
     optionsButton.setText(_("OPTIONS"));
     optionsButton.setOnClick(std::bind(&MainMenu::onOptions, this));
     MenuButtons.addWidget(&optionsButton);
@@ -126,6 +133,11 @@ void MainMenu::onMapEditor() const
     mapEditor.RunEditor();
 }
 
+void MainMenu::onMods() const
+{
+    ModMenu modMenu;
+    modMenu.showMenu();
+}
 
 void MainMenu::onOptions() {
     OptionsMenu  optionsMenu;

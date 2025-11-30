@@ -72,6 +72,12 @@ GameOptionsWindow::GameOptionsWindow(SettingsClass::GameOptionsClass& initialGam
     vboxLeft.addWidget(&manualCarryallDropsCheckbox);
     vboxLeft.addWidget(VSpacer::create(6));
 
+    immortalHumanPlayerCheckbox.setText(_("Immortal Human Player"));
+    immortalHumanPlayerCheckbox.setTooltipText(_("God mode / cheat: Human-controlled units and structures are invulnerable to damage. Single-player only."));
+    immortalHumanPlayerCheckbox.setChecked(gameOptions.immortalHumanPlayer);
+    vboxLeft.addWidget(&immortalHumanPlayerCheckbox);
+    vboxLeft.addWidget(VSpacer::create(6));
+
     maxUnitsOverrideCheckbox.setText(_("Override max. number of units"));
     maxUnitsOverrideCheckbox.setTooltipText(_("If checked the maximum number of units per house can be overridden; otherwise it is map dependent. 0 = unlimited."));
     maxUnitsOverrideCheckbox.setChecked(gameOptions.maximumNumberOfUnitsOverride >= 0);
@@ -84,7 +90,19 @@ GameOptionsWindow::GameOptionsWindow(SettingsClass::GameOptionsClass& initialGam
     vboxLeft.addWidget(&maxUnitsOverrideHBox, 24);
     vboxLeft.addWidget(VSpacer::create(6));
 
-    vboxLeft.addWidget(VSpacer::create(62));
+    maxHarvestersOverrideCheckbox.setText(_("Override max. number of harvesters"));
+    maxHarvestersOverrideCheckbox.setTooltipText(_("If checked the maximum number of harvesters per house can be overridden; otherwise it is based on map size from ObjectData.ini."));
+    maxHarvestersOverrideCheckbox.setChecked(gameOptions.maximumNumberOfHarvestersOverride >= 0);
+    maxHarvestersOverrideCheckbox.setOnClick([this]() { maxHarvestersOverrideTextBox.setVisible(maxHarvestersOverrideCheckbox.isChecked()); });
+    maxHarvestersOverrideHBox.addWidget(&maxHarvestersOverrideCheckbox);
+    maxHarvestersOverrideTextBox.setMinMax(0,999);
+    maxHarvestersOverrideTextBox.setValue( (gameOptions.maximumNumberOfHarvestersOverride < 0) ? 0 : gameOptions.maximumNumberOfHarvestersOverride );
+    maxHarvestersOverrideTextBox.setVisible(gameOptions.maximumNumberOfHarvestersOverride >= 0);
+    maxHarvestersOverrideHBox.addWidget(&maxHarvestersOverrideTextBox);
+    vboxLeft.addWidget(&maxHarvestersOverrideHBox, 24);
+    vboxLeft.addWidget(VSpacer::create(6));
+
+    vboxLeft.addWidget(VSpacer::create(14));
 
 
     concreteRequiredCheckbox.setText(_("Concrete Required"));
@@ -168,7 +186,9 @@ void GameOptionsWindow::onOK() {
     gameOptions.sandwormsRespawn = sandwormsRespawnCheckbox.isChecked();
     gameOptions.killedSandwormsDropSpice = killedSandwormsDropSpiceCheckbox.isChecked();
     gameOptions.manualCarryallDrops = manualCarryallDropsCheckbox.isChecked();
+    gameOptions.immortalHumanPlayer = immortalHumanPlayerCheckbox.isChecked();
     gameOptions.maximumNumberOfUnitsOverride = maxUnitsOverrideCheckbox.isChecked() ? maxUnitsOverrideTextBox.getValue() : -1;
+    gameOptions.maximumNumberOfHarvestersOverride = maxHarvestersOverrideCheckbox.isChecked() ? maxHarvestersOverrideTextBox.getValue() : -1;
 
     Window* pParentWindow = dynamic_cast<Window*>(getParent());
     if(pParentWindow != nullptr) {

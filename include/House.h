@@ -39,7 +39,7 @@ class HumanPlayer;
 class House
 {
 public:
-    House(int newHouse, int newCredits, int maxUnits, Uint8 teamID = 0, int quota = 0);
+    House(int newHouse, int newCredits, int maxUnits, int maxHarvesters, Uint8 teamID = 0, int quota = 0);
     explicit House(InputStream& stream);
     void init();
     virtual ~House();
@@ -99,6 +99,7 @@ public:
 
     inline int getQuota() const { return quota; };
     inline int getMaxUnits() const { return maxUnits; };
+    inline int getMaxHarvesters() const { return maxHarvesters; };
 
     inline void informContactWithEnemy() { bHadContactWithEnemy = true; };
     inline bool hadContactWithEnemy() const { return bHadContactWithEnemy; };
@@ -146,6 +147,15 @@ public:
     inline bool isAirUnitLimitReached() const {
         if (maxUnits == 0) return false;  // 0 = unlimited units
         return (numItem[Unit_Carryall] + numItem[Unit_Ornithopter] >= 11*std::max(maxUnits,25)/25);
+    }
+
+    /**
+        This function checks if the limit for harvesters is already reached.
+        \return true, if the limit is already reached, false if building further harvesters is allowed
+    */
+    inline bool isHarvesterLimitReached() const {
+        if (maxHarvesters == 0) return false;  // 0 = unlimited harvesters
+        return (numItem[Unit_Harvester] >= maxHarvesters);
     }
 
     inline Choam& getChoam() { return choam; };
@@ -229,6 +239,7 @@ protected:
     int oldCredits;           ///< amount of credits in the last game cycle (used for playing the credits tick sound)
 
     int maxUnits;             ///< maximum number of units this house is allowed to build
+    int maxHarvesters;        ///< maximum number of harvesters this house is allowed to build
     int quota;                ///< number of credits to win
 
     Choam   choam;            ///< the things that are deliverable at the starport

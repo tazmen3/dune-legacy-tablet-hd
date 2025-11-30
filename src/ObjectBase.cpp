@@ -236,6 +236,20 @@ int ObjectBase::getMaxHealth() const {
 }
 
 void ObjectBase::handleDamage(int damage, Uint32 damagerID, House* damagerOwner) {
+    // Immortality guard: Human-controlled houses are invulnerable in single-player modes when option is enabled
+    // This applies when ANY human player controls the house (not just AI players)
+    if(damage > 0) {
+        GameType gameType = currentGame->getGameInitSettings().getGameType();
+        if(gameType != GameType::CustomMultiplayer 
+           && gameType != GameType::LoadMultiplayer
+           && currentGame->getGameInitSettings().getGameOptions().immortalHumanPlayer
+           && getOwner() == pLocalHouse) {
+            // Zero damage so human-controlled units/structures are invulnerable
+            // Continue function execution so visibility/music/stats hooks still run
+            damage = 0;
+        }
+    }
+    
     if(damage >= 0) {
         FixPoint newHealth = getHealth();
 

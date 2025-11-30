@@ -41,6 +41,7 @@ private:
     void onSinglePlayer() const;
     void onMultiPlayer() const;
     void onMapEditor() const;
+    void onMods() const;
     void onOptions();
     void onAbout() const;
     void onQuit();
@@ -51,6 +52,7 @@ private:
     TextButton      singlePlayerButton;
     TextButton      multiPlayerButton;
     TextButton      mapEditorButton;
+    TextButton      modsButton;
     TextButton      optionsButton;
     TextButton      aboutButton;
     TextButton      quitButton;

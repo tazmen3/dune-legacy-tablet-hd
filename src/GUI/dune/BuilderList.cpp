@@ -69,6 +69,7 @@ BuilderList::BuilderList(Uint32 builderObjectID) {
     pPlaceItTextTexture = pFontManager->createTextureWithMultilineText(_("PLACE IT"), COLOR_WHITE, 12, true);
     pOnHoldTextTexture = pFontManager->createTextureWithMultilineText(_("ON HOLD"), COLOR_WHITE, 12, true);
     pUnitLimitReachedTextTexture = pFontManager->createTextureWithMultilineText(_("UNIT LIMIT\nREACHED"), COLOR_WHITE, 12, true);
+    pHarvesterLimitReachedTextTexture = pFontManager->createTextureWithMultilineText(_("HARVESTER LIMIT\nREACHED"), COLOR_WHITE, 12, true);
 
     pLastTooltip = nullptr;
     tooltipText = "";
