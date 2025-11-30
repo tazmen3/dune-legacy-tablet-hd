@@ -130,6 +130,76 @@
           <br />
 
           <div class="post">
+            <div class="post-title"><h2><a name="2025-11-30-00-00-00">Dune Legacy 0.99 Released</a></h2></div>
+            <div class="post-date">November 30, 2025</div>
+            <div class="post-body">
+              <p>Dune Legacy 0.99 is now available! This major release introduces a complete mod system with multiplayer synchronization, fixes critical unit combat behaviors, and delivers comprehensive AI improvements.</p>
+              <h3>🎮 NEW: Complete Mod System</h3>
+              <ul>
+                <li><b>Mod Editor & Management:</b> Create, edit, and manage mods directly in-game via Main Menu → MODS</li>
+                <li><b>Multiplayer Mod Sync:</b> Host's mod automatically synced to all clients - no manual file sharing required!</li>
+                <li><b>Metaserver Integration:</b> Server browser shows mod name and version for each game</li>
+                <li><b>Moddable Files:</b> ObjectData.ini (unit/structure stats), GameOptions.ini (game rules), QuantBot Config.ini (AI behavior)</li>
+                <li><b>Mod Structure:</b> Simple folder-based system with automatic vanilla mod seeding</li>
+              </ul>
+              <h3>⚔️ Major Combat & Unit Behavior Fixes</h3>
+              <ul>
+                <li><b>Instant Counter-Attack:</b> Units now immediately respond when damaged (eliminated 2-second delay - restores 0.96.4 behavior)</li>
+                <li><b>Pursuit Behavior Fixed:</b> Removed flawed "close enough" logic that prevented units from pursuing enemies within 3 tiles</li>
+                <li><b>Saboteur Fixes:</b> AI palace-spawned saboteurs now work correctly with proper pathfinding and detonation</li>
+                <li><b>AMBUSH Mode:</b> Infantry in AMBUSH mode now pursue attackers when damaged (matches Dynasty behavior)</li>
+                <li><b>Sandworm Improvements:</b> Sandworms counter-attack when damaged from range</li>
+              </ul>
+              <h3>🤖 AI Improvements</h3>
+              <ul>
+                <li><b>Campaign Difficulty Balance:</b> Rebalanced Easy/Medium/Hard/Brutal with improved spice management and attack forces</li>
+                <li><b>Factory Priority System:</b> Light Factory/WOR only produce when no Heavy Factory exists (fixes Sardaukar producing trikes instead of tanks)</li>
+                <li><b>Enhanced Kiting:</b> Launchers and Deviators now kite on all difficulties with proportional retreat distances (3-8 tiles based on threat proximity)</li>
+                <li><b>Support Mode Awareness:</b> Long-range units no longer kite when in support mode</li>
+                <li><b>Squad Rally Points:</b> AI establishes rally points for tactical coordination on Hard/Brutal</li>
+              </ul>
+              <h3>🎮 Cheat Codes & God Mode</h3>
+              <ul>
+                <li><b>New God Mode:</b> Type "muaddib" during single-player to toggle immortality for human units/structures</li>
+                <li><b>Game Options:</b> Checkbox for "Immortal Human Player" when starting new games</li>
+                <li><b>Special Effects:</b> Sandworms choke on immortal units, safe carryall drops, survives sabotage attempts</li>
+              </ul>
+              <h3>🎯 Bug Fixes</h3>
+              <ul>
+                <li><b>Harvester Recovery:</b> Automatic stuck detection with 3-attempt retry counter prevents infinite pathfinding loops</li>
+                <li><b>Deviated Unit Positioning:</b> Now use tighter 2-tile radius to actually move to squad center</li>
+                <li><b>Deathhand Accuracy:</b> Dynasty scatter algorithm implemented for more predictable strikes</li>
+                <li><b>Carryall Improvements:</b> Distance-based damage falloff and better pickup/dropoff logic</li>
+              </ul>
+              <h3>🗺️ New Multiplayer Maps</h3>
+              <ul>
+                <li>4P Moshpit with Garbages (128x128)</li>
+                <li>6P Alkozeltser 2 (128x128) and 6P Alkozeltser 4 (256x256)</li>
+                <li>6P Full Wormage (128x128)</li>
+              </ul>
+              <h3>🌐 Multiplayer Improvements</h3>
+              <ul>
+                <li><b>Automatic Map Sharing:</b> Custom maps automatically saved to clients when joining games - no manual file copying needed!</li>
+                <li><b>Automatic Mod Sync:</b> Host's mod files transferred and synced to all clients with checksum verification</li>
+                <li><b>Server Browser:</b> Shows mod name and version for each active game</li>
+              </ul>
+              <h3>⚙️ Performance & Technical</h3>
+              <ul>
+                <li><b>Proper VSync:</b> Implemented using SDL_RenderSetVSync() with multi-tier FPS thresholds (58/55/50 fps)</li>
+                <li><b>Configuration:</b> Renamed .bak files to .ini.default for clarity</li>
+                <li><b>macOS Fix:</b> Fixed data directory path resolution for proper mod seeding in app bundles</li>
+              </ul>
+              <h3>Download</h3>
+              <ul>
+                <li><b>Windows:</b> <a href="https://sourceforge.net/projects/dunelegacy/files/dunelegacy/0.98.0aplpha/DuneLegacy-0.99-Windows-x64.exe/download">DuneLegacy-0.99-Windows-x64.exe</a></li>
+                <li><b>macOS:</b> <a href="https://sourceforge.net/projects/dunelegacy/files/dunelegacy/0.98.0aplpha/DuneLegacy-0.99-macOS.dmg/download">DuneLegacy-0.99-macOS.dmg</a></li>
+              </ul>
+              <p><b>Gameplay Impact:</b> Units respond instantly to threats, AI opponents use tactics effectively at all difficulties, saboteurs actually work, and the new mod system enables easy customization. Multiplayer is seamless with automatic map and mod sharing. God mode provides casual/practice options. All PAK files included in installer!</p>
+              <p>For full details, see the <a href="dune-legacy-0.99-released.html">release notes</a>.</p>
+            </div>
+          </div>
+
+          <div class="post">
             <div class="post-title"><h2><a name="2025-11-21-00-00-00">Dune Legacy 0.98.7.1 Released</a></h2></div>
             <div class="post-date">November 21, 2025</div>
             <div class="post-body">

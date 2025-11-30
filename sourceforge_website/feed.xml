@@ -8,6 +8,59 @@
     <atom:link href="http://dunelegacy.sourceforge.net/website/feed.xml" rel="self" type="application/rss+xml" />
 
     <item>
+      <title>Dune Legacy 0.99 Released</title>
+      <description>&lt;p&gt;Dune Legacy 0.99 is now available! This major release introduces a complete mod system with multiplayer synchronization, fixes critical unit combat behaviors, and delivers comprehensive AI improvements.&lt;/p&gt;
+
+&lt;h3&gt;🎮 NEW: Complete Mod System&lt;/h3&gt;
+&lt;ul&gt;
+  &lt;li&gt;&lt;b&gt;Mod Editor & Management:&lt;/b&gt; Create, edit, and manage mods directly in-game via Main Menu → MODS&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;Multiplayer Mod Sync:&lt;/b&gt; Host's mod automatically synced to all clients - no manual file sharing required!&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;Metaserver Integration:&lt;/b&gt; Server browser shows mod name and version for each game&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;Moddable Files:&lt;/b&gt; ObjectData.ini (unit stats), GameOptions.ini (game rules), QuantBot Config.ini (AI behavior)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h3&gt;⚔️ Major Combat & Unit Behavior Fixes&lt;/h3&gt;
+&lt;ul&gt;
+  &lt;li&gt;&lt;b&gt;Instant Counter-Attack:&lt;/b&gt; Units now immediately respond when damaged (eliminated 2-second delay)&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;Pursuit Behavior Fixed:&lt;/b&gt; Units now move to exact weapon range instead of stopping 3 tiles short&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;Saboteur Fixes:&lt;/b&gt; AI palace-spawned saboteurs now work correctly&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;AMBUSH Mode:&lt;/b&gt; Infantry pursue attackers when damaged (matches Dynasty behavior)&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;Sandworm Improvements:&lt;/b&gt; Counter-attack when damaged from range&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h3&gt;🤖 AI Improvements&lt;/h3&gt;
+&lt;ul&gt;
+  &lt;li&gt;&lt;b&gt;Campaign Difficulty Balance:&lt;/b&gt; Rebalanced Easy/Medium/Hard/Brutal with better progression&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;Factory Priority System:&lt;/b&gt; Fixes Sardaukar producing trikes instead of tanks&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;Enhanced Kiting:&lt;/b&gt; Launchers/Deviators kite on all difficulties with proportional retreat distances&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h3&gt;🎮 Cheat Codes & God Mode&lt;/h3&gt;
+&lt;ul&gt;
+  &lt;li&gt;&lt;b&gt;New God Mode:&lt;/b&gt; Type "muaddib" during single-player for immortality (single-player only)&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;Special Effects:&lt;/b&gt; Sandworms choke on immortal units, safe carryall drops&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h3&gt;🌐 Multiplayer Improvements&lt;/h3&gt;
+&lt;ul&gt;
+  &lt;li&gt;&lt;b&gt;Automatic Map Sharing:&lt;/b&gt; Custom maps automatically saved to clients when joining&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;Automatic Mod Sync:&lt;/b&gt; Host's mod files transferred with checksum verification&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;New Maps:&lt;/b&gt; Four new multiplayer maps (4P Moshpit, 6P Alkozeltser, 6P Full Wormage)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h3&gt;Download&lt;/h3&gt;
+&lt;ul&gt;
+  &lt;li&gt;&lt;b&gt;Windows:&lt;/b&gt; &lt;a href=&quot;https://sourceforge.net/projects/dunelegacy/files/dunelegacy/0.98.0aplpha/DuneLegacy-0.99-Windows-x64.exe/download&quot;&gt;DuneLegacy-0.99-Windows-x64.exe&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;b&gt;macOS:&lt;/b&gt; &lt;a href=&quot;https://sourceforge.net/projects/dunelegacy/files/dunelegacy/0.98.0aplpha/DuneLegacy-0.99-macOS.dmg/download&quot;&gt;DuneLegacy-0.99-macOS.dmg&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Complete mod system enables easy customization. Units respond instantly to threats. Seamless multiplayer with automatic map and mod sharing. All PAK files included!&lt;/p&gt;</description>
+      <pubDate>Sat, 30 Nov 2025 00:00:00 +0000</pubDate>
+      <link>http://dunelegacy.sourceforge.net/website/news.html#2025-11-30-00-00-00</link>
+      <guid isPermaLink="true">http://dunelegacy.sourceforge.net/website/news.html#2025-11-30-00-00-00</guid>
+    </item>
+
+    <item>
       <title>Dune Legacy 0.98.7.1 Released</title>
       <description>&lt;p&gt;Dune Legacy 0.98.7.1 is now available! This release doubles the map editor's design canvas, overhauls the pathfinding pipeline, restores the classic Campaign AI as the default opponent, and adds stability fixes for both single-player and multiplayer queue stress situations.&lt;/p&gt;
 
