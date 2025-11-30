@@ -748,14 +748,9 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                         SDL_Log("================================================");
                         
                         if(mismatchFound) {
-                            SDL_Log("!!! CONFIG MISMATCH DETECTED - ABORTING GAME !!!");
-                            if(pOnConfigMismatch) {
-                                std::string errorMsg = std::string("CONFIG MISMATCH DETECTED!\n\nMultiplayer game cannot continue - config files don't match:") + mismatchMessage + 
-                                                     "\n\nPlease ensure all players have identical config files:\n" +
-                                                     "- " + getQuantBotConfigFilepath() + "\n" +
-                                                     "- " + getObjectDataFilepath();
-                                pOnConfigMismatch(errorMsg);
-                            }
+                            // Don't abort - mod sync system will handle this
+                            // Host already sent MOD_INFO, client will download and sync
+                            SDL_Log("Config mismatch for %s - mod sync will resolve this", peerData->name.c_str());
                         } else {
                             SDL_Log("Config verification passed for %s", peerData->name.c_str());
                         }
@@ -819,14 +814,9 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                         sendPacketToHost(responsePacket);
                         
                         if(mismatchFound) {
-                            SDL_Log("!!! CONFIG MISMATCH DETECTED - CANNOT JOIN GAME !!!");
-                            if(pOnConfigMismatch) {
-                                std::string errorMsg = std::string("CONFIG MISMATCH DETECTED!\n\nCannot join multiplayer game - your config files don't match the server's:") + mismatchMessage + 
-                                                     "\n\nPlease ensure your config files match the server's:\n" +
-                                                     "- " + getQuantBotConfigFilepath() + "\n" +
-                                                     "- " + getObjectDataFilepath();
-                                pOnConfigMismatch(errorMsg);
-                            }
+                            // Don't block connection - mod sync system will handle this
+                            // The client will receive MOD_INFO next and download the correct mod
+                            SDL_Log("Config mismatch detected - waiting for mod sync to resolve");
                         } else {
                             SDL_Log("Config verification passed - configs match server");
                         }
