@@ -1319,8 +1319,15 @@ void NetworkManager::sendModFilesToPeer(ENetPeer* peer, const std::string& modNa
     
     // Get mod path from ModManager
     std::string modPath = ModManager::instance().getModPath(modName);
-    // Check if mod exists by looking for mod.ini (modPath is a directory, not a file)
     std::string modIniPath = modPath + "/mod.ini";
+    
+    SDL_Log("NetworkManager::sendModFilesToPeer - modName: '%s'", modName.c_str());
+    SDL_Log("NetworkManager::sendModFilesToPeer - modPath: '%s'", modPath.c_str());
+    SDL_Log("NetworkManager::sendModFilesToPeer - modIniPath: '%s'", modIniPath.c_str());
+    SDL_Log("NetworkManager::sendModFilesToPeer - modPath.empty(): %d", modPath.empty() ? 1 : 0);
+    SDL_Log("NetworkManager::sendModFilesToPeer - existsFile(modIniPath): %d", existsFile(modIniPath) ? 1 : 0);
+    
+    // Check if mod exists by looking for mod.ini (modPath is a directory, not a file)
     if(modPath.empty() || !existsFile(modIniPath)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: Mod '%s' not found at path: %s (mod.ini missing)", 
                     modName.c_str(), modPath.c_str());
