@@ -790,6 +790,10 @@ void CustomGamePlayers::onModDownloadComplete(bool success, const std::string& d
             ModManager::instance().updateChecksums();
             std::string newChecksum = ModManager::instance().getEffectiveChecksums().combined;
             
+            // Update the mod label on screen to show the new mod
+            ModInfo activeModInfo = ModManager::instance().getModInfo(hostModName);
+            mapPropertyMod.setText(activeModInfo.displayName);
+            
             addInfoMessage("Mod '" + hostModName + "' synced successfully!");
             SDL_Log("CLIENT: Switched to mod '%s', new checksum: %s", hostModName.c_str(), newChecksum.c_str());
             
