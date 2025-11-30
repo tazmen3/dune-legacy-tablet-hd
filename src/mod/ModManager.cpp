@@ -617,6 +617,21 @@ bool ModManager::saveReceivedMod(const std::string& modName, const std::string& 
     }
     
     SDL_Log("ModManager: Mod '%s' saved successfully", modName.c_str());
+    
+    // Ensure mod.ini exists - create a basic one if missing
+    std::string modIniPath = modPath + "/" + MOD_INI_FILE;
+    if (!existsFile(modIniPath)) {
+        SDL_Log("ModManager: Creating default mod.ini for received mod '%s'", modName.c_str());
+        ModInfo defaultInfo;
+        defaultInfo.name = modName;
+        defaultInfo.displayName = modName;
+        defaultInfo.author = "Downloaded from host";
+        defaultInfo.description = "Mod received from multiplayer host";
+        defaultInfo.gameVersion = VERSION;
+        defaultInfo.version = "";
+        writeModInfo(modPath, defaultInfo);
+    }
+    
     checksumsDirty = true;  // Checksums need recalculation
     return true;
 }

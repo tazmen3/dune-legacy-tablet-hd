@@ -1332,7 +1332,7 @@ void NetworkManager::sendModFilesToPeer(ENetPeer* peer, const std::string& modNa
     uint32_t numFiles = 0;
     
     // List of files to include
-    std::vector<std::string> filesToInclude = {"ObjectData.ini", "QuantBot Config.ini", "GameOptions.ini", "mod.json"};
+    std::vector<std::string> filesToInclude = {"ObjectData.ini", "QuantBot Config.ini", "GameOptions.ini", "mod.ini"};
     std::vector<std::pair<std::string, std::string>> fileData;  // name -> content pairs
     
     for(const std::string& filename : filesToInclude) {
