@@ -77,14 +77,86 @@ When reviewing code or fixing bugs:
 ## Common Tasks
 
 ### Building for macOS
+
+#### Quick Build + Installer (RECOMMENDED)
+**Always use the CMake build system with vcpkg for consistent, reproducible builds:**
+
+```bash
+# Navigate to project root
+cd /Users/stefanvanderwel/development/dune/dunelegacy
+
+# Build and create DMG installer (one command does it all!)
+cmake --build build --target dmg --config Release
+```
+
+**Output**: `build/DuneLegacy-0.99.1-macOS.dmg`
+
+**What this does automatically:**
+1. Cleans CPack cache to prevent stale files
+2. Builds the binary with Release optimizations
+3. Stages all files (app bundle, data, config, docs)
+4. Creates fresh DMG installer with hdiutil
+5. Cleans up staging directory
+
+#### Fresh Build from Scratch (Clean Build)
+**Use this when you want to rebuild everything without using any cache:**
+
+```bash
+cd /Users/stefanvanderwel/development/dune/dunelegacy
+
+# Step 1: Remove build directory
+rm -rf build
+
+# Step 2: Configure CMake with vcpkg (builds all dependencies from source)
+cmake -B build \
+  -DCMAKE_TOOLCHAIN_FILE=/Users/stefanvanderwel/development/dune/vcpkg/scripts/buildsystems/vcpkg.cmake \
+  -DCMAKE_BUILD_TYPE=Release
+
+# Step 3: Build and create DMG installer
+cmake --build build --target dmg --config Release
+```
+
+**First build takes ~5-10 minutes** as vcpkg downloads and compiles SDL2 libraries.
+**Subsequent builds are much faster** (seconds to minutes depending on changes).
+
+#### Legacy Xcode Build (Alternative)
 ```bash
 cd IDE/xCode
 xcodebuild -project "Dune Legacy.xcodeproj" -configuration Release
+./create_dmg.sh  # Creates DMG from Xcode build
 ```
 
-### Creating macOS Installer
+### Building for Windows
+
+#### CMake + vcpkg Build (RECOMMENDED)
+```powershell
+# PowerShell - Navigate to project root
+cd C:\path\to\dunelegacy
+
+# Configure (one-time or after CMakeLists.txt changes)
+cmake -B build -G "Visual Studio 17 2022" -A x64 `
+  -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+
+# Build and create installer
+cmake --build build --target installer --config Release
+```
+
+**Output**: 
+- `build/DuneLegacy-0.99.1-Windows-x64.exe` (NSIS installer)
+- `build/DuneLegacy-0.99.1-Windows-x64.zip` (portable zip)
+
+### Building for Linux
+
 ```bash
-./create_dmg.sh
+cd /path/to/dunelegacy
+
+# Configure with vcpkg
+cmake -B build \
+  -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake \
+  -DCMAKE_BUILD_TYPE=Release
+
+# Build and create packages (DEB, RPM, TGZ)
+cmake --build build --target package --config Release
 ```
 
 ### Running Tests
@@ -97,12 +169,74 @@ xcodebuild -project "Dune Legacy.xcodeproj" -configuration Release
 ./updatelocale.sh
 ```
 
+## Build Troubleshooting
+
+### Common Build Issues
+
+#### Missing Release Notes File
+**Problem**: DMG/installer creation fails with "Error copying file RELEASE_NOTES_X.Y.Z.md"
+
+**Solution**: Ensure release notes file matches version in CMakeLists.txt:
+```bash
+# Check version in CMakeLists.txt (line 4)
+grep "project(DuneLegacy VERSION" CMakeLists.txt
+
+# Create matching release notes file if missing
+cp release_notes/RELEASE_NOTES_0.99.md release_notes/RELEASE_NOTES_0.99.1.md
+```
+
+#### vcpkg Dependencies Not Found
+**Problem**: CMake can't find SDL2 or other dependencies
+
+**Solution**: Ensure vcpkg toolchain file path is correct:
+```bash
+# Verify vcpkg location
+ls /Users/stefanvanderwel/development/dune/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+# Reconfigure with correct path
+cmake -B build \
+  -DCMAKE_TOOLCHAIN_FILE=/Users/stefanvanderwel/development/dune/vcpkg/scripts/buildsystems/vcpkg.cmake \
+  -DCMAKE_BUILD_TYPE=Release
+```
+
+#### Stale Files in Installer
+**Problem**: Old binary or files appear in DMG/installer after rebuild
+
+**Solution**: The `dmg`, `installer`, and `package` targets automatically clean CPack cache. If issues persist:
+```bash
+# Manual clean
+rm -rf build/_CPack_Packages
+rm -rf build/install
+rm build/*.dmg
+
+# Then rebuild
+cmake --build build --target dmg --config Release
+```
+
+#### macOS Version Warnings
+**Problem**: Warnings like "object file was built for newer 'macOS' version (15.0) than being linked (14.0)"
+
+**Solution**: These are harmless warnings. vcpkg builds for current OS but CMake targets 14.0 for compatibility. To suppress:
+```bash
+# Update CMakeLists.txt line 24 to match your OS version
+set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum OS X deployment version" FORCE)
+```
+
+### Important Notes
+
+- **Always use installer targets** (`dmg`, `installer`, `package`) - they ensure fresh builds
+- **First vcpkg build is slow** (~5-10 min) - subsequent builds are fast
+- **vcpkg caches binaries** in `~/.cache/vcpkg/archives` for reuse across projects
+- **Build directory is safe to delete** - just reconfigure and rebuild
+- **Version must match** between CMakeLists.txt and release_notes filename
+
 ## Recent Fixes
 - Network permission handling on macOS (prevents crashes when accessing multiplayer)
 - Socket initialization retry mechanism for permission prompts
 - Visual Studio 2022 build configuration fixes for x64 Release/Debug builds
 - SDL2 library dependency resolution and project reference updates
 - **SDL2 DLL Copying Fix**: Fixed post-build events in `IDE/VC/DuneLegacy.vcxproj` for x64 configurations to correctly copy SDL2 DLLs from their build location to the output directory
+- **Release Notes Version Matching**: Created RELEASE_NOTES_0.99.1.md to match CMakeLists.txt version
 
 ## Code Style Notes
 - C++17 standard

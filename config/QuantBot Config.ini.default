@@ -50,6 +50,7 @@
 [Difficulty Settings]
 # === DEFEND (Very Easy) - Never attacks ===
 Defend_AttackEnabled=0
+Defend_AttackThresholdPercent=0.90
 Defend_OrnithopterAttackEnabled=0
 Defend_OrnithopterAttackThreshold=999
 Defend_AttackForceMilitaryValueRatio=0.0
@@ -57,33 +58,45 @@ Defend_AttackForceMilitaryValueRatio=0.0
 Defend_HarvesterLimitMultiplier=2
 Defend_MilitaryValueMultiplier=1.8
 Defend_RefineryMinimum=0
-# Custom games: Small, Medium, Large map limits
+# Custom games: Small, Medium, Large, Huge map limits
 Defend_HarvesterLimitSmallMap=3
 Defend_HarvesterLimitMediumMap=4
 Defend_HarvesterLimitLargeMap=15
+Defend_HarvesterLimitHugeMap=20
 Defend_MilitaryValueLimitSmallMap=4000
 Defend_MilitaryValueLimitMediumMap=10000
 Defend_MilitaryValueLimitLargeMap=25000
+Defend_MilitaryValueLimitHugeMap=30000
+# Defense scramble: units to send when attacked
+Defend_StructureDefenders=5
+Defend_HarvesterDefenders=3
 
 # === EASY - Ground units attack, ornithopters defend only ===
 Easy_AttackEnabled=1
+Easy_AttackThresholdPercent=0.50
 Easy_OrnithopterAttackEnabled=0
 Easy_OrnithopterAttackThreshold=999
-Easy_AttackForceMilitaryValueRatio=0.30
+Easy_AttackForceMilitaryValueRatio=0.25
 # Campaign: 1 harvester per refinery, 2.0x initial military (minimum 2000 at mission 21+)
 Easy_HarvesterLimitMultiplier=1
 Easy_MilitaryValueMultiplier=2.0
 Easy_RefineryMinimum=0
-# Custom games: Small, Medium, Large map limits
+# Custom games: Small, Medium, Large, Huge map limits
 Easy_HarvesterLimitSmallMap=2
 Easy_HarvesterLimitMediumMap=2
 Easy_HarvesterLimitLargeMap=8
+Easy_HarvesterLimitHugeMap=15
 Easy_MilitaryValueLimitSmallMap=3000
 Easy_MilitaryValueLimitMediumMap=8000
 Easy_MilitaryValueLimitLargeMap=20000
+Easy_MilitaryValueLimitHugeMap=30000
+# Defense scramble: units to send when attacked
+Easy_StructureDefenders=10
+Easy_HarvesterDefenders=5
 
 # === MEDIUM - Ground units attack, ornithopters defend only ===
 Medium_AttackEnabled=1
+Medium_AttackThresholdPercent=0.40
 Medium_OrnithopterAttackEnabled=0
 Medium_OrnithopterAttackThreshold=999
 Medium_AttackForceMilitaryValueRatio=0.40
@@ -91,47 +104,64 @@ Medium_AttackForceMilitaryValueRatio=0.40
 Medium_HarvesterLimitMultiplier=2
 Medium_MilitaryValueMultiplier=2.5
 Medium_RefineryMinimum=0
-# Custom games: Small, Medium, Large map limits
+# Custom games: Small, Medium, Large, Huge map limits
 Medium_HarvesterLimitSmallMap=3
 Medium_HarvesterLimitMediumMap=4
 Medium_HarvesterLimitLargeMap=15
+Medium_HarvesterLimitHugeMap=25
 Medium_MilitaryValueLimitSmallMap=5000
 Medium_MilitaryValueLimitMediumMap=12000
 Medium_MilitaryValueLimitLargeMap=35000
+Medium_MilitaryValueLimitHugeMap=50000
+# Defense scramble: units to send when attacked
+Medium_StructureDefenders=15
+Medium_HarvesterDefenders=10
 
 # === HARD - Full aggression ===
 Hard_AttackEnabled=1
+Hard_AttackThresholdPercent=0.30
 Hard_OrnithopterAttackEnabled=1
 Hard_OrnithopterAttackThreshold=1
-Hard_AttackForceMilitaryValueRatio=0.60
+Hard_AttackForceMilitaryValueRatio=0.50
 # Campaign: 2.5 harvesters per refinery, 3.0x initial military (fixed 10000 at mission 21+)
 Hard_HarvesterLimitMultiplier=2.5
 Hard_MilitaryValueMultiplier=3.0
 Hard_RefineryMinimum=2
-# Custom games: Small, Medium, Large map limits
+# Custom games: Small, Medium, Large, Huge map limits
 Hard_HarvesterLimitSmallMap=4
 Hard_HarvesterLimitMediumMap=7
 Hard_HarvesterLimitLargeMap=40
+Hard_HarvesterLimitHugeMap=40
 Hard_MilitaryValueLimitSmallMap=8000
 Hard_MilitaryValueLimitMediumMap=20000
 Hard_MilitaryValueLimitLargeMap=50000
+Hard_MilitaryValueLimitHugeMap=70000
+# Defense scramble: units to send when attacked
+Hard_StructureDefenders=25
+Hard_HarvesterDefenders=15
 
 # === BRUTAL - Maximum aggression ===
 Brutal_AttackEnabled=1
+Brutal_AttackThresholdPercent=0.30
 Brutal_OrnithopterAttackEnabled=1
 Brutal_OrnithopterAttackThreshold=3
-Brutal_AttackForceMilitaryValueRatio=0.80
+Brutal_AttackForceMilitaryValueRatio=0.60
 # Campaign: Uses Custom map-size limits (ignores multiplier), 3.5x initial military
 Brutal_HarvesterLimitMultiplier=999
 Brutal_MilitaryValueMultiplier=3.5
 Brutal_RefineryMinimum=4
-# Custom games: Small, Medium, Large map limits
+# Custom games: Small, Medium, Large, Huge map limits
 Brutal_HarvesterLimitSmallMap=6
 Brutal_HarvesterLimitMediumMap=10
 Brutal_HarvesterLimitLargeMap=100
+Brutal_HarvesterLimitHugeMap=50
 Brutal_MilitaryValueLimitSmallMap=20000
 Brutal_MilitaryValueLimitMediumMap=40000
 Brutal_MilitaryValueLimitLargeMap=80000
+Brutal_MilitaryValueLimitHugeMap=100000
+# Defense scramble: units to send when attacked
+Brutal_StructureDefenders=25
+Brutal_HarvesterDefenders=25
 
 # ============================================================================
 # UNIT COMPOSITION RATIOS

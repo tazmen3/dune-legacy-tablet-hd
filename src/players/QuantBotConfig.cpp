@@ -48,9 +48,13 @@ QuantBotConfig::QuantBotConfig() {
     defend.harvesterLimitCustomSmallMap = 3;                // Custom: Small map (32x32)
     defend.harvesterLimitCustomMediumMap = 4;               // Custom: Medium map (64x64)
     defend.harvesterLimitCustomLargeMap = 15;               // Custom: Large map (128x128)
+    defend.harvesterLimitCustomHugeMap = 20;                // Custom: Huge map (>128x128)
     defend.militaryValueLimitCustomSmallMap = 4000;
     defend.militaryValueLimitCustomMediumMap = 10000;
     defend.militaryValueLimitCustomLargeMap = 25000;
+    defend.militaryValueLimitCustomHugeMap = 30000;         // Custom: Huge map (>128x128)
+    defend.structureDefenders = 5;                          // Max units to scramble for structure defense
+    defend.harvesterDefenders = 3;                          // Max units to scramble for harvester defense
     
     // === EASY DIFFICULTY ===
     easy.attackEnabled = true;                              // Can attack
@@ -64,9 +68,13 @@ QuantBotConfig::QuantBotConfig() {
     easy.harvesterLimitCustomSmallMap = 2;
     easy.harvesterLimitCustomMediumMap = 2;
     easy.harvesterLimitCustomLargeMap = 8;
+    easy.harvesterLimitCustomHugeMap = 15;
     easy.militaryValueLimitCustomSmallMap = 3000;
     easy.militaryValueLimitCustomMediumMap = 8000;
     easy.militaryValueLimitCustomLargeMap = 20000;
+    easy.militaryValueLimitCustomHugeMap = 30000;
+    easy.structureDefenders = 10;
+    easy.harvesterDefenders = 5;
     
     // === MEDIUM DIFFICULTY ===
     medium.attackEnabled = true;
@@ -80,41 +88,53 @@ QuantBotConfig::QuantBotConfig() {
     medium.harvesterLimitCustomSmallMap = 3;
     medium.harvesterLimitCustomMediumMap = 4;
     medium.harvesterLimitCustomLargeMap = 15;
+    medium.harvesterLimitCustomHugeMap = 25;
     medium.militaryValueLimitCustomSmallMap = 5000;
     medium.militaryValueLimitCustomMediumMap = 12000;
     medium.militaryValueLimitCustomLargeMap = 35000;
+    medium.militaryValueLimitCustomHugeMap = 50000;
+    medium.structureDefenders = 15;
+    medium.harvesterDefenders = 10;
     
     // === HARD DIFFICULTY ===
     hard.attackEnabled = true;
     hard.attackThresholdPercent = 0.30f;                    // 30% - aggressive
     hard.ornithopterAttackEnabled = true;
     hard.ornithopterAttackThreshold = 1;                    // Attack as soon as 1 ornithopter is ready
-    hard.attackForceMilitaryValueRatio = 0.50f;             // 50% of military value per attack
+    hard.attackForceMilitaryValueRatio = 0.50f;             // 50% of military value per attack (large attacks)
     hard.harvesterLimitPerRefineryMultiplier = 2;           // Campaign: 2.5 harvesters per refinery (rounded to 2)
     hard.militaryValueMultiplier = 2.5f;                    // Campaign: 2.5x initial (fixed 10000 at mission 21+)
     hard.refineryMinimum = 2;                               // Campaign: Guaranteed 2 refineries (tops up if needed)
     hard.harvesterLimitCustomSmallMap = 4;
     hard.harvesterLimitCustomMediumMap = 7;
     hard.harvesterLimitCustomLargeMap = 40;
+    hard.harvesterLimitCustomHugeMap = 40;
     hard.militaryValueLimitCustomSmallMap = 8000;
     hard.militaryValueLimitCustomMediumMap = 20000;
     hard.militaryValueLimitCustomLargeMap = 50000;
+    hard.militaryValueLimitCustomHugeMap = 70000;
+    hard.structureDefenders = 25;
+    hard.harvesterDefenders = 15;
     
     // === BRUTAL DIFFICULTY ===
     brutal.attackEnabled = true;
-    brutal.attackThresholdPercent = 0.20f;                  // 20% - very aggressive
+    brutal.attackThresholdPercent = 0.30f;                  // 30% - aggressive (same as Hard)
     brutal.ornithopterAttackEnabled = true;
     brutal.ornithopterAttackThreshold = 3;                  // Attack as soon as 3 ornithopters are ready
-    brutal.attackForceMilitaryValueRatio = 0.50f;           // 50% of military value per attack
+    brutal.attackForceMilitaryValueRatio = 0.60f;           // 60% of military value per attack (massive attacks)
     brutal.harvesterLimitPerRefineryMultiplier = 3;         // Campaign: 3 harvesters per refinery
     brutal.militaryValueMultiplier = 3.0f;                  // Campaign: 3.0x initial military
     brutal.refineryMinimum = 2;                             // Campaign: Guaranteed 2 refineries (tops up if needed)
     brutal.harvesterLimitCustomSmallMap = 6;
     brutal.harvesterLimitCustomMediumMap = 10;
     brutal.harvesterLimitCustomLargeMap = 100;
+    brutal.harvesterLimitCustomHugeMap = 50;
     brutal.militaryValueLimitCustomSmallMap = 20000;
     brutal.militaryValueLimitCustomMediumMap = 40000;
     brutal.militaryValueLimitCustomLargeMap = 80000;
+    brutal.militaryValueLimitCustomHugeMap = 100000;
+    brutal.structureDefenders = 25;
+    brutal.harvesterDefenders = 25;
     
     // === UNIT COMPOSITION RATIOS ===
     // Single set of ratios used across all difficulties
@@ -223,11 +243,15 @@ static void saveDifficultySettings(INIFile& iniFile, const std::string& section,
     iniFile.setIntValue(section, prefix + "_MilitaryValueLimitSmallMap", settings.militaryValueLimitCustomSmallMap);
     iniFile.setIntValue(section, prefix + "_MilitaryValueLimitMediumMap", settings.militaryValueLimitCustomMediumMap);
     iniFile.setIntValue(section, prefix + "_MilitaryValueLimitLargeMap", settings.militaryValueLimitCustomLargeMap);
+    iniFile.setIntValue(section, prefix + "_MilitaryValueLimitHugeMap", settings.militaryValueLimitCustomHugeMap);
     iniFile.setIntValue(section, prefix + "_HarvesterLimitMultiplier", settings.harvesterLimitPerRefineryMultiplier);
     iniFile.setIntValue(section, prefix + "_RefineryMinimum", settings.refineryMinimum);
     iniFile.setIntValue(section, prefix + "_HarvesterLimitSmallMap", settings.harvesterLimitCustomSmallMap);
     iniFile.setIntValue(section, prefix + "_HarvesterLimitMediumMap", settings.harvesterLimitCustomMediumMap);
     iniFile.setIntValue(section, prefix + "_HarvesterLimitLargeMap", settings.harvesterLimitCustomLargeMap);
+    iniFile.setIntValue(section, prefix + "_HarvesterLimitHugeMap", settings.harvesterLimitCustomHugeMap);
+    iniFile.setIntValue(section, prefix + "_StructureDefenders", settings.structureDefenders);
+    iniFile.setIntValue(section, prefix + "_HarvesterDefenders", settings.harvesterDefenders);
 }
 
 // Helper function to load difficulty settings from INI
@@ -242,11 +266,15 @@ static void loadDifficultySettings(const INIFile& iniFile, const std::string& se
     settings.militaryValueLimitCustomSmallMap = iniFile.getIntValue(section, prefix + "_MilitaryValueLimitSmallMap", settings.militaryValueLimitCustomSmallMap);
     settings.militaryValueLimitCustomMediumMap = iniFile.getIntValue(section, prefix + "_MilitaryValueLimitMediumMap", settings.militaryValueLimitCustomMediumMap);
     settings.militaryValueLimitCustomLargeMap = iniFile.getIntValue(section, prefix + "_MilitaryValueLimitLargeMap", settings.militaryValueLimitCustomLargeMap);
+    settings.militaryValueLimitCustomHugeMap = iniFile.getIntValue(section, prefix + "_MilitaryValueLimitHugeMap", settings.militaryValueLimitCustomHugeMap);
     settings.harvesterLimitPerRefineryMultiplier = iniFile.getIntValue(section, prefix + "_HarvesterLimitMultiplier", settings.harvesterLimitPerRefineryMultiplier);
     settings.refineryMinimum = iniFile.getIntValue(section, prefix + "_RefineryMinimum", settings.refineryMinimum);
     settings.harvesterLimitCustomSmallMap = iniFile.getIntValue(section, prefix + "_HarvesterLimitSmallMap", settings.harvesterLimitCustomSmallMap);
     settings.harvesterLimitCustomMediumMap = iniFile.getIntValue(section, prefix + "_HarvesterLimitMediumMap", settings.harvesterLimitCustomMediumMap);
     settings.harvesterLimitCustomLargeMap = iniFile.getIntValue(section, prefix + "_HarvesterLimitLargeMap", settings.harvesterLimitCustomLargeMap);
+    settings.harvesterLimitCustomHugeMap = iniFile.getIntValue(section, prefix + "_HarvesterLimitHugeMap", settings.harvesterLimitCustomHugeMap);
+    settings.structureDefenders = iniFile.getIntValue(section, prefix + "_StructureDefenders", settings.structureDefenders);
+    settings.harvesterDefenders = iniFile.getIntValue(section, prefix + "_HarvesterDefenders", settings.harvesterDefenders);
 }
 
 // Helper function to save unit ratios to INI
@@ -735,9 +763,13 @@ std::string QuantBotConfig::getConfigHash() const {
         configStr += std::to_string(s.militaryValueLimitCustomSmallMap);
         configStr += std::to_string(s.militaryValueLimitCustomMediumMap);
         configStr += std::to_string(s.militaryValueLimitCustomLargeMap);
+        configStr += std::to_string(s.militaryValueLimitCustomHugeMap);
         configStr += std::to_string(s.harvesterLimitCustomSmallMap);
         configStr += std::to_string(s.harvesterLimitCustomMediumMap);
         configStr += std::to_string(s.harvesterLimitCustomLargeMap);
+        configStr += std::to_string(s.harvesterLimitCustomHugeMap);
+        configStr += std::to_string(s.structureDefenders);
+        configStr += std::to_string(s.harvesterDefenders);
     };
     
     addDiffSettings("defend", defend);

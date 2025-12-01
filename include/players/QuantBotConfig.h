@@ -50,15 +50,21 @@ struct QuantBotConfig {
         int militaryValueLimitCustomSmallMap;   // Military value limit for small maps (Custom)
         int militaryValueLimitCustomMediumMap;  // Military value limit for medium maps (Custom)
         int militaryValueLimitCustomLargeMap;   // Military value limit for large maps (Custom)
+        int militaryValueLimitCustomHugeMap;    // Military value limit for huge maps >128x128 (Custom)
         
         // Harvester limits
         int harvesterLimitPerRefineryMultiplier; // Harvesters per refinery
         int harvesterLimitCustomSmallMap;       // Harvester limit for small maps (Custom)
         int harvesterLimitCustomMediumMap;      // Harvester limit for medium maps (Custom)
         int harvesterLimitCustomLargeMap;       // Harvester limit for large maps (Custom)
+        int harvesterLimitCustomHugeMap;        // Harvester limit for huge maps >128x128 (Custom)
         
         // Refinery minimum (Campaign)
         int refineryMinimum;                    // Guaranteed refineries at start (tops up if below, 0 = no guarantee)
+        
+        // Defense scramble settings
+        int structureDefenders;                 // Max units to scramble when structure is attacked
+        int harvesterDefenders;                 // Max units to scramble when harvester is attacked
     };
     
     DifficultySettings defend;   // Very Easy (Defend only)

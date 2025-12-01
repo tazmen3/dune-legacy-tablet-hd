@@ -482,19 +482,16 @@ void QuantBot::update() {
 			harvesterLimit = diffSettings.harvesterLimitCustomMediumMap;
 			militaryValueLimit = diffSettings.militaryValueLimitCustomMediumMap;
 			logDebug("  Map Category: Medium (64x64)");
-		} else if (mapsize < 16384) {
-			// Large map (< 128x128)
+		} else if (mapsize <= 16384) {
+			// Large map (up to 128x128)
 			harvesterLimit = diffSettings.harvesterLimitCustomLargeMap;
 			militaryValueLimit = diffSettings.militaryValueLimitCustomLargeMap;
-			logDebug("  Map Category: Large (< 128x128)");
+			logDebug("  Map Category: Large (up to 128x128)");
 		} else {
-			// Huge maps (>= 128x128) - scale more slowly using square root
-			// 256x256 (4x tiles) gets 2x harvesters/military, 512x512 (16x tiles) gets 4x, etc.
-			double scaleFactor = sqrt(mapsize / 16384.0);
-			harvesterLimit = diffSettings.harvesterLimitCustomLargeMap * scaleFactor;
-			militaryValueLimit = diffSettings.militaryValueLimitCustomLargeMap * scaleFactor;
-			logDebug("  Map Category: Huge (>= 128x128, scaled from Large)");
-			logDebug("  Scale Factor: %.2fx (sqrt-based)", scaleFactor);
+			// Huge maps (> 128x128) - use config values
+			harvesterLimit = diffSettings.harvesterLimitCustomHugeMap;
+			militaryValueLimit = diffSettings.militaryValueLimitCustomHugeMap;
+			logDebug("  Map Category: Huge (> 128x128)");
 		}
 		
 		logDebug("  Config Values - Small(H:%d,M:%d) Med(H:%d,M:%d) Large(H:%d,M:%d)",
@@ -746,15 +743,9 @@ void QuantBot::onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID)
         doRepair(pObject);
         // no point scrambling to defend a missile
         if(pDamager->getItemID() != Structure_Palace) {
-            int numStructureDefenders = 0;
-            switch(difficulty) {
-                case Difficulty::Defend:    numStructureDefenders = 4;                                  break;
-                case Difficulty::Easy:      numStructureDefenders = 6;                                  break;
-                case Difficulty::Medium:    numStructureDefenders = 10;                                 break;
-                case Difficulty::Hard:      numStructureDefenders = 20;                                 break;
-                case Difficulty::Brutal:    numStructureDefenders = std::numeric_limits<int>::max();    break;
-            }
-            scrambleUnitsAndDefend(pDamager, numStructureDefenders);
+            const QuantBotConfig& config = getQuantBotConfig();
+            const QuantBotConfig::DifficultySettings& diffSettings = config.getSettings(static_cast<int>(difficulty));
+            scrambleUnitsAndDefend(pDamager, diffSettings.structureDefenders);
         }
 
 	}
@@ -778,15 +769,9 @@ void QuantBot::onDamage(const ObjectBase* pObject, int damage, Uint32 damagerID)
 			// Defend the harvester!
 			const Harvester* pHarvester = static_cast<const Harvester*>(pGroundUnit);
 			if (pHarvester->isActive() && (!pHarvester->isReturning()) && pHarvester->getAmountOfSpice() > 0) {
-				int numHarvesterDefenders = 0;
-				switch (difficulty) {
-				case Difficulty::Defend:    numHarvesterDefenders = 2;                                  break;
-				case Difficulty::Easy:      numHarvesterDefenders = 3;                                  break;
-				case Difficulty::Medium:    numHarvesterDefenders = 5;                                  break;
-				case Difficulty::Hard:      numHarvesterDefenders = 10;                                 break;
-				case Difficulty::Brutal:    numHarvesterDefenders = std::numeric_limits<int>::max();    break;
-				}
-				scrambleUnitsAndDefend(pDamager, numHarvesterDefenders);
+				const QuantBotConfig& config = getQuantBotConfig();
+				const QuantBotConfig::DifficultySettings& diffSettings = config.getSettings(static_cast<int>(difficulty));
+				scrambleUnitsAndDefend(pDamager, diffSettings.harvesterDefenders);
 				doReturn(pHarvester);
 			}
 		}
@@ -2546,27 +2531,22 @@ void QuantBot::scrambleUnitsAndDefend(const ObjectBase* pIntruder, int numUnits)
 		if (pUnit->isRespondable() && (pUnit->getOwner() == getHouse())) {
 			if (!pUnit->hasATarget() && !pUnit->wasForced()) {
 				Uint32 itemID = pUnit->getItemID();
-				if ((itemID != Unit_Harvester) && (pUnit->getItemID() != Unit_MCV) && (pUnit->getItemID() != Unit_Carryall)
-					&& (pUnit->getItemID() != Unit_Frigate) && (pUnit->getItemID() != Unit_Saboteur) && (pUnit->getItemID() != Unit_Sandworm)) {
+				if ((itemID != Unit_Harvester) && (itemID != Unit_MCV) && (itemID != Unit_Carryall)
+					&& (itemID != Unit_Frigate) && (itemID != Unit_Saboteur) && (itemID != Unit_Sandworm)) {
 
 					doSetAttackMode(pUnit, AREAGUARD);
+					doAttackObject(pUnit, pIntruder, true);
 
-					if (pUnit->getItemID() == Unit_Launcher || pUnit->getItemID() == Unit_Deviator) {
-						doAttackObject(pUnit, pIntruder, false);
-					}
-					else {
-						doAttackObject(pUnit, pIntruder, true);
-					}
-
+					// Request carryall drop for ground units if far away (except Launchers/Deviators)
 					if (getGameInitSettings().getGameOptions().manualCarryallDrops
 						&& pUnit->isVisible()
 						&& pUnit->isAGroundUnit()
-						&& (pUnit->getItemID() != Unit_Deviator)
-						&& (pUnit->getItemID() != Unit_Launcher)
+						&& (itemID != Unit_Deviator)
+						&& (itemID != Unit_Launcher)
 						&& (blockDistance(pUnit->getLocation(), pUnit->getDestination()) >= 10)
 						&& (pUnit->getHealth() / pUnit->getMaxHealth() > BADLYDAMAGEDRATIO)) {
 
-						doRequestCarryallDrop(static_cast<const GroundUnit*>(pUnit)); //do request carryall to defend unit
+						doRequestCarryallDrop(static_cast<const GroundUnit*>(pUnit));
 					}
 
 					if (--numUnits == 0) {

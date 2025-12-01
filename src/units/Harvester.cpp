@@ -204,8 +204,21 @@ void Harvester::checkPos()
                     }
                 } else if(!awaitingPickup && owner->hasCarryalls() && pRefinery->isFree() && blockDistance(location, pRefinery->getClosestPoint(location)) >= MIN_CARRYALL_LIFT_DISTANCE) {
                     requestCarryall();
+                } else if(!awaitingPickup && !moving && pathList.empty()) {
+                    // Stuck returning to refinery - path blocked and can't request carryall normally
+                    // (either too close, no carryalls, or refinery busy)
+                    Coord refineryPoint = pRefinery->getClosestPoint(location);
+                    if(location != refineryPoint) {
+                        // Not at refinery - we're stuck
+                        if(owner->hasCarryalls()) {
+                            // Request carryall regardless of distance
+                            requestCarryall();
+                        } else {
+                            // No carryalls - try a different refinery
+                            setTarget(nullptr);
+                        }
+                    }
                 }
-
 
             } else {
                 int leastNumBookings = std::numeric_limits<int>::max(); //huge amount so refinery couldn't possibly compete with any refinery num bookings
