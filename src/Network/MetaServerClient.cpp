@@ -436,8 +436,9 @@ int MetaServerClient::connectionThreadMain(void* data) {
                             // Support formats:
                             // - Old: 9 fields (no localIP, no mod)
                             // - Intermediate: 10 fields (with localIP, no mod)
+                            // - New: 11 fields (with localIP, modname, empty modversion - trailing field dropped by regex)
                             // - New: 12 fields (with localIP, modname, modversion)
-                            if(parts.size() < 9 || parts.size() == 11 || parts.size() > 12) {
+                            if(parts.size() < 9 || parts.size() > 12) {
                                 break;
                             }
 
@@ -481,9 +482,9 @@ int MetaServerClient::connectionThreadMain(void* data) {
                             }
                             
                             // Parse mod info if available (11th and 12th fields)
-                            if(parts.size() >= 12) {
+                            if(parts.size() >= 11) {
                                 gameServerInfo.modName = parts[10];
-                                gameServerInfo.modVersion = parts[11];
+                                gameServerInfo.modVersion = (parts.size() >= 12) ? parts[11] : "";
                             } else {
                                 gameServerInfo.modName = "vanilla";
                                 gameServerInfo.modVersion = "";
@@ -501,7 +502,6 @@ int MetaServerClient::connectionThreadMain(void* data) {
 
                     } else {
                         const std::string errorMsg = result.substr(result.find_first_not_of("\x0D\x0A",5), std::string::npos);
-
                         pMetaServerClient->setErrorMessage(METASERVERCOMMAND_LIST, errorMsg);
                     }
 
