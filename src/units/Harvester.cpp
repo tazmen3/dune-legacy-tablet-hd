@@ -206,6 +206,7 @@ void Harvester::checkPos()
                     requestCarryall();
                 }
 
+
             } else {
                 int leastNumBookings = std::numeric_limits<int>::max(); //huge amount so refinery couldn't possibly compete with any refinery num bookings
                 FixPoint closestLeastBookedRefineryDistance = FixPt32_MAX;
