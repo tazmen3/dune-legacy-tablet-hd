@@ -1572,6 +1572,11 @@ UnitBase::PathRequestStats UnitBase::resolvePendingPathRequest() {
                       && !static_cast<Harvester*>(this)->isReturning()
                       && blockDistance(location, destination) >= 2) {
                 static_cast<Harvester*>(this)->doReturn();
+            } else if((getItemID() == Unit_Harvester)
+                      && static_cast<Harvester*>(this)->isReturning()) {
+                // Returning harvester stuck close to refinery - don't give up, keep trying
+                // The blocker will eventually move
+                noCloserPointCount = 0;  // Reset counter so we keep trying
             } else {
                 setDestination(location);
                 forced = false;
