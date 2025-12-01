@@ -24,6 +24,9 @@
 #include <GUI/TextButton.h>
 #include <GUI/Spacer.h>
 #include <GUI/PictureLabel.h>
+#include <Network/VersionChecker.h>
+
+#include <memory>
 
 class MainMenu final : public MenuBase {
 public:
@@ -36,6 +39,8 @@ public:
     MainMenu& operator=(MainMenu &&) = delete;
 
     virtual int showMenu() override;
+    virtual void update() override;
+    virtual void onChildWindowClose(Window* pChildWindow) override;
 
 private:
     void onSinglePlayer() const;
@@ -60,6 +65,13 @@ private:
     PictureLabel    planetPicture;
     PictureLabel    duneLegacy;
     PictureLabel    buttonBorder;
+
+    // Version checking
+    std::unique_ptr<VersionChecker> pVersionChecker;
+    bool bVersionCheckStarted = false;
+    bool bUpdateDialogShown = false;
+    std::string latestVersion;
+    std::string downloadURL;
 };
 
 #endif // MAINMENU_H

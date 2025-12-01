@@ -198,6 +198,7 @@ target_sources(dunelegacy
         Network/NetworkManager.cpp
         Network/ENetHttp.cpp
         Network/MetaServerClient.cpp
+        Network/VersionChecker.cpp
 
         # Players
         players/Player.cpp
