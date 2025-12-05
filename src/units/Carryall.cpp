@@ -395,6 +395,37 @@ void Carryall::engageTarget()
 
     targetDistance = distanceFrom(realLocation, realDestination);
 
+    // SNAP: When close to target, directly adjust position toward it
+    // This bypasses orientation-based movement and prevents circling
+    // Similar to Dynasty's Script_Unit_MoveToTarget approach
+    static const FixPoint SNAP_RANGE = 2 * TILESIZE;  // Start snapping within 2 tiles
+    static const FixPoint SNAP_SPEED = 16;            // Max pixels per update
+    
+    if (targetDistance < SNAP_RANGE && targetDistance > TILESIZE/10) {
+        // Direct position adjustment toward target
+        FixPoint dx = realDestination.x - realX;
+        FixPoint dy = realDestination.y - realY;
+        
+        // Clamp movement to max SNAP_SPEED pixels in each direction
+        dx = std::max(-SNAP_SPEED, std::min(SNAP_SPEED, dx));
+        dy = std::max(-SNAP_SPEED, std::min(SNAP_SPEED, dy));
+        
+        realX += dx;
+        realY += dy;
+        
+        // Update location if we crossed a tile boundary
+        Coord newLocation = Coord(lround(realX)/TILESIZE, lround(realY)/TILESIZE);
+        if(newLocation != location) {
+            unassignFromMap(location);
+            assignToMap(newLocation);
+            location = newLocation;
+        }
+        
+        // Recalculate distance after snap
+        realLocation = Coord(lround(realX), lround(realY));
+        targetDistance = distanceFrom(realLocation, realDestination);
+    }
+
     // Increased pickup radius from TILESIZE/32 to TILESIZE/10 to match Dynasty's 1/16th tile (6.4% vs 6.25%)
     // Original: TILESIZE/32 = 3.125% was too strict, Dynasty uses ~6.25%
     if (targetDistance <= TILESIZE/10) {

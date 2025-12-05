@@ -93,7 +93,6 @@ private:
     bool campaignAIAttackFlag = false;
     Coord squadRallyLocation = Coord::Invalid();
     Coord squadRetreatLocation = Coord::Invalid();
-    bool heavyFactoryRushActive = false;
     bool supportMode = false;
     Uint32 lastStatsLogCycle = 0;
     

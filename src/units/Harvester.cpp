@@ -61,6 +61,7 @@ Harvester::Harvester(House* newOwner) : TrackedUnit(newOwner)
     returningToRefinery = false;
     spiceCheckCounter = 0;
     pathFailCounter = 0;
+    returnPathFailCounter = 0;
 
     attackMode = GUARD;
 }
@@ -74,6 +75,7 @@ Harvester::Harvester(InputStream& stream) : TrackedUnit(stream)
     spice = stream.readFixPoint();
     spiceCheckCounter = stream.readUint32();
     pathFailCounter = 0;  // Runtime counter - not persisted
+    returnPathFailCounter = 0;  // Runtime counter - not persisted
 }
 
 void Harvester::init()
@@ -204,6 +206,49 @@ void Harvester::checkPos()
                     }
                 } else if(!awaitingPickup && owner->hasCarryalls() && pRefinery->isFree() && blockDistance(location, pRefinery->getClosestPoint(location)) >= MIN_CARRYALL_LIFT_DISTANCE) {
                     requestCarryall();
+                }
+                
+                // Check if path to refinery is blocked - request carryall if stuck
+                if(!awaitingPickup && !moving && pathList.empty() && destination != location) {
+                    // Not moving, no path, but has a destination - path is likely blocked
+                    returnPathFailCounter++;
+                    if(returnPathFailCounter >= 3) {
+                        if(pRefinery->isFree() && owner->hasCarryalls()) {
+                            // Refinery is free but path is blocked - request carryall
+                            SDL_Log("HARVESTER %d: Path to refinery blocked, requesting carryall pickup", getObjectID());
+                            requestCarryall();
+                            returnPathFailCounter = 0;
+                        } else if(!pRefinery->isFree()) {
+                            // Refinery is occupied - try to find another free refinery
+                            Refinery* pAlternateRefinery = nullptr;
+                            FixPoint closestDistance = FixPt32_MAX;
+                            
+                            for(StructureBase* pStructure : structureList) {
+                                if((pStructure->getItemID() == Structure_Refinery) && (pStructure->getOwner() == owner)) {
+                                    Refinery* pOtherRefinery = static_cast<Refinery*>(pStructure);
+                                    if(pOtherRefinery != pRefinery && pOtherRefinery->isFree()) {
+                                        FixPoint dist = blockDistance(location, pOtherRefinery->getClosestPoint(location));
+                                        if(dist < closestDistance) {
+                                            closestDistance = dist;
+                                            pAlternateRefinery = pOtherRefinery;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if(pAlternateRefinery) {
+                                // Found an alternate free refinery - switch to it
+                                SDL_Log("HARVESTER %d: Current refinery occupied, switching to alternate", getObjectID());
+                                doMove2Object(pAlternateRefinery);
+                                pAlternateRefinery->startAnimate();
+                            }
+                            // If no alternate found, just wait for current refinery
+                            returnPathFailCounter = 0;
+                        }
+                    }
+                } else if(moving || !pathList.empty()) {
+                    // Successfully moving or have path - reset counter
+                    returnPathFailCounter = 0;
                 }
 
 

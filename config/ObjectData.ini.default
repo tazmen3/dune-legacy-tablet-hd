@@ -102,6 +102,13 @@ HarvesterLimitMediumMap = 10    # Maps 64x64 or smaller (4096 tiles)
 HarvesterLimitLargeMap = 15     # Maps between 64x64 and 128x128 (4096-16384 tiles)
 HarvesterLimitHugeMap = 40      # Maps 128x128 or larger (16384+ tiles)
 
+# Maximum units per house based on map size (when override is not set)
+# These are used when "Override max. number of units" is unchecked in game options
+UnitLimitSmallMap = 25          # Maps 32x32 or smaller (1024 tiles)
+UnitLimitMediumMap = 100        # Maps 64x64 or smaller (4096 tiles)
+UnitLimitLargeMap = 250         # Maps between 64x64 and 128x128 (4096-16384 tiles)
+UnitLimitHugeMap = 300          # Maps 128x128 or larger (16384+ tiles)
+
 ### default structure ###
 
 [default structure]

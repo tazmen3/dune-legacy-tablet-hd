@@ -60,6 +60,11 @@ ObjectData::ObjectData()
     harvesterLimitMediumMap = 10;
     harvesterLimitLargeMap = 15;
     harvesterLimitHugeMap = 40;
+    
+    unitLimitSmallMap = 25;
+    unitLimitMediumMap = 100;
+    unitLimitLargeMap = 250;
+    unitLimitHugeMap = 300;
 }
 
 ObjectData::~ObjectData() = default;
@@ -175,6 +180,13 @@ void ObjectData::loadFromINIFile(const std::string& filename)
         harvesterLimitHugeMap = objectDataFile->getIntValue("Map Settings", "HarvesterLimitHugeMap", 40);
         SDL_Log("[ObjectData] Harvester limits: Small=%d, Medium=%d, Large=%d, Huge=%d", 
                 harvesterLimitSmallMap, harvesterLimitMediumMap, harvesterLimitLargeMap, harvesterLimitHugeMap);
+        
+        unitLimitSmallMap = objectDataFile->getIntValue("Map Settings", "UnitLimitSmallMap", 25);
+        unitLimitMediumMap = objectDataFile->getIntValue("Map Settings", "UnitLimitMediumMap", 100);
+        unitLimitLargeMap = objectDataFile->getIntValue("Map Settings", "UnitLimitLargeMap", 250);
+        unitLimitHugeMap = objectDataFile->getIntValue("Map Settings", "UnitLimitHugeMap", 300);
+        SDL_Log("[ObjectData] Unit limits: Small=%d, Medium=%d, Large=%d, Huge=%d", 
+                unitLimitSmallMap, unitLimitMediumMap, unitLimitLargeMap, unitLimitHugeMap);
     }
 
     // load default structure values
@@ -305,6 +317,10 @@ void ObjectData::save(OutputStream& stream) const
     stream.writeSint32(harvesterLimitMediumMap);
     stream.writeSint32(harvesterLimitLargeMap);
     stream.writeSint32(harvesterLimitHugeMap);
+    stream.writeSint32(unitLimitSmallMap);
+    stream.writeSint32(unitLimitMediumMap);
+    stream.writeSint32(unitLimitLargeMap);
+    stream.writeSint32(unitLimitHugeMap);
 }
 
 void ObjectData::load(InputStream& stream)
@@ -336,6 +352,10 @@ void ObjectData::load(InputStream& stream)
     harvesterLimitMediumMap = stream.readSint32();
     harvesterLimitLargeMap = stream.readSint32();
     harvesterLimitHugeMap = stream.readSint32();
+    unitLimitSmallMap = stream.readSint32();
+    unitLimitMediumMap = stream.readSint32();
+    unitLimitLargeMap = stream.readSint32();
+    unitLimitHugeMap = stream.readSint32();
 }
 
 int ObjectData::loadIntValue(const INIFile& objectDataFile, const std::string& section, const std::string& key, char houseChar, int defaultValue) {
@@ -459,6 +479,10 @@ std::string ObjectData::getEffectiveHash() const {
     dataStr += std::to_string(harvesterLimitMediumMap);
     dataStr += std::to_string(harvesterLimitLargeMap);
     dataStr += std::to_string(harvesterLimitHugeMap);
+    dataStr += std::to_string(unitLimitSmallMap);
+    dataStr += std::to_string(unitLimitMediumMap);
+    dataStr += std::to_string(unitLimitLargeMap);
+    dataStr += std::to_string(unitLimitHugeMap);
     
     // FNV-1a hash (consistent across platforms)
     uint64_t hash = 14695981039346656037ULL;

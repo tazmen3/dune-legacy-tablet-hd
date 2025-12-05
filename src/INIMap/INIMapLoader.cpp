@@ -429,7 +429,18 @@ void INIMapLoader::loadHouses()
         if(currentGame->getGameInitSettings().getGameOptions().maximumNumberOfUnitsOverride >= 0) {
             maxUnits = currentGame->getGameInitSettings().getGameOptions().maximumNumberOfUnitsOverride;
         } else {
-            int defaultMaxUnit = std::max(25, 25*(currentGameMap->getSizeX()*currentGameMap->getSizeY())/(64*64));
+            // Use map size defaults from ObjectData.ini
+            const int mapsize = currentGameMap->getSizeX() * currentGameMap->getSizeY();
+            int defaultMaxUnit;
+            if (mapsize <= 1024) {
+                defaultMaxUnit = currentGame->objectData.unitLimitSmallMap;
+            } else if (mapsize < 4096) {
+                defaultMaxUnit = currentGame->objectData.unitLimitMediumMap;
+            } else if (mapsize < 16384) {
+                defaultMaxUnit = currentGame->objectData.unitLimitLargeMap;
+            } else {
+                defaultMaxUnit = currentGame->objectData.unitLimitHugeMap;
+            }
             int maxUnit = inifile->getIntValue(houseName,"MaxUnit",defaultMaxUnit);
             maxUnits = inifile->getIntValue(houseName,"MaxUnits",maxUnit);
         }
@@ -932,19 +943,28 @@ House* INIMapLoader::getOrCreateHouse(int houseID) {
             team = 2;
         }
 
+        // Use map size defaults from ObjectData.ini
+        const int mapsize = currentGameMap->getSizeX() * currentGameMap->getSizeY();
+
         int maxUnits = 0;
         if(currentGame->getGameInitSettings().getGameOptions().maximumNumberOfUnitsOverride >= 0) {
             maxUnits = currentGame->getGameInitSettings().getGameOptions().maximumNumberOfUnitsOverride;
         } else {
-            maxUnits = std::min(40, 20 * (currentGameMap->getSizeX() * currentGameMap->getSizeY()) / (32 * 32));
+            if (mapsize <= 1024) {
+                maxUnits = currentGame->objectData.unitLimitSmallMap;
+            } else if (mapsize < 4096) {
+                maxUnits = currentGame->objectData.unitLimitMediumMap;
+            } else if (mapsize < 16384) {
+                maxUnits = currentGame->objectData.unitLimitLargeMap;
+            } else {
+                maxUnits = currentGame->objectData.unitLimitHugeMap;
+            }
         }
 
         int maxHarvesters = 0;
         if(currentGame->getGameInitSettings().getGameOptions().maximumNumberOfHarvestersOverride >= 0) {
             maxHarvesters = currentGame->getGameInitSettings().getGameOptions().maximumNumberOfHarvestersOverride;
         } else {
-            // Use map size defaults from ObjectData.ini
-            const int mapsize = currentGameMap->getSizeX() * currentGameMap->getSizeY();
             if (mapsize <= 1024) {
                 maxHarvesters = currentGame->objectData.harvesterLimitSmallMap;
             } else if (mapsize < 4096) {

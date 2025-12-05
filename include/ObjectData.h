@@ -127,6 +127,11 @@ public:
     int harvesterLimitMediumMap;     ///< Max harvesters for medium maps (64x64 or smaller)
     int harvesterLimitLargeMap;      ///< Max harvesters for large maps (between 64x64 and 128x128)
     int harvesterLimitHugeMap;       ///< Max harvesters for huge maps (128x128 or larger)
+    
+    int unitLimitSmallMap;           ///< Max units per house for small maps (32x32 or smaller)
+    int unitLimitMediumMap;          ///< Max units per house for medium maps (64x64 or smaller)
+    int unitLimitLargeMap;           ///< Max units per house for large maps (between 64x64 and 128x128)
+    int unitLimitHugeMap;            ///< Max units per house for huge maps (128x128 or larger)
 
 private:
 
