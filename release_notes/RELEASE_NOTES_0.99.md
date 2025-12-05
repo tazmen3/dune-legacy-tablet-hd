@@ -5,6 +5,42 @@
 
 ---
 
+## 🚀 Version 0.99.2 Updates
+
+### Harvester & Carryall Improvements
+
+**Smarter Path Blocking Recovery:**
+- Harvesters now request carryall pickup when path to spice is blocked (instead of giving up)
+- Returning harvesters wait for blockers to move instead of switching refineries
+- Harvesters with a booked carrier wait patiently instead of canceling
+- Freshly deployed units can now request carryall help immediately
+- Reduced carryall request cooldown from 5 seconds to 2 seconds for faster recovery
+
+**Refinery Patience Logic:**
+- Returning harvesters no longer give up when path is blocked 3 times
+- Added patience logic - harvesters keep trying instead of resetting destination
+- Prevents constant refinery-switching when temporarily blocked by other units
+
+### Configurable Unit Limits
+
+**Map-Size Based Unit Limits:**
+- New `ObjectData.ini` settings for per-house unit limits based on map size:
+  - `UnitLimitSmallMap = 25` (maps 32x32 or smaller)
+  - `UnitLimitMediumMap = 100` (maps up to 64x64)
+  - `UnitLimitLargeMap = 250` (maps up to 128x128)
+  - `UnitLimitHugeMap = 300` (maps 128x128 or larger)
+- Replaces hardcoded formula with configurable INI values
+- Only used when "Override max. number of units" is unchecked in game options
+
+### QuantBot Refactoring
+- Removed obsolete `heavyFactoryRushActive` flag
+- Code cleanup and logic improvements
+
+### Website Updates
+- Added Linux download links for version 0.99.1
+
+---
+
 ## 🎮 NEW: Complete Mod System
 
 ### Mod Editor & Management
