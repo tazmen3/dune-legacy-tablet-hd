@@ -1537,15 +1537,17 @@ UnitBase::PathRequestStats UnitBase::resolvePendingPathRequest() {
             noProgressCount++;
             
             // After 3 attempts without progress, request carryall (if cooldown expired)
-            if(noProgressCount >= 3 && carryallRequestCooldown <= 0 && (location != oldLocation)) {
+            // Removed (location != oldLocation) requirement - freshly deployed units should also get help
+            if(noProgressCount >= 3 && carryallRequestCooldown <= 0) {
                 if(getOwner()->hasCarryalls()
                    && this->isAGroundUnit()
+                   && !static_cast<GroundUnit*>(this)->hasBookedCarrier()
                    && (currentGame->getGameInitSettings().getGameOptions().manualCarryallDrops || getOwner()->isAI())
                    && currentDistance >= MIN_CARRYALL_LIFT_DISTANCE) {
                     
                     static_cast<GroundUnit*>(this)->requestCarryall();
                     noProgressCount = 0;
-                    carryallRequestCooldown = MILLI2CYCLES(5000); // 5 second cooldown
+                    carryallRequestCooldown = MILLI2CYCLES(2000); // 2 second cooldown (reduced from 5s)
                 }
             }
         }
@@ -1554,7 +1556,8 @@ UnitBase::PathRequestStats UnitBase::resolvePendingPathRequest() {
     lastDistanceToDestination = currentDistance;
 
     if(!pathFound) {
-        if((++noCloserPointCount >= 3) && (location != oldLocation)) {
+        // Removed (location != oldLocation) requirement - freshly deployed units should also get help
+        if(++noCloserPointCount >= 3) {
             if(target.getObjPointer() != nullptr && targetFriendly
                && (target.getObjPointer()->getItemID() != Structure_RepairYard)
                && ((target.getObjPointer()->getItemID() != Structure_Refinery)
@@ -1564,6 +1567,7 @@ UnitBase::PathRequestStats UnitBase::resolvePendingPathRequest() {
 
             if(getOwner()->hasCarryalls()
                && this->isAGroundUnit()
+               && !static_cast<GroundUnit*>(this)->hasBookedCarrier()
                && (currentGame->getGameInitSettings().getGameOptions().manualCarryallDrops || getOwner()->isAI())
                && blockDistance(location, destination) >= MIN_CARRYALL_LIFT_DISTANCE) {
                 static_cast<GroundUnit*>(this)->requestCarryall();

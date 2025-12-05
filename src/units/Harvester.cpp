@@ -287,13 +287,21 @@ void Harvester::checkPos()
             requestCarryall();
         } else if(harvestingMode && destination != location && pathList.empty() && !moving) {
             // Stuck in harvesting mode with unreachable destination
-            // Give pathfinding a few cycles to resolve, then give up
+            // Give pathfinding a few cycles to resolve, then try carryall or give up
             pathFailCounter++;
             if(pathFailCounter >= 3) {
-                // Can't reach this spice after 3 attempts - give up
-                harvestingMode = false;
-                setDestination(location);
-                pathFailCounter = 0;
+                if(!hasBookedCarrier() && owner->hasCarryalls() && blockDistance(location, destination) >= MIN_CARRYALL_LIFT_DISTANCE) {
+                    // Path blocked but carryalls available - request pickup to spice
+                    SDL_Log("HARVESTER %d: Path to spice blocked, requesting carryall pickup", getObjectID());
+                    requestCarryall();
+                    pathFailCounter = 0;
+                } else if(!owner->hasCarryalls()) {
+                    // No carryalls available - give up on this spice location
+                    harvestingMode = false;
+                    setDestination(location);
+                    pathFailCounter = 0;
+                }
+                // If already has a booked carrier, just wait
             }
         } else if(harvestingMode && (!pathList.empty() || moving)) {
             // Successfully moving or have path - reset counter
