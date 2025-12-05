@@ -89,7 +89,7 @@ cd /Users/stefanvanderwel/development/dune/dunelegacy
 cmake --build build --target dmg --config Release
 ```
 
-**Output**: `build/DuneLegacy-0.99.1-macOS.dmg`
+**Output**: `build/DuneLegacy-0.99.2-macOS.dmg`
 
 **What this does automatically:**
 1. Cleans CPack cache to prevent stale files
@@ -142,8 +142,8 @@ cmake --build build --target installer --config Release
 ```
 
 **Output**: 
-- `build/DuneLegacy-0.99.1-Windows-x64.exe` (NSIS installer)
-- `build/DuneLegacy-0.99.1-Windows-x64.zip` (portable zip)
+- `build/DuneLegacy-0.99.2-Windows-x64.exe` (NSIS installer)
+- `build/DuneLegacy-0.99.2-Windows-x64.zip` (portable zip)
 
 ### Building for Linux
 
@@ -174,15 +174,12 @@ cmake --build build --target package --config Release
 ### Common Build Issues
 
 #### Missing Release Notes File
-**Problem**: DMG/installer creation fails with "Error copying file RELEASE_NOTES_X.Y.Z.md"
+**Problem**: DMG/installer creation fails with "Error copying file RELEASE_NOTES.md"
 
-**Solution**: Ensure release notes file matches version in CMakeLists.txt:
+**Solution**: Ensure `release_notes/RELEASE_NOTES.md` exists:
 ```bash
-# Check version in CMakeLists.txt (line 4)
-grep "project(DuneLegacy VERSION" CMakeLists.txt
-
-# Create matching release notes file if missing
-cp release_notes/RELEASE_NOTES_0.99.md release_notes/RELEASE_NOTES_0.99.1.md
+# Verify release notes file exists
+ls release_notes/RELEASE_NOTES.md
 ```
 
 #### vcpkg Dependencies Not Found
@@ -228,7 +225,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum OS X deployment ver
 - **First vcpkg build is slow** (~5-10 min) - subsequent builds are fast
 - **vcpkg caches binaries** in `~/.cache/vcpkg/archives` for reuse across projects
 - **Build directory is safe to delete** - just reconfigure and rebuild
-- **Version must match** between CMakeLists.txt and release_notes filename
+- **Release notes** uses single file `release_notes/RELEASE_NOTES.md` (no version in filename)
 
 ## Recent Fixes
 - Network permission handling on macOS (prevents crashes when accessing multiplayer)
@@ -236,7 +233,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum OS X deployment ver
 - Visual Studio 2022 build configuration fixes for x64 Release/Debug builds
 - SDL2 library dependency resolution and project reference updates
 - **SDL2 DLL Copying Fix**: Fixed post-build events in `IDE/VC/DuneLegacy.vcxproj` for x64 configurations to correctly copy SDL2 DLLs from their build location to the output directory
-- **Release Notes Version Matching**: Created RELEASE_NOTES_0.99.1.md to match CMakeLists.txt version
+- **Release Notes Simplification**: Changed to single `RELEASE_NOTES.md` file without version in filename
 
 ## Code Style Notes
 - C++17 standard

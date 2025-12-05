@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 # Project name and version
-project(DuneLegacy VERSION 0.99.1 LANGUAGES C CXX)
+project(DuneLegacy VERSION 0.99.2 LANGUAGES C CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -199,7 +199,7 @@ if(WIN32)
         DESTINATION ${DUNELEGACY_DOC_DIR}
     )
     # Install release notes
-    install(FILES "release_notes/RELEASE_NOTES_${PROJECT_VERSION}.md"
+    install(FILES "release_notes/RELEASE_NOTES.md"
         DESTINATION ${DUNELEGACY_DOC_DIR}
         RENAME "Release_Notes.md"
     )
@@ -208,7 +208,7 @@ elseif(NOT APPLE)
     install(FILES AUTHORS COPYING NEWS README
         DESTINATION ${DUNELEGACY_DOC_DIR}
     )
-    install(FILES "release_notes/RELEASE_NOTES_${PROJECT_VERSION}.md"
+    install(FILES "release_notes/RELEASE_NOTES.md"
         DESTINATION ${DUNELEGACY_DOC_DIR}
         RENAME "Release_Notes.md"
         OPTIONAL
@@ -292,7 +292,7 @@ elseif(APPLE)
     
     # Install README and release notes to DMG root (not inside .app)
     install(FILES README DESTINATION . COMPONENT Runtime)
-    install(FILES "release_notes/RELEASE_NOTES_${PROJECT_VERSION}.md" 
+    install(FILES "release_notes/RELEASE_NOTES.md" 
             DESTINATION . 
             RENAME "Release Notes.md"
             COMPONENT Runtime
@@ -319,7 +319,7 @@ elseif(APPLE)
         COMMAND ${CMAKE_COMMAND} -E make_directory /tmp/dunelegacy_dmg_staging
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/dunelegacy.app /tmp/dunelegacy_dmg_staging/dunelegacy.app
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/README /tmp/dunelegacy_dmg_staging/README
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/release_notes/RELEASE_NOTES_${PROJECT_VERSION}.md /tmp/dunelegacy_dmg_staging/Release\\ Notes.md
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/release_notes/RELEASE_NOTES.md /tmp/dunelegacy_dmg_staging/Release\\ Notes.md
         COMMAND ${CMAKE_COMMAND} -E echo "Creating Applications symlink for drag-and-drop install..."
         COMMAND ln -sf /Applications /tmp/dunelegacy_dmg_staging/Applications
         COMMAND ${CMAKE_COMMAND} -E echo "Creating DMG with hdiutil..."
