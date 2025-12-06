@@ -430,6 +430,16 @@ if(APPLE)
             "${BUNDLE_RESOURCES_DIR}/config/"
         COMMENT "Copying data and config files into app bundle Resources"
     )
+    
+    # Code sign the app bundle with ad-hoc signature
+    # This is required for macOS Gatekeeper to allow the app to run when downloaded
+    # Without proper signing, users get "app is damaged and can't be opened" error
+    add_custom_command(
+        TARGET dunelegacy
+        POST_BUILD
+        COMMAND codesign --force --deep --sign - "$<TARGET_BUNDLE_DIR:dunelegacy>"
+        COMMENT "Code signing app bundle with ad-hoc signature"
+    )
 else()
     # For other platforms, copy to build/data directory
     set(BUILD_DATA_DIR "${CMAKE_BINARY_DIR}/data")
