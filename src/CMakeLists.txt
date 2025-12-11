@@ -199,6 +199,7 @@ target_sources(dunelegacy
         Network/ENetHttp.cpp
         Network/MetaServerClient.cpp
         Network/VersionChecker.cpp
+        Network/UPnPManager.cpp
 
         # Players
         players/Player.cpp
@@ -366,6 +367,9 @@ if(APPLE)
     )
 endif()
 
+# Find miniupnpc for UPnP support
+find_package(miniupnpc CONFIG REQUIRED)
+
 # Link libraries
 # vcpkg provides modern CMake targets for SDL2
 target_link_libraries(dunelegacy
@@ -375,6 +379,7 @@ target_link_libraries(dunelegacy
         $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,SDL2_mixer::SDL2_mixer-static>
         $<IF:$<TARGET_EXISTS:SDL2_ttf::SDL2_ttf>,SDL2_ttf::SDL2_ttf,SDL2_ttf::SDL2_ttf-static>
         CURL::libcurl
+        miniupnpc::miniupnpc
 )
 
 if(WIN32)

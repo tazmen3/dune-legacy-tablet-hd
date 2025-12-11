@@ -62,6 +62,9 @@ NetworkManager::NetworkManager(int port, const std::string& metaserver) {
     try {
         pLANGameFinderAndAnnouncer = std::make_unique<LANGameFinderAndAnnouncer>();
         pMetaServerClient = std::make_unique<MetaServerClient>(metaserver);
+        pUPnPManager = std::make_unique<UPnPManager>();
+        // UPnP discovery is deferred to startServer() to avoid startup delay
+        // when just joining games or playing offline
     } catch (...) {
         enet_deinitialize();
         throw;
@@ -70,6 +73,19 @@ NetworkManager::NetworkManager(int port, const std::string& metaserver) {
 
 
 NetworkManager::~NetworkManager() {
+    // Remove UPnP port mapping if active
+    // Note: We attempt removal even if previous attempts failed, and log but don't block on failure
+    if (upnpMappedPort != 0 && pUPnPManager) {
+        if (pUPnPManager->removePortMapping(upnpMappedPort, "UDP")) {
+            SDL_Log("NetworkManager: UPnP port mapping removed on shutdown");
+        } else {
+            SDL_Log("NetworkManager: Warning - failed to remove UPnP port mapping on shutdown");
+        }
+        upnpPortMapped = false;
+        upnpMappedPort = 0;
+    }
+    
+    pUPnPManager.reset();
     pMetaServerClient.reset();
     pLANGameFinderAndAnnouncer.reset();
     enet_host_destroy(host);
@@ -82,6 +98,33 @@ void NetworkManager::startServer(bool bLANServer, const std::string& serverName,
             pLANGameFinderAndAnnouncer->startAnnounce(serverName, host->address.port, pGameInitSettings->getFilename(), numPlayers, maxPlayers);
         }
     } else {
+        // Internet game - try UPnP port mapping
+        if (pUPnPManager && !upnpPortMapped) {
+            // Discover UPnP devices if not already done (deferred from constructor)
+            if (!pUPnPManager->isAvailable()) {
+                SDL_Log("NetworkManager: Discovering UPnP devices...");
+                if (pUPnPManager->discover(2000)) {
+                    SDL_Log("NetworkManager: UPnP available - automatic port forwarding enabled");
+                } else {
+                    SDL_Log("NetworkManager: UPnP not available - manual port forwarding may be required");
+                }
+            }
+            
+            // Try to add port mapping if UPnP is available
+            // Use 1 hour lease (3600s) instead of permanent - will be renewed if game runs longer
+            if (pUPnPManager->isAvailable()) {
+                if (pUPnPManager->addPortMapping(host->address.port, host->address.port, "UDP", "Dune Legacy", UPNP_LEASE_DURATION)) {
+                    upnpPortMapped = true;
+                    upnpMappedPort = host->address.port;
+                    upnpLeaseStartTime = SDL_GetTicks();
+                    SDL_Log("NetworkManager: UPnP port %d mapped successfully (%d min lease, auto-renews)", 
+                            host->address.port, UPNP_LEASE_DURATION / 60);
+                } else {
+                    SDL_Log("NetworkManager: UPnP port mapping failed - manual port forwarding may be required");
+                }
+            }
+        }
+        
         if(pMetaServerClient != nullptr) {
             // Get active mod info
             ModInfo activeModInfo = ModManager::instance().getModInfo(ModManager::instance().getActiveModName());
@@ -129,6 +172,19 @@ void NetworkManager::stopAnnouncing() {
 
 void NetworkManager::stopServer() {
     stopAnnouncing();
+    
+    // Remove UPnP port mapping if active
+    if (upnpPortMapped && pUPnPManager && upnpMappedPort != 0) {
+        if (pUPnPManager->removePortMapping(upnpMappedPort, "UDP")) {
+            upnpPortMapped = false;
+            upnpMappedPort = 0;
+            upnpLeaseStartTime = 0;
+            SDL_Log("NetworkManager: UPnP port mapping removed");
+        } else {
+            // Keep upnpPortMapped true so destructor can retry
+            SDL_Log("NetworkManager: Warning - failed to remove UPnP port mapping, will retry on exit");
+        }
+    }
     
     // Fully stop the server (called when leaving a game or menu)
     bIsServer = false;
@@ -178,6 +234,20 @@ void NetworkManager::update()
 
     if(pMetaServerClient != nullptr) {
         pMetaServerClient->update();
+    }
+    
+    // Renew UPnP lease before it expires (5 minutes before expiry)
+    if (upnpPortMapped && pUPnPManager && upnpLeaseStartTime != 0) {
+        Uint32 elapsed = (SDL_GetTicks() - upnpLeaseStartTime) / 1000;  // seconds
+        if (elapsed >= (UPNP_LEASE_DURATION - UPNP_RENEWAL_MARGIN)) {
+            SDL_Log("NetworkManager: Renewing UPnP port mapping lease...");
+            if (pUPnPManager->addPortMapping(upnpMappedPort, upnpMappedPort, "UDP", "Dune Legacy", UPNP_LEASE_DURATION)) {
+                upnpLeaseStartTime = SDL_GetTicks();
+                SDL_Log("NetworkManager: UPnP lease renewed successfully");
+            } else {
+                SDL_Log("NetworkManager: Warning - UPnP lease renewal failed");
+            }
+        }
     }
 
     if(bIsServer) {

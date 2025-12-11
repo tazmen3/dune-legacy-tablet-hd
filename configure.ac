@@ -1,4 +1,4 @@
-AC_INIT(dunelegacy, 0.98.7.0, http://dunelegacy.sourceforge.net)
+AC_INIT(dunelegacy, 0.99.3, http://dunelegacy.sourceforge.net)
 
 AC_CANONICAL_BUILD
 

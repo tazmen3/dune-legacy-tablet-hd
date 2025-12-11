@@ -25,6 +25,7 @@
 
 #include <Network/LANGameFinderAndAnnouncer.h>
 #include <Network/MetaServerClient.h>
+#include <Network/UPnPManager.h>
 
 #include <misc/string_util.h>
 #include <misc/SDL2pp.h>
@@ -387,6 +388,21 @@ private:
 
     std::unique_ptr<LANGameFinderAndAnnouncer>  pLANGameFinderAndAnnouncer = nullptr;
     std::unique_ptr<MetaServerClient>           pMetaServerClient = nullptr;
+    std::unique_ptr<UPnPManager>                pUPnPManager = nullptr;
+    bool                                        upnpPortMapped = false;
+    uint16_t                                    upnpMappedPort = 0;
+    Uint32                                      upnpLeaseStartTime = 0;
+    static constexpr int                        UPNP_LEASE_DURATION = 3600;      // 1 hour lease
+    static constexpr int                        UPNP_RENEWAL_MARGIN = 300;       // Renew 5 min before expiry
+
+public:
+    /**
+     * Get UPnP status information
+     */
+    bool isUPnPAvailable() const { return pUPnPManager && pUPnPManager->isAvailable(); }
+    bool isUPnPPortMapped() const { return upnpPortMapped; }
+    std::string getUPnPStatus() const { return pUPnPManager ? pUPnPManager->getStatusString() : "Not initialized"; }
+    std::string getExternalIPAddress() const { return pUPnPManager ? pUPnPManager->getExternalIPAddress() : ""; }
 };
 
 #endif // NETWORKMANAGER_H
