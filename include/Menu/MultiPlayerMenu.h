@@ -40,6 +40,8 @@ public:
 
 private:
     void showDisconnectMessageBox(int cause);
+    bool validateAndSavePlayerName();
+    void savePlayerNameToConfig();
 
     void onCreateLANGame();
     void onCreateInternetGame();
@@ -76,6 +78,9 @@ private:
     TextBox         connectHostTextBox;
     TextBox         connectPortTextBox;
     TextButton      connectButton;
+
+    HBox            playerNameHBox;
+    TextBox         playerNameTextBox;
 
     // left VBox with create game buttons
     VBox            leftVBox;

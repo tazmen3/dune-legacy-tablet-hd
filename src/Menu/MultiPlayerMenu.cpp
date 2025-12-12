@@ -5,6 +5,7 @@
 
 #include <FileClasses/GFXManager.h>
 #include <FileClasses/TextManager.h>
+#include <FileClasses/INIFile.h>
 
 #include <Network/NetworkManager.h>
 #include <Network/ENetHelper.h>
@@ -12,6 +13,7 @@
 #include <GUI/MsgBox.h>
 
 #include <globals.h>
+#include <main.h>
 
 #include <misc/string_util.h>
 
@@ -30,6 +32,17 @@ MultiPlayerMenu::MultiPlayerMenu() : MenuBase() {
     mainVBox.addWidget(&captionLabel, 24);
     mainVBox.addWidget(VSpacer::create(24));
 
+    // Player name row
+    playerNameHBox.addWidget(Label::create(_("Player Name:")), 100);
+    playerNameTextBox.setText(settings.general.playerName);
+    playerNameTextBox.setMaximumTextLength(20);
+    playerNameHBox.addWidget(&playerNameTextBox, 200);
+    playerNameHBox.addWidget(Spacer::create());
+
+    mainVBox.addWidget(&playerNameHBox, 28);
+    mainVBox.addWidget(VSpacer::create(8));
+
+    // Connect row
     connectHBox.addWidget(Label::create("Host:"), 50);
     connectHostTextBox.setText("localhost");
     connectHBox.addWidget(&connectHostTextBox);
@@ -127,8 +140,55 @@ MultiPlayerMenu::MultiPlayerMenu() : MenuBase() {
 
 
 MultiPlayerMenu::~MultiPlayerMenu() {
+    // Save player name on exit (even if just going back)
+    savePlayerNameToConfig();
     SDL_Log("Stopping network...");
     pNetworkManager.reset();
+}
+
+
+bool MultiPlayerMenu::validateAndSavePlayerName() {
+    std::string name = playerNameTextBox.getText();
+    
+    // Trim whitespace
+    size_t start = name.find_first_not_of(" \t");
+    size_t end = name.find_last_not_of(" \t");
+    if (start == std::string::npos) {
+        name = "";
+    } else {
+        name = name.substr(start, end - start + 1);
+    }
+    
+    if (name.empty()) {
+        openWindow(MsgBox::create(_("Please enter a player name.")));
+        return false;
+    }
+    
+    // Update settings and save
+    settings.general.playerName = name;
+    playerNameTextBox.setText(name);  // Update with trimmed version
+    savePlayerNameToConfig();
+    return true;
+}
+
+void MultiPlayerMenu::savePlayerNameToConfig() {
+    std::string name = playerNameTextBox.getText();
+    
+    // Trim whitespace
+    size_t start = name.find_first_not_of(" \t");
+    size_t end = name.find_last_not_of(" \t");
+    if (start != std::string::npos) {
+        name = name.substr(start, end - start + 1);
+    }
+    
+    if (!name.empty() && name != settings.general.playerName) {
+        settings.general.playerName = name;
+        
+        // Save to config file
+        INIFile myINIFile(getConfigFilepath());
+        myINIFile.setStringValue("General", "Player Name", settings.general.playerName);
+        myINIFile.saveChangesTo(getConfigFilepath());
+    }
 }
 
 
@@ -143,16 +203,25 @@ void MultiPlayerMenu::onChildWindowClose(Window* pChildWindow) {
 }
 
 void MultiPlayerMenu::onCreateLANGame() {
+    if (!validateAndSavePlayerName()) {
+        return;
+    }
     CustomGameMenu(true, true).showMenu();
 }
 
 
 void MultiPlayerMenu::onCreateInternetGame() {
+    if (!validateAndSavePlayerName()) {
+        return;
+    }
     CustomGameMenu(true, false).showMenu();
 }
 
 
 void MultiPlayerMenu::onConnect() {
+    if (!validateAndSavePlayerName()) {
+        return;
+    }
     if (!pNetworkManager) {
         openWindow(MsgBox::create(_("Network not available. Please grant network permissions and restart the game.")));
         return;
@@ -179,6 +248,9 @@ void MultiPlayerMenu::onPeerDisconnected(const std::string& playername, bool bHo
 }
 
 void MultiPlayerMenu::onJoin() {
+    if (!validateAndSavePlayerName()) {
+        return;
+    }
     if (!pNetworkManager) {
         openWindow(MsgBox::create(_("Network not available. Please grant network permissions and restart the game.")));
         return;
