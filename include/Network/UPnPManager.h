@@ -102,6 +102,11 @@ public:
     bool isAvailable() const { return status == Status::Available || status == Status::PortMapped; }
 
     /**
+     * Check if discovery has been attempted (regardless of success)
+     */
+    bool wasDiscoveryAttempted() const { return status != Status::NotInitialized; }
+
+    /**
      * Check if a port is currently mapped
      */
     bool isPortMapped() const { return status == Status::PortMapped; }

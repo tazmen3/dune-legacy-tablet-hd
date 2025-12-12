@@ -101,7 +101,8 @@ void NetworkManager::startServer(bool bLANServer, const std::string& serverName,
         // Internet game - try UPnP port mapping
         if (pUPnPManager && !upnpPortMapped) {
             // Discover UPnP devices if not already done (deferred from constructor)
-            if (!pUPnPManager->isAvailable()) {
+            // Only attempt discovery once - don't retry if it failed before
+            if (!pUPnPManager->wasDiscoveryAttempted()) {
                 SDL_Log("NetworkManager: Discovering UPnP devices...");
                 if (pUPnPManager->discover(2000)) {
                     SDL_Log("NetworkManager: UPnP available - automatic port forwarding enabled");

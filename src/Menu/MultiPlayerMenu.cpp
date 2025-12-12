@@ -153,6 +153,10 @@ void MultiPlayerMenu::onCreateInternetGame() {
 
 
 void MultiPlayerMenu::onConnect() {
+    if (!pNetworkManager) {
+        openWindow(MsgBox::create(_("Network not available. Please grant network permissions and restart the game.")));
+        return;
+    }
     std::string hostname = connectHostTextBox.getText();
     int port = atol(connectPortTextBox.getText().c_str());
 
@@ -165,7 +169,7 @@ void MultiPlayerMenu::onConnect() {
 
 
 void MultiPlayerMenu::onPeerDisconnected(const std::string& playername, bool bHost, int cause) {
-    if(bHost) {
+    if(bHost && pNetworkManager) {
         pNetworkManager->setOnReceiveGameInfo(std::function<void (const GameInitSettings&, const ChangeEventList&)>());
         pNetworkManager->setOnPeerDisconnected(std::function<void (const std::string&, bool, int)>());
         closeChildWindow();
@@ -175,6 +179,10 @@ void MultiPlayerMenu::onPeerDisconnected(const std::string& playername, bool bHo
 }
 
 void MultiPlayerMenu::onJoin() {
+    if (!pNetworkManager) {
+        openWindow(MsgBox::create(_("Network not available. Please grant network permissions and restart the game.")));
+        return;
+    }
     int selectedEntry = gameList.getSelectedIndex();
     if(selectedEntry >= 0) {
         GameServerInfo* pGameServerInfo = static_cast<GameServerInfo*>(gameList.getEntryPtrData(selectedEntry));
@@ -226,6 +234,12 @@ void MultiPlayerMenu::onQuit() {
 
 
 void MultiPlayerMenu::onGameTypeChange(int buttonID) {
+    if (!pNetworkManager) {
+        // Network not available - just update button states
+        LANGamesButton.setToggleState(buttonID == 0);
+        internetGamesButton.setToggleState(buttonID == 1);
+        return;
+    }
     MetaServerClient* pMetaServerClient = pNetworkManager->getMetaServerClient();
     if((buttonID == 0) && internetGamesButton.getToggleState() == true) {
         // LAN Games
@@ -379,7 +393,9 @@ void MultiPlayerMenu::onMetaServerError(int errorcause, const std::string& error
 void MultiPlayerMenu::onReceiveGameInfo(const GameInitSettings& gameInitSettings, const ChangeEventList& changeEventList) {
     closeChildWindow();
 
-    pNetworkManager->setOnPeerDisconnected(std::function<void (const std::string&, bool, int)>());
+    if (pNetworkManager) {
+        pNetworkManager->setOnPeerDisconnected(std::function<void (const std::string&, bool, int)>());
+    }
 
     auto pCustomGamePlayers = std::make_unique<CustomGamePlayers>(gameInitSettings, false);
     pCustomGamePlayers->onReceiveChangeEventList(changeEventList);
