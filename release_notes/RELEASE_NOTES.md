@@ -1,7 +1,35 @@
-# Dune Legacy 0.99 Release Notes
+# Dune Legacy 0.99.3 Release Notes
 
-**Release Date:** November 30, 2025  
+**Release Date:** December 12, 2025  
 **Download:** [Windows Installer](https://dunelegacy.sourceforge.net/downloads/)
+
+---
+
+## 🚀 Version 0.99.3 Updates
+
+### Steam Integration
+- **Discord-style Rich Presence:** Shows your game status to friends
+- Displays current game mode, map, and player count
+- Integrates with Steam's social features
+
+### Multiplayer Improvements
+
+**Custom Player Names:**
+- Set your own multiplayer name in the Multiplayer menu
+- Name is saved between sessions to your config file
+- Validates that name is not empty before joining/hosting games
+- Maximum 20 characters
+
+**UPnP Port Forwarding:**
+- Automatic router configuration when hosting Internet games
+- Uses UPnP to open ports without manual router setup
+- Makes hosting games much easier for players behind NAT
+- Discovery cached per session to avoid delays on subsequent hosts
+
+### Bug Fixes
+- Fixed crash on Mac when clicking Multiplayer without network permissions
+- Fixed metaserver delay caused by HTTP→HTTPS redirect
+- Added null checks throughout multiplayer menu for graceful network failure handling
 
 ---
 
