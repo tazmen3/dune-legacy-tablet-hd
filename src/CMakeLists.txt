@@ -298,6 +298,7 @@ target_sources(dunelegacy
         Trigger/TimeoutTrigger.cpp
 
         # misc
+        misc/DiscordManager.cpp
         misc/draw_util.cpp
         misc/FileSystem.cpp
         misc/fnkdat.cpp
@@ -370,6 +371,9 @@ endif()
 # Find miniupnpc for UPnP support
 find_package(miniupnpc CONFIG REQUIRED)
 
+# Find discord-rpc for Discord Rich Presence
+find_library(DISCORD_RPC_LIBRARY discord-rpc PATHS ${CMAKE_PREFIX_PATH}/lib)
+
 # Link libraries
 # vcpkg provides modern CMake targets for SDL2
 target_link_libraries(dunelegacy
@@ -380,6 +384,7 @@ target_link_libraries(dunelegacy
         $<IF:$<TARGET_EXISTS:SDL2_ttf::SDL2_ttf>,SDL2_ttf::SDL2_ttf,SDL2_ttf::SDL2_ttf-static>
         CURL::libcurl
         miniupnpc::miniupnpc
+        ${DISCORD_RPC_LIBRARY}
 )
 
 if(WIN32)
