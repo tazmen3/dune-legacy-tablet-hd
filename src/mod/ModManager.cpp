@@ -370,14 +370,15 @@ void ModManager::updateChecksums() {
     cachedChecksums.objectData = hashFileCanonical(getActiveObjectDataPath());
     cachedChecksums.quantBotConfig = hashFileCanonical(getActiveQuantBotConfigPath());
 
-    // Game options: hash the file for modded game options, but for vanilla (or missing file)
-    // hash the actual effective options that will be used in-game. This avoids reporting
-    // identical mod checksums when players' real options differ.
+    // Game options: always hash the mod's GameOptions.ini file (for all mods including vanilla).
+    // This ensures all players with the same mod version get the same checksum.
+    // Runtime game settings (from Dune Legacy.ini) are synced separately via the game lobby.
     const std::string gameOptionsPath = getActiveGameOptionsPath();
-    if (activeMod == VANILLA_MOD_NAME || !existsFile(gameOptionsPath)) {
-        cachedChecksums.gameOptions = effectiveGameOptions.getHash();
-    } else {
+    if (existsFile(gameOptionsPath)) {
         cachedChecksums.gameOptions = hashFileCanonical(gameOptionsPath);
+    } else {
+        // No GameOptions.ini file - use a constant hash to indicate "no game options file"
+        cachedChecksums.gameOptions = "0000000000000000";
     }
     
     // Combined hash

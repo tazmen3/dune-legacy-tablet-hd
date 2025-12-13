@@ -54,6 +54,11 @@ public:
     // Set presence for multiplayer game in progress
     void setMultiplayerGame(const std::string& houseName, const std::string& mapName, int playerCount);
     
+    // Set presence for game starting (countdown) with player details
+    // playerDetails format: "Atreides: Player1, Harkonnen: QuantBot, ..."
+    void setGameStarting(const std::string& mapName, const std::string& modName, 
+                         const std::string& playerDetails, int playerCount);
+    
     // Set presence for map editor
     void setMapEditor(const std::string& mapName = "");
     

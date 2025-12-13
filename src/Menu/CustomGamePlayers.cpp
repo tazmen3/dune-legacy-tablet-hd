@@ -42,6 +42,8 @@
 
 #include <INIMap/INIMapPreviewCreator.h>
 
+#include <misc/DiscordManager.h>
+
 #include <sand.h>
 #include <globals.h>
 
@@ -747,8 +749,74 @@ void CustomGamePlayers::onReceiveModInfo(const std::string& modName, const std::
     
     // Check if we have the host's mod locally
     if(ModManager::instance().modExists(modName)) {
-        // We have the mod, but different version - switch to it
-        SDL_Log("CLIENT: Found mod '%s' locally, but checksums differ. Downloading host's version.", modName.c_str());
+        SDL_Log("CLIENT: Found mod '%s' locally, attempting to switch to it first", modName.c_str());
+        
+        // Try switching to the host's mod locally first
+        if(ModManager::instance().setActiveMod(modName)) {
+            // Recalculate checksums after switching
+            ModManager::instance().updateChecksums();
+            std::string newChecksum = ModManager::instance().getEffectiveChecksums().combined;
+            
+            SDL_Log("CLIENT: Switched to local mod '%s', new checksum=%s", modName.c_str(), newChecksum.c_str());
+            
+            // Update the mod label on screen
+            ModInfo activeModInfo = ModManager::instance().getModInfo(modName);
+            mapPropertyMod.setText(activeModInfo.displayName);
+            
+            // Reload effective game options for the new mod
+            effectiveGameOptions = ModManager::instance().loadEffectiveGameOptions(settings.gameOptions);
+            
+            if(newChecksum == modChecksum) {
+                // Local mod matches host - no download needed!
+                SDL_Log("CLIENT: Local mod '%s' matches host after switching!", modName.c_str());
+                addInfoMessage("Switched to mod: " + modName);
+                
+                if(pNetworkManager != nullptr) {
+                    pNetworkManager->sendModAck(true, newChecksum);
+                }
+                return;
+            } else {
+                // Checksums still differ - may need to download host's version
+                SDL_Log("CLIENT: Local mod '%s' checksums still differ (local=%s, host=%s)", 
+                        modName.c_str(), newChecksum.c_str(), modChecksum.c_str());
+                
+                // Special case: vanilla mod cannot be downloaded/overwritten
+                // If checksums differ, it's likely a game version mismatch
+                if(modName == "vanilla") {
+                    SDL_Log("CLIENT: Vanilla mod checksum mismatch - cannot sync (possible version mismatch)");
+                    addInfoMessage("Vanilla mod version mismatch with host!");
+                    bConfigMismatchDetected = true;
+                    
+                    openWindow(MsgBox::create(_("Vanilla mod checksum mismatch.\n\nThis usually means different game versions.\nHost: ") + modChecksum + "\nLocal: " + newChecksum));
+                    
+                    if(pNetworkManager != nullptr) {
+                        pNetworkManager->sendModAck(false, "");
+                    }
+                    return;
+                }
+            }
+        }
+    }
+    
+    // Mod doesn't exist locally or switching didn't help - download from host
+    // Note: vanilla mod cannot be downloaded (it's seeded locally)
+    if(modName == "vanilla") {
+        SDL_Log("CLIENT: Cannot download vanilla mod - should be seeded locally!");
+        addInfoMessage("Error: vanilla mod not found locally!");
+        bConfigMismatchDetected = true;
+        
+        // Try to seed vanilla now
+        if(!ModManager::instance().modExists("vanilla")) {
+            SDL_Log("CLIENT: Attempting emergency vanilla reseed");
+            ModManager::instance().initialize();  // Will reseed vanilla if missing
+        }
+        
+        openWindow(MsgBox::create(_("Vanilla mod not found or corrupted.\n\nPlease restart the game to reseed the vanilla configuration.")));
+        
+        if(pNetworkManager != nullptr) {
+            pNetworkManager->sendModAck(false, "");
+        }
+        return;
     }
     
     // Show message and start download
@@ -909,7 +977,72 @@ void CustomGamePlayers::checkAllClientsReady() {
         pNetworkManager->sendStartGame(timeLeft);
         
         disableAllDropDownBoxes();
+        
+        // Send Discord presence with game details
+        updateDiscordGameStarting();
     }
+}
+
+void CustomGamePlayers::updateDiscordGameStarting() {
+    // Build player details string: "Atreides: Player1, Harkonnen: AIBot, ..."
+    std::string playerDetails;
+    int playerCount = 0;
+    
+    for(int i = 0; i < NUM_HOUSES; i++) {
+        HouseInfo& curHouseInfo = houseInfo[i];
+        
+        int houseID = curHouseInfo.houseDropDown.getSelectedEntryIntData();
+        int player1 = curHouseInfo.player1DropDown.getSelectedEntryIntData();
+        int player2 = curHouseInfo.player2DropDown.getSelectedEntryIntData();
+        
+        // Skip if no players in this house
+        if((player1 == PLAYER_OPEN || player1 == PLAYER_CLOSED) && 
+           (player2 == PLAYER_OPEN || player2 == PLAYER_CLOSED)) {
+            continue;
+        }
+        
+        // Get house name
+        std::string houseName;
+        if(houseID == HOUSE_INVALID) {
+            houseName = "Random";
+        } else {
+            houseName = getHouseNameByNumber((HOUSETYPE)houseID);
+        }
+        
+        // Get player names
+        std::vector<std::string> players;
+        
+        if(player1 != PLAYER_OPEN && player1 != PLAYER_CLOSED) {
+            std::string name = curHouseInfo.player1DropDown.getSelectedEntry();
+            players.push_back(name);
+            playerCount++;
+        }
+        
+        if(player2 != PLAYER_OPEN && player2 != PLAYER_CLOSED) {
+            std::string name = curHouseInfo.player2DropDown.getSelectedEntry();
+            players.push_back(name);
+            playerCount++;
+        }
+        
+        // Build house entry
+        if(!players.empty()) {
+            if(!playerDetails.empty()) {
+                playerDetails += ", ";
+            }
+            playerDetails += houseName + ": ";
+            for(size_t j = 0; j < players.size(); j++) {
+                if(j > 0) playerDetails += "+";
+                playerDetails += players[j];
+            }
+        }
+    }
+    
+    // Get map name and mod name
+    std::string mapName = getBasename(gameInitSettings.getFilename(), true);
+    std::string modName = ModManager::instance().getActiveModName();
+    
+    // Update Discord presence
+    DiscordManager::instance().setGameStarting(mapName, modName, playerDetails, playerCount);
 }
 
 void CustomGamePlayers::onNext()

@@ -172,6 +172,28 @@ void DiscordManager::setMultiplayerGame(const std::string& houseName, const std:
                    playerCount, playerCount);
 }
 
+void DiscordManager::setGameStarting(const std::string& mapName, const std::string& modName,
+                                      const std::string& playerDetails, int playerCount) {
+    // State: "Game Starting!" with player count
+    std::string state = "Game Starting!";
+    
+    // Details: Map name and mod
+    std::string details = mapName;
+    if (!modName.empty() && modName != "vanilla") {
+        details += " [" + modName + "]";
+    }
+    
+    // Log the full player details for Discord presence
+    SDL_Log("Discord: Game starting - Map: %s, Mod: %s, Players: %s", 
+            mapName.c_str(), modName.c_str(), playerDetails.c_str());
+    
+    // Discord Rich Presence has limited space, so we show map/mod in details
+    // and use state for the starting message. The full player list is logged.
+    // For the presence, show a condensed version
+    updatePresence(state, details, "logo", "Dune Legacy", "multiplayer", playerDetails,
+                   playerCount, playerCount);
+}
+
 void DiscordManager::setMapEditor(const std::string& mapName) {
     std::string state = "Map Editor";
     std::string details = mapName.empty() ? "Creating a map" : "Editing: " + mapName;
