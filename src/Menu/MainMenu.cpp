@@ -32,10 +32,14 @@
 #include <Menu/AboutMenu.h>
 
 #include <GUI/QstBox.h>
+#include <misc/DiscordManager.h>
 #include <config.h>
 
 MainMenu::MainMenu()
 {
+    // Update Discord Rich Presence
+    DiscordManager::instance().setMainMenu();
+    
     // set up window
     SDL_Texture *pBackground = pGFXManager->getUIGraphic(UI_MenuBackground);
     setBackground(pBackground);

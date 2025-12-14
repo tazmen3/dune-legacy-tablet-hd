@@ -30,6 +30,7 @@
 #include <misc/FileSystem.h>
 #include <misc/draw_util.h>
 #include <misc/format.h>
+#include <misc/DiscordManager.h>
 
 #include <globals.h>
 #include <mmath.h>
@@ -62,6 +63,9 @@ private:
 
 
 MapEditor::MapEditor() : pInterface(nullptr) {
+    // Update Discord Rich Presence
+    DiscordManager::instance().setMapEditor();
+    
     bQuitEditor = false;
     scrollDownMode = false;
     scrollLeftMode = false;

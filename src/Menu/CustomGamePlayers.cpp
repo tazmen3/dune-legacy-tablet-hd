@@ -444,6 +444,14 @@ CustomGamePlayers::CustomGamePlayers(const GameInitSettings& newGameInitSettings
         } else {
             pNetworkManager->setOnStartGame(std::bind(&CustomGamePlayers::onStartGame, this, std::placeholders::_1));
         }
+        
+        // Update Discord Rich Presence for multiplayer lobby
+        std::string mapName = getBasename(gameInitSettings.getFilename(), true);
+        if(bServer) {
+            DiscordManager::instance().setHostingGame(mapName, 1, gameInitSettings.isMultiplePlayersPerHouse() ? numHouses*2 : numHouses);
+        } else {
+            DiscordManager::instance().setInLobby(gameInitSettings.getServername(), mapName);
+        }
     }
 }
 

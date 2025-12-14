@@ -46,6 +46,7 @@ std::mutex Game::performanceLogMutex;
 #include <misc/exceptions.h>
 #include <misc/format.h>
 #include <misc/SDL2pp.h>
+#include <misc/DiscordManager.h>
 
 #include <players/HumanPlayer.h>
 
@@ -1935,6 +1936,31 @@ void Game::setupView()
 void Game::runMainLoop() {
     SDL_Log("Starting game...");
     initializeGameLoop();
+    
+    // Update Discord Rich Presence for in-game status
+    std::string houseName = pLocalHouse ? getHouseNameByNumber(static_cast<HOUSETYPE>(pLocalHouse->getHouseID())) : "Unknown";
+    std::string mapName = gameInitSettings.getFilename();
+    // Extract just the map name from the path
+    size_t lastSlash = mapName.find_last_of("/\\");
+    if (lastSlash != std::string::npos) {
+        mapName = mapName.substr(lastSlash + 1);
+    }
+    size_t lastDot = mapName.find_last_of('.');
+    if (lastDot != std::string::npos) {
+        mapName = mapName.substr(0, lastDot);
+    }
+    
+    if (gameInitSettings.getGameType() == GameType::CustomMultiplayer || 
+        gameInitSettings.getGameType() == GameType::LoadMultiplayer) {
+        int playerCount = 0;
+        for (int i = 0; i < NUM_HOUSES; i++) {
+            if (house[i] && house[i]->isAlive()) playerCount++;
+        }
+        DiscordManager::instance().setMultiplayerGame(houseName, mapName, playerCount);
+    } else {
+        bool isCampaign = (gameInitSettings.getGameType() == GameType::Campaign);
+        DiscordManager::instance().setInGame(houseName, mapName, isCampaign);
+    }
 
     int frameStart = SDL_GetTicks();
     int frameTime = 0;
