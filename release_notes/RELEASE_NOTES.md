@@ -1,7 +1,37 @@
-# Dune Legacy 0.99.3 Release Notes
+# Dune Legacy 0.99.4 Release Notes
 
-**Release Date:** December 12, 2025  
+**Release Date:** December 14, 2025  
 **Download:** [Windows Installer](https://dunelegacy.sourceforge.net/downloads/)
+
+---
+
+## 🚀 Version 0.99.4 Updates
+
+### Discord Integration
+
+**Discord Game Notifications:**
+- Game Starting notifications posted to Discord channel when multiplayer game begins
+- Shows map name, mod, and all player/house assignments
+- Notifications sent via metaserver (no client-side webhook configuration needed)
+
+**Enhanced Rich Presence:**
+- Shows lobby status when hosting/joining multiplayer games
+- Displays in-game activity with house, map, and player count
+- Updates dynamically as players join/leave lobby
+- Proper party size display (current players / max slots)
+- DiscordManager::update() now called regularly for reliable presence updates
+
+### Multiplayer Mod Sync Fixes
+
+**Vanilla Mod Sync:**
+- Fixed issue where clients couldn't sync when host uses vanilla mod
+- Clients now switch to local vanilla first before attempting download
+- Vanilla mod checksum now based on file contents, not runtime settings
+- Clear error message if vanilla versions don't match
+
+**General Improvements:**
+- Mod sync tries local mod switch before downloading
+- Better error handling for mod mismatch scenarios
 
 ---
 
