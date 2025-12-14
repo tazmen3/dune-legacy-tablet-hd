@@ -1963,8 +1963,8 @@ void Game::runMainLoop() {
                 }
             }
         }
-        // Use human count for current, total slots for max (so party shows correctly)
-        DiscordManager::instance().setMultiplayerGame(houseName, mapName, humanPlayerCount);
+        // Use human count for current players, total slots for max party size
+        DiscordManager::instance().setMultiplayerGame(houseName, mapName, humanPlayerCount, totalPlayerSlots);
     } else {
         bool isCampaign = (gameInitSettings.getGameType() == GameType::Campaign);
         DiscordManager::instance().setInGame(houseName, mapName, isCampaign);

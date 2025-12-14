@@ -457,15 +457,9 @@ void CustomGamePlayers::updateDiscordLobbyPresence() {
     int maxPlayers = gameInitSettings.isMultiplePlayersPerHouse() ? numHouses*2 : numHouses;
     
     if(bServer) {
-        // Count current human players (host + connected peers)
-        int currentPlayers = 1;  // Host counts as 1
-        for(int i = 0; i < numHouses * 2; i++) {
-            DropDownBox& curDropDownBox = (i % 2 == 0) ? houseInfo[i / 2].player1DropDown : houseInfo[i / 2].player2DropDown;
-            if(curDropDownBox.getSelectedEntryIntData() == PLAYER_HUMAN && 
-               curDropDownBox.getSelectedEntry() != settings.general.playerName) {
-                currentPlayers++;
-            }
-        }
+        // Count current players from actual connected peers (not dropdown selections)
+        // This is accurate even if a slot shows "Human" but no peer is connected
+        int currentPlayers = static_cast<int>(pNetworkManager->getConnectedPeers().size()) + 1;  // +1 for host
         DiscordManager::instance().setHostingGame(mapName, currentPlayers, maxPlayers);
     } else {
         DiscordManager::instance().setInLobby(gameInitSettings.getServername(), mapName);

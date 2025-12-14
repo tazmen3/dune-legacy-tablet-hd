@@ -53,7 +53,8 @@ public:
     void setInLobby(const std::string& hostName, const std::string& mapName);
     
     // Set presence for multiplayer game in progress
-    void setMultiplayerGame(const std::string& houseName, const std::string& mapName, int playerCount);
+    void setMultiplayerGame(const std::string& houseName, const std::string& mapName, 
+                            int currentPlayers, int maxPlayers);
     
     // Set presence for game starting (countdown) with player details
     // playerDetails format: "Atreides: Player1, Harkonnen: QuantBot, ..."

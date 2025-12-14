@@ -166,12 +166,13 @@ void DiscordManager::setInLobby(const std::string& hostName, const std::string& 
     updatePresence(state, details, "logo", "Dune Legacy", "multiplayer", "Multiplayer");
 }
 
-void DiscordManager::setMultiplayerGame(const std::string& houseName, const std::string& mapName, int playerCount) {
+void DiscordManager::setMultiplayerGame(const std::string& houseName, const std::string& mapName,
+                                         int currentPlayers, int maxPlayers) {
     std::string state = "Playing as " + houseName;
     std::string details = "Multiplayer - " + mapName;
     
     updatePresence(state, details, "logo", "Dune Legacy", "multiplayer", "Multiplayer",
-                   playerCount, playerCount);
+                   currentPlayers, maxPlayers);
 }
 
 void DiscordManager::setGameStarting(const std::string& mapName, const std::string& modName,
