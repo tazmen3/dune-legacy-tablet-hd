@@ -62,6 +62,14 @@ public:
     void updateAnnounce(Uint8 numPlayers);
 
     void stopAnnounce();
+    
+    /**
+        Announce that a game is starting (sends Discord notification via metaserver)
+        \param  mapName     The name of the map
+        \param  modName     The name of the mod
+        \param  players     Player details in format "House1:Player1,House2:Player2,..."
+    */
+    void announceGameStart(const std::string& mapName, const std::string& modName, const std::string& players);
 
     void update();
 

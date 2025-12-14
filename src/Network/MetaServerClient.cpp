@@ -145,6 +145,19 @@ void MetaServerClient::stopAnnounce() {
     }
 }
 
+void MetaServerClient::announceGameStart(const std::string& mapName, const std::string& modName, const std::string& players) {
+    // Only announce if we have an active game server announcement
+    if(secret.empty()) {
+        SDL_Log("MetaServerClient::announceGameStart - No active game, skipping");
+        return;
+    }
+    
+    SDL_Log("MetaServerClient::announceGameStart - map=%s, mod=%s, players=%s", 
+            mapName.c_str(), modName.c_str(), players.c_str());
+    
+    enqueueMetaServerCommand(std::make_unique<MetaServerGameStart>(secret, mapName, modName, players, VERSIONSTRING));
+}
+
 
 void MetaServerClient::update() {
 
@@ -505,6 +518,29 @@ int MetaServerClient::connectionThreadMain(void* data) {
                         pMetaServerClient->setErrorMessage(METASERVERCOMMAND_LIST, errorMsg);
                     }
 
+                } break;
+
+                case METASERVERCOMMAND_GAMESTART: {
+                    MetaServerGameStart* pMetaServerGameStart = dynamic_cast<MetaServerGameStart*>(nextMetaServerCommand.get());
+                    if(!pMetaServerGameStart) {
+                        break;
+                    }
+
+                    std::map<std::string, std::string> parameters;
+
+                    parameters["command"] = "gamestart";
+                    parameters["secret"] = pMetaServerGameStart->secret;
+                    parameters["map"] = pMetaServerGameStart->mapName;
+                    parameters["modname"] = pMetaServerGameStart->modName;
+                    parameters["players"] = pMetaServerGameStart->players;
+                    parameters["version"] = pMetaServerGameStart->version;
+
+                    try {
+                        loadFromHttp(pMetaServerClient->metaServerURL, parameters);
+                        SDL_Log("MetaServerClient: Game start announced to metaserver");
+                    } catch(std::exception& e) {
+                        SDL_Log("MetaServerClient: Failed to announce game start: %s", e.what());
+                    }
                 } break;
 
                 case METASERVERCOMMAND_EXIT: {

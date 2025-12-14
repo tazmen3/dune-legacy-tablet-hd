@@ -27,6 +27,7 @@
 #define METASERVERCOMMAND_REMOVE    3
 #define METASERVERCOMMAND_LIST      4
 #define METASERVERCOMMAND_EXIT      5
+#define METASERVERCOMMAND_GAMESTART 6
 
 
 
@@ -150,6 +151,21 @@ public:
     MetaServerExit()
      : MetaServerCommand(METASERVERCOMMAND_EXIT) {
     }
+};
+
+class MetaServerGameStart : public MetaServerCommand {
+public:
+    MetaServerGameStart(const std::string& secret, const std::string& mapName, const std::string& modName,
+                        const std::string& players, const std::string& version)
+     : MetaServerCommand(METASERVERCOMMAND_GAMESTART), secret(secret), mapName(mapName), 
+       modName(modName), players(players), version(version) {
+    }
+
+    std::string secret;
+    std::string mapName;
+    std::string modName;
+    std::string players;  // Format: "House1:Player1,House2:Player2,..."
+    std::string version;
 };
 
 #endif // METASERVERCOMMANDS_H

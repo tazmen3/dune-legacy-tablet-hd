@@ -1063,11 +1063,16 @@ void CustomGamePlayers::updateDiscordGameStarting() {
     std::string mapName = getBasename(gameInitSettings.getFilename(), true);
     std::string modName = ModManager::instance().getActiveModName();
     
-    // Update Discord presence
+    // Update Discord Rich Presence
     DiscordManager::instance().setGameStarting(mapName, modName, playerDetails, playerCount);
     
-    // Send webhook notification to Discord channel
-    DiscordManager::instance().sendGameStartingNotification(mapName, modName, playerDetails);
+    // Send game start notification to metaserver (which sends Discord webhook)
+    if(pNetworkManager != nullptr) {
+        MetaServerClient* metaServer = pNetworkManager->getMetaServerClient();
+        if(metaServer != nullptr) {
+            metaServer->announceGameStart(mapName, modName, playerDetails);
+        }
+    }
 }
 
 void CustomGamePlayers::onNext()
