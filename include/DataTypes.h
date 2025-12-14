@@ -199,6 +199,11 @@ public:
         bool        debugNetwork;
     } network;
 
+    class DiscordClass {
+    public:
+        std::string webhookUrl;  // Discord webhook URL for game notifications
+    } discord;
+
     class AIClass {
     public:
         std::string campaignAI;

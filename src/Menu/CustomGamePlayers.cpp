@@ -1043,6 +1043,9 @@ void CustomGamePlayers::updateDiscordGameStarting() {
     
     // Update Discord presence
     DiscordManager::instance().setGameStarting(mapName, modName, playerDetails, playerCount);
+    
+    // Send webhook notification to Discord channel
+    DiscordManager::instance().sendGameStartingNotification(mapName, modName, playerDetails);
 }
 
 void CustomGamePlayers::onNext()

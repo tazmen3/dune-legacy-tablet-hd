@@ -834,6 +834,9 @@ int main(int argc, char *argv[]) {
                 SDL_Log("Metaserver URL updated to: %s", settings.network.metaServer.c_str());
             }
             
+            // Discord settings
+            settings.discord.webhookUrl = myINIFile.getStringValue("Discord","WebhookUrl","");
+            
             settings.network.debugNetwork = myINIFile.getBoolValue("Network","Debug Network",false);
 
             settings.ai.campaignAI = myINIFile.getStringValue("AI","Campaign AI",DEFAULTAIPLAYERCLASS);
@@ -1087,6 +1090,10 @@ int main(int argc, char *argv[]) {
 
                 // Initialize Discord Rich Presence
                 DiscordManager::instance().initialize();
+                if (!settings.discord.webhookUrl.empty()) {
+                    DiscordManager::instance().setWebhookUrl(settings.discord.webhookUrl);
+                    SDL_Log("Discord webhook configured");
+                }
 
                 SDL_Log("Starting main menu...");
                 { // Scope

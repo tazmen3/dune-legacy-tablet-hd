@@ -20,6 +20,7 @@
 
 #include <string>
 #include <cstdint>
+#include <thread>
 
 /**
  * Discord Rich Presence Manager
@@ -67,6 +68,17 @@ public:
     
     // Check if Discord is connected
     bool isConnected() const { return connected; }
+    
+    // Set webhook URL for posting game notifications to a Discord channel
+    void setWebhookUrl(const std::string& url) { webhookUrl = url; }
+    
+    // Send a webhook message to the configured Discord channel (async, non-blocking)
+    void sendWebhookMessage(const std::string& title, const std::string& description, 
+                            int color = 0x3498db);  // Default: blue color
+    
+    // Send game starting notification to Discord channel
+    void sendGameStartingNotification(const std::string& mapName, const std::string& modName,
+                                      const std::string& playerDetails);
 
 private:
     DiscordManager() = default;
@@ -79,6 +91,7 @@ private:
     bool initialized = false;
     bool connected = false;
     int64_t startTimestamp = 0;
+    std::string webhookUrl;
     
     void updatePresence(const std::string& state, const std::string& details,
                         const std::string& largeImageKey = "logo",

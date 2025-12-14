@@ -20,6 +20,8 @@
 #include <SDL2/SDL_timer.h>
 
 #include <discord_rpc.h>
+#include <curl/curl.h>
+#include <thread>
 
 // Discord Application ID from Discord Developer Portal
 static constexpr const char* DISCORD_APP_ID = "1448523957492908034";
@@ -207,5 +209,86 @@ void DiscordManager::clear() {
     }
     
     Discord_ClearPresence();
+}
+
+void DiscordManager::sendWebhookMessage(const std::string& title, const std::string& description, int color) {
+    if (webhookUrl.empty()) {
+        SDL_Log("Discord: Webhook URL not configured, skipping notification");
+        return;
+    }
+    
+    // Send webhook in a separate thread to avoid blocking the game
+    std::string url = webhookUrl;
+    std::thread([url, title, description, color]() {
+        CURL* curl = curl_easy_init();
+        if (!curl) {
+            SDL_Log("Discord: Failed to initialize curl for webhook");
+            return;
+        }
+        
+        // Build JSON payload with embed
+        // Escape special characters in strings for JSON
+        auto escapeJson = [](const std::string& s) -> std::string {
+            std::string result;
+            for (char c : s) {
+                switch (c) {
+                    case '"': result += "\\\""; break;
+                    case '\\': result += "\\\\"; break;
+                    case '\n': result += "\\n"; break;
+                    case '\r': result += "\\r"; break;
+                    case '\t': result += "\\t"; break;
+                    default: result += c; break;
+                }
+            }
+            return result;
+        };
+        
+        std::string json = "{\"embeds\":[{"
+            "\"title\":\"" + escapeJson(title) + "\","
+            "\"description\":\"" + escapeJson(description) + "\","
+            "\"color\":" + std::to_string(color) + ","
+            "\"footer\":{\"text\":\"Dune Legacy\"}"
+            "}]}";
+        
+        struct curl_slist* headers = nullptr;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+        
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json.c_str());
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+        
+        CURLcode res = curl_easy_perform(curl);
+        if (res != CURLE_OK) {
+            SDL_Log("Discord: Webhook failed: %s", curl_easy_strerror(res));
+        } else {
+            long httpCode = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+            if (httpCode >= 200 && httpCode < 300) {
+                SDL_Log("Discord: Webhook sent successfully");
+            } else {
+                SDL_Log("Discord: Webhook returned HTTP %ld", httpCode);
+            }
+        }
+        
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(curl);
+    }).detach();
+}
+
+void DiscordManager::sendGameStartingNotification(const std::string& mapName, const std::string& modName,
+                                                   const std::string& playerDetails) {
+    // Build title
+    std::string title = "🎮 Game Starting!";
+    
+    // Build description with map, mod, and players
+    std::string description = "**Map:** " + mapName + "\n";
+    if (!modName.empty()) {
+        description += "**Mod:** " + modName + "\n";
+    }
+    description += "\n**Players:**\n" + playerDetails;
+    
+    // Orange color for game starting
+    sendWebhookMessage(title, description, 0xE67E22);
 }
 
