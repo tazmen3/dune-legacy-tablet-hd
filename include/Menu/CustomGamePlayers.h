@@ -68,6 +68,7 @@ private:
     void onReceiveModAck(const std::string& playerName, bool success, const std::string& modChecksum);
     void checkAllClientsReady();
     void updateDiscordGameStarting();
+    void updateDiscordLobbyPresence();
     void onPeerDisconnected(const std::string& playername, bool bHost, int cause);
 
     void extractMapInfo(INIFile* pMap);

@@ -23,6 +23,7 @@
 #include <misc/string_util.h>
 #include <misc/FileSystem.h>
 #include <misc/draw_util.h>
+#include <misc/DiscordManager.h>
 
 #include <globals.h>
 
@@ -55,6 +56,9 @@ int MenuBase::showMenu() {
         int frameStart = SDL_GetTicks();
 
         update();
+
+        // Update Discord Rich Presence callbacks
+        DiscordManager::instance().update();
 
         if(pNetworkManager != nullptr) {
             pNetworkManager->update();

@@ -1952,11 +1952,19 @@ void Game::runMainLoop() {
     
     if (gameInitSettings.getGameType() == GameType::CustomMultiplayer || 
         gameInitSettings.getGameType() == GameType::LoadMultiplayer) {
-        int playerCount = 0;
-        for (int i = 0; i < NUM_HOUSES; i++) {
-            if (house[i] && house[i]->isAlive()) playerCount++;
+        // Count human players from game init settings (not alive houses which can change during game)
+        int humanPlayerCount = 0;
+        int totalPlayerSlots = 0;
+        for (const auto& houseInfo : gameInitSettings.getHouseInfoList()) {
+            for (const auto& playerInfo : houseInfo.playerInfoList) {
+                totalPlayerSlots++;
+                if (playerInfo.playerClass == HUMANPLAYERCLASS) {
+                    humanPlayerCount++;
+                }
+            }
         }
-        DiscordManager::instance().setMultiplayerGame(houseName, mapName, playerCount);
+        // Use human count for current, total slots for max (so party shows correctly)
+        DiscordManager::instance().setMultiplayerGame(houseName, mapName, humanPlayerCount);
     } else {
         bool isCampaign = (gameInitSettings.getGameType() == GameType::Campaign);
         DiscordManager::instance().setInGame(houseName, mapName, isCampaign);
@@ -1988,6 +1996,14 @@ void Game::runMainLoop() {
         
         // MULTIPLAYER FIX (Issue #1): Removed time-based pathfinding budget
         // Token budget is now the only gate (deterministic)
+        
+        // Update Discord Rich Presence callbacks (once per second to avoid overhead)
+        static Uint32 lastDiscordUpdate = 0;
+        Uint32 discordNow = SDL_GetTicks();
+        if (discordNow - lastDiscordUpdate >= 1000) {
+            DiscordManager::instance().update();
+            lastDiscordUpdate = discordNow;
+        }
         
         renderFrame();
 

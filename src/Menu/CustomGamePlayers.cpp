@@ -446,12 +446,29 @@ CustomGamePlayers::CustomGamePlayers(const GameInitSettings& newGameInitSettings
         }
         
         // Update Discord Rich Presence for multiplayer lobby
-        std::string mapName = getBasename(gameInitSettings.getFilename(), true);
-        if(bServer) {
-            DiscordManager::instance().setHostingGame(mapName, 1, gameInitSettings.isMultiplePlayersPerHouse() ? numHouses*2 : numHouses);
-        } else {
-            DiscordManager::instance().setInLobby(gameInitSettings.getServername(), mapName);
+        updateDiscordLobbyPresence();
+    }
+}
+
+void CustomGamePlayers::updateDiscordLobbyPresence() {
+    if(pNetworkManager == nullptr) return;
+    
+    std::string mapName = getBasename(gameInitSettings.getFilename(), true);
+    int maxPlayers = gameInitSettings.isMultiplePlayersPerHouse() ? numHouses*2 : numHouses;
+    
+    if(bServer) {
+        // Count current human players (host + connected peers)
+        int currentPlayers = 1;  // Host counts as 1
+        for(int i = 0; i < numHouses * 2; i++) {
+            DropDownBox& curDropDownBox = (i % 2 == 0) ? houseInfo[i / 2].player1DropDown : houseInfo[i / 2].player2DropDown;
+            if(curDropDownBox.getSelectedEntryIntData() == PLAYER_HUMAN && 
+               curDropDownBox.getSelectedEntry() != settings.general.playerName) {
+                currentPlayers++;
+            }
         }
+        DiscordManager::instance().setHostingGame(mapName, currentPlayers, maxPlayers);
+    } else {
+        DiscordManager::instance().setInLobby(gameInitSettings.getServername(), mapName);
     }
 }
 
@@ -592,6 +609,9 @@ void CustomGamePlayers::onReceiveChangeEventList(const ChangeEventList& changeEv
 
         pNetworkManager->sendChangeEventList(changeEventList2);
     }
+    
+    // Update Discord presence when lobby state changes (players join/leave/change slots)
+    updateDiscordLobbyPresence();
 }
 
 ChangeEventList CustomGamePlayers::getChangeEventList()
@@ -1594,6 +1614,9 @@ void CustomGamePlayers::onPeerDisconnected(const std::string& playername, bool b
         checkPlayerBoxes();
 
         addInfoMessage(playername + " disconnected!");
+        
+        // Update Discord presence when player count changes
+        updateDiscordLobbyPresence();
     }
 }
 
@@ -1606,6 +1629,9 @@ void CustomGamePlayers::onStartGame(unsigned int timeLeft) {
     
     startGameTime = SDL_GetTicks() + timeLeft;
     disableAllDropDownBoxes();
+    
+    // Update Discord presence with game starting details (client side)
+    updateDiscordGameStarting();
 }
 
 void CustomGamePlayers::setPlayer2Slot(const std::string& playername, int slot) {
