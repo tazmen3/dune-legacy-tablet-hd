@@ -3,21 +3,12 @@
 ## Project Overview
 This is Dune Legacy, a modernized clone of Westwood Studios' "Dune 2" real-time strategy game.
 
-### Current Development Setup (Dual Version for Regression Testing)
-- **Current Version (0.98.6)**: `/Users/stefanvanderwel/development/dune/dunelegacy/`
-- **Reference Version (0.97.5)**: `/Users/stefanvanderwel/development/dune/dunelegacy-code-0.97.5/`
-- **Purpose**: Compare versions to identify and fix regressions introduced via vibe coding
+### Current Development
+- **Version**: 0.99.4 (see `CMakeLists.txt` line 4)
+- **Path**: `/Users/stefanvanderwel/development/dune/dunelegacy/`
 - Platform: Cross-platform (Windows, macOS, Linux)
 - Language: C++17
 - Graphics: SDL2, SDL2_mixer, SDL2_ttf
-
-### Version Comparison Guidelines
-When reviewing code or fixing bugs:
-1. **Check both versions** - Compare implementations between 0.98.6 and 0.97.5
-2. **Identify regressions** - Look for functionality that worked in 0.97.5 but is broken in 0.98.6
-3. **Understand changes** - Review what changed between versions and why
-4. **Preserve working code** - Don't modify code that was working correctly in 0.97.5
-5. **Reference paths clearly** - Always specify which version when discussing code
 
 ## Development Environment
 
@@ -49,7 +40,7 @@ When reviewing code or fixing bugs:
 - **Shell**: PowerShell (use PowerShell syntax for commands)
 - **Cross-compilation**: `./buildcrosswin32.sh` (requires mingw, run in PowerShell)
 - **Native**: Visual Studio project in `IDE/VC/`
-- **Installer**: NSIS scripts in `nsis/` directory
+- **Installer**: NSIS scripts in `legacy/nsis-old/` directory
 - **Build Commands**: Use PowerShell syntax, e.g., `.\buildcrosswin32.sh` or `& .\buildcrosswin32.sh`
 - **Visual Studio 2022**: Open `IDE/VC/DuneLegacy.sln` and build for x64 Release/Debug
 - **SDL Dependencies**: All SDL2 libraries are included as project references in the solution
@@ -89,7 +80,7 @@ cd /Users/stefanvanderwel/development/dune/dunelegacy
 cmake --build build --target dmg --config Release
 ```
 
-**Output**: `build/DuneLegacy-0.99.2-macOS.dmg`
+**Output**: `build/DuneLegacy-0.99.4-macOS.dmg`
 
 **What this does automatically:**
 1. Cleans CPack cache to prevent stale files
@@ -142,8 +133,8 @@ cmake --build build --target installer --config Release
 ```
 
 **Output**: 
-- `build/DuneLegacy-0.99.2-Windows-x64.exe` (NSIS installer)
-- `build/DuneLegacy-0.99.2-Windows-x64.zip` (portable zip)
+- `build/DuneLegacy-0.99.4-Windows-x64.exe` (NSIS installer)
+- `build/DuneLegacy-0.99.4-Windows-x64.zip` (portable zip)
 
 ### Building for Linux
 

@@ -259,12 +259,14 @@ void MultiPlayerMenu::onJoin() {
     if(selectedEntry >= 0) {
         GameServerInfo* pGameServerInfo = static_cast<GameServerInfo*>(gameList.getEntryPtrData(selectedEntry));
         
-        // Smart NAT detection: Use local IP if available (for NAT hairpinning/same LAN)
-        // This allows players behind the same router to connect directly via LAN IP
+        // Smart NAT detection: For internet games, decide whether to use external or local IP
+        // - If found via LAN broadcast, use LAN address (same network confirmed)
+        // - Otherwise, use external IP from metaserver (the default for internet games)
+        // Note: The local IP is only useful if both players are behind the same router,
+        // which would be detected via LAN broadcast anyway.
         ENetAddress connectAddress = pGameServerInfo->serverAddress;
         
-        if(internetGamesButton.getToggleState() && !pGameServerInfo->localIP.empty()) {
-            // We're in Internet Games mode and server provided a local IP
+        if(internetGamesButton.getToggleState()) {
             // Check if this game is also on LAN (UDP broadcast discovery)
             bool foundOnLAN = false;
             for(const GameServerInfo& lanGame : LANGameList) {
@@ -281,11 +283,10 @@ void MultiPlayerMenu::onJoin() {
             }
             
             if(!foundOnLAN) {
-                // Not found via LAN broadcast, but metaserver provided local IP
-                // Try local IP first (handles NAT hairpinning when on same network)
-                SDL_Log("Smart NAT: Trying local IP from metaserver: %s:%d",
-                        pGameServerInfo->localIP.c_str(), pGameServerInfo->localAddress.port);
-                connectAddress = pGameServerInfo->localAddress;
+                // Not found on LAN - use the external IP from metaserver
+                SDL_Log("Connecting to internet game via external IP: %s:%d",
+                        Address2String(pGameServerInfo->serverAddress).c_str(), pGameServerInfo->serverAddress.port);
+                // connectAddress is already set to serverAddress (external IP)
             }
         }
 

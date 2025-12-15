@@ -2181,6 +2181,16 @@ void QuantBot::build(int militaryValue) {
 					&& pBuilder->isAvailableToBuild(Structure_WindTrap)) {
 						itemID = Structure_WindTrap;
 					}
+				// 1b. Power Deficit Recovery - build windtraps when power production is below requirement
+				// This ensures the AI catches up on power even without turret prerequisites being met
+				if (itemID == NONE_ID && !skipRemainingStructureLogic
+					&& getHouse()->getProducedPower() < getHouse()->getPowerRequirement()
+					&& pBuilder->isAvailableToBuild(Structure_WindTrap)
+					&& findPlaceLocation(Structure_WindTrap).isValid()) {
+					itemID = Structure_WindTrap;
+					int powerDeficit = getHouse()->getPowerRequirement() - getHouse()->getProducedPower();
+					logDebug("POWER-RECOVERY: Building windtrap to recover from power deficit (%d)", powerDeficit);
+				}
 				// 2. Refinery (if 0)
 				if (itemID == NONE_ID && !skipRemainingStructureLogic
 					&& itemCount[Structure_Refinery] == 0 
