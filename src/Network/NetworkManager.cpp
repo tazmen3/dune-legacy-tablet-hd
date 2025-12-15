@@ -250,6 +250,26 @@ void NetworkManager::update()
             }
         }
     }
+    
+    // NAT keep-alive: Send periodic reliable ping to prevent NAT mapping timeout
+    // Many routers drop UDP NAT mappings after 30-60 seconds of "inactivity"
+    // (unreliable packets don't count as activity since they have no ACKs)
+    if (!peerList.empty() || connectPeer != nullptr) {
+        Uint32 now = SDL_GetTicks();
+        if (now - lastKeepAliveTime >= KEEPALIVE_INTERVAL_MS) {
+            lastKeepAliveTime = now;
+            
+            ENetPacketOStream packetStream(ENET_PACKET_FLAG_RELIABLE);
+            packetStream.writeUint32(NETWORKPACKET_KEEPALIVE);
+            packetStream.writeUint32(now);  // Timestamp for debugging
+            
+            if (bIsServer) {
+                sendPacketToAllConnectedPeers(packetStream);
+            } else if (connectPeer != nullptr) {
+                sendPacketToHost(packetStream);
+            }
+        }
+    }
 
     if(bIsServer) {
         // Check for timeout of one client
@@ -1137,6 +1157,12 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
                 if(pOnReceiveModAck) {
                     pOnReceiveModAck(playerName, success, modChecksum);
                 }
+            } break;
+            
+            case NETWORKPACKET_KEEPALIVE: {
+                // NAT keep-alive ping - just receiving it is enough to keep the NAT mapping alive
+                // The reliable packet triggers ACKs which count as bidirectional traffic
+                // No action needed, packet is silently consumed
             } break;
 
             default: {

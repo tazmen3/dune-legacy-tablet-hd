@@ -60,6 +60,7 @@
 #define NETWORKPACKET_MOD_CHUNK             16  // Host -> Client: mod file chunk
 #define NETWORKPACKET_MOD_COMPLETE          17  // Host -> Client: transfer complete
 #define NETWORKPACKET_MOD_ACK               18  // Client -> Host: acknowledge mod sync complete
+#define NETWORKPACKET_KEEPALIVE             19  // Periodic ping to keep NAT mappings alive
 
 // Network protocol version - increment when packet formats change
 // Version 2: Added simMsAvg to NETWORKPACKET_CLIENTSTATS (5 fields instead of 4)
@@ -394,6 +395,10 @@ private:
     Uint32                                      upnpLeaseStartTime = 0;
     static constexpr int                        UPNP_LEASE_DURATION = 3600;      // 1 hour lease
     static constexpr int                        UPNP_RENEWAL_MARGIN = 300;       // Renew 5 min before expiry
+    
+    // NAT keep-alive: send reliable ping every 10 seconds to prevent NAT timeout
+    Uint32                                      lastKeepAliveTime = 0;
+    static constexpr int                        KEEPALIVE_INTERVAL_MS = 10000;   // 10 seconds
 
 public:
     /**
