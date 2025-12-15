@@ -3206,6 +3206,16 @@ void Game::onReceiveSelectionList(const std::string& name, const std::set<Uint32
 void Game::onPeerDisconnected(const std::string& name, bool bHost, int cause) {
     pInterface->getChatManager().addInfoMessage(name + " disconnected!");
     
+    // If host disconnected, the game cannot continue - end it
+    if(bHost) {
+        SDL_Log("Host '%s' disconnected - ending game", name.c_str());
+        pInterface->getChatManager().addInfoMessage("Host disconnected! Game ending...");
+        
+        // Set game as lost/quit so we return to menu
+        bQuitGame = true;
+        return;
+    }
+    
     // CRITICAL: Clear all client stats when ANY peer disconnects
     // Active clients will re-register at the next interval (< 375 cycles)
     // This is simpler and safer than trying to map player name → clientId

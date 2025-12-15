@@ -1155,7 +1155,8 @@ void NetworkManager::handlePacket(ENetPeer* peer, ENetPacketIStream& packetStrea
 
 void NetworkManager::sendPacketToHost(ENetPacketOStream& packetStream, int channel) {
     if(connectPeer == nullptr) {
-        SDL_Log("NetworkManager: sendPacketToHost() called on server!");
+        // This can happen if host disconnected but game hasn't processed the quit yet
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "NetworkManager: sendPacketToHost() failed - no host connection");
         return;
     }
 
