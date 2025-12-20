@@ -1,7 +1,7 @@
 # NAT Traversal via STUN + Coordinated Hole Punching
 
 ## Status
-IN_REVIEW (Rev 5 - addressing Codex feedback)
+APPROVED (Rev 5)
 
 ## Revision History
 | Rev | Date | Changes |
@@ -11,6 +11,7 @@ IN_REVIEW (Rev 5 - addressing Codex feedback)
 | 3 | 2024-12-20 | STUN on ENet socket, `list2` endpoint, IP derived server-side |
 | 4 | 2024-12-20 | STUN only pre-connection, explicit host/client roles, extend `command=add` |
 | 5 | 2024-12-20 | **Fixes**: (1) session_id stable per secret, (2) No JSON - all GET + line-based responses |
+| 5a | 2024-12-20 | **APPROVED** - Added: fallback to direct connect, STUN call site clarification |
 
 ## Problem / Goal
 
@@ -380,6 +381,74 @@ STUN queries only run pre-connection when no ENet peers exist:
 - Client: Before `punch_request`, while no `connectPeer`
 
 No concurrent `enet_host_service()` during STUN window.
+
+## STUN Call Sites (Rev 5 - Clarified)
+
+The ENet socket is created in `NetworkManager::NetworkManager()`, so STUN must run on the already-bound socket:
+
+| Role | When | Where in Code |
+|------|------|---------------|
+| Host | After socket exists, before announcing | `startServer()` before `pMetaServerClient->startAnnounce(...)` |
+| Client | Before initiating connect | Just before `NetworkManager::connect(...)` in MultiPlayerMenu |
+
+```cpp
+// Host: NetworkManager::startServer()
+void NetworkManager::startServer(...) {
+    // ... host is already created in constructor with bound socket
+    
+    // Run STUN before announcing (no peers exist yet)
+    uint16_t stunPort = performStunQuery(host->socket);
+    
+    // Pass stunPort to metaserver
+    pMetaServerClient->startAnnounce(..., stunPort);
+}
+
+// Client: MultiPlayerMenu before connect
+void MultiPlayerMenu::onJoin() {
+    // ... before calling connect
+    
+    if (gameInfo.holePunchAvailable) {
+        uint16_t stunPort = pNetworkManager->performStunQuery();
+        // Initiate punch flow with stunPort
+    }
+    
+    pNetworkManager->connect(...);
+}
+```
+
+## Fallback to Direct Connect
+
+If hole punching is unavailable or fails, fall back to direct connection (existing behavior):
+
+| Condition | Fallback Behavior |
+|-----------|-------------------|
+| `list2` unavailable (old server) | Use `list`, connect directly to `ip:port` |
+| `holePunchAvailable == false` | Connect directly (no punch attempt) |
+| `punch_request` timeout/error | Log warning, connect directly |
+| `punch_status` timeout (10s) | Log warning, connect directly |
+| Punch packets fail + no connection | Connection fails (as today) |
+
+```cpp
+// MultiPlayerMenu::onJoin() pseudocode
+if (!gameInfo.holePunchAvailable) {
+    // No hole punch data - direct connect
+    pNetworkManager->connect(gameInfo.serverAddress);
+    return;
+}
+
+// Attempt hole punch
+auto punchResult = attemptHolePunch(gameInfo);
+if (punchResult.success) {
+    // Punched address may be different from original
+    pNetworkManager->connect(punchResult.address);
+} else {
+    // Punch failed - try direct connect as last resort
+    SDL_Log("Hole punch failed, attempting direct connect");
+    pNetworkManager->connect(gameInfo.serverAddress);
+}
+```
+
+This ensures users without UPnP still get a connection attempt (which may work if port is forwarded manually or if NAT is permissive).
 
 ## Host/Client Punch Roles (unchanged from Rev 4)
 

@@ -5,12 +5,14 @@ Branch: `master` (not started)
 Commit: N/A
 
 ## Current Step
-**Rev 5 submitted for re-review.** Addressed all Rev 4 blockers:
-1. `session_id` preserved on re-add (same secret) - only generated on first add
-2. No JSON - all endpoints use GET + line-based responses
-3. No new HTTP code needed - existing `loadFromHttp()` works as-is
+**APPROVED** - Begin implementation. Start with metaserver protocol changes:
 
-Awaiting Codex re-review of `design.md` Rev 5.
+1. `command=list2` endpoint (14 tab-separated fields with session_id, stun_port)
+2. `command=add` extended to accept `stun_port`, return `session_id`
+3. Punch endpoints: `punch_request`, `punch_poll`, `punch_ready`, `punch_status`
+4. Storage + TTL cleanup for punch data
+
+Then client-side: STUN client, MetaServerClient extensions, hole punch flow.
 
 ## How To Validate
 Design phase - no code to validate yet.
@@ -36,6 +38,14 @@ None yet.
 None yet.
 
 ## Review Notes (Codex)
+### Rev 5 Outcome
+APPROVE (design is implementable in this repo with no new dependencies).
+
+### Rev 5 Non-blocking Notes
+- Add an explicit “fallback to direct connect” section: if `holePunchAvailable == false`, or any punch step times out/errors, attempt direct `ip:port` connect as today.
+- Clarify the STUN call sites to match the current code: ENet host/socket is created in `NetworkManager::NetworkManager()`, so STUN should run in `startServer()` before `pMetaServerClient->startAnnounce(...)`, and on the client just before calling `NetworkManager::connect(...)`.
+- Consider making punch polling + punch burst time-sliced (state machine) to avoid UI stalls from `SDL_Delay()`, but OK for v1.
+
 ### Rev 4 Outcome
 REJECT (major blockers fixed; remaining gaps are “can we implement this safely with current codebase”).
 
@@ -122,6 +132,10 @@ REJECT (design is close, but two core assumptions are still wrong/unsafe).
   - [x] session_id preserved on re-add
   - [x] No JSON - all GET + line-based
   - [x] Existing loadFromHttp() works
-- [ ] Codex re-review of Rev 5
-- [ ] Owner approval of revised design
-- [ ] No external library needed (STUN client + existing HTTP helper)
+- [x] Codex re-review of Rev 5 - **APPROVED**
+- [x] Owner approval of revised design - **APPROVED**
+- [x] Added fallback to direct connect section
+- [x] Clarified STUN call sites
+- [ ] **NEXT:** Implement metaserver protocol changes
+- [ ] Implement STUN client (no external library)
+- [ ] Wire up hole punch flow in game client
