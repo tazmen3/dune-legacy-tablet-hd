@@ -1,7 +1,33 @@
-# Dune Legacy 0.99.4 Release Notes
+# Dune Legacy 0.99.5 Release Notes
 
-**Release Date:** December 14, 2025  
+**Release Date:** December 20, 2025  
 **Download:** [Windows Installer](https://dunelegacy.sourceforge.net/downloads/)
+
+---
+
+## 🚀 Version 0.99.5 Updates
+
+### NAT Traversal / Hole Punching
+
+**Internet Multiplayer Without Port Forwarding:**
+- Automatic NAT hole punching for internet games
+- Uses STUN protocol to discover external IP:port
+- Coordinated UDP hole punching via metaserver
+- Falls back to direct connect if hole punch fails
+- Works with most symmetric NAT routers
+
+**Technical Details:**
+- Custom STUN client implementation (no external library)
+- Non-blocking punch state machine (no UI freezing)
+- Metaserver coordinates timing for simultaneous punching
+- Host polls for punch requests, client polls for readiness
+
+### Multiplayer Stability
+
+**Connection Improvements:**
+- Added NAT keep-alive packets to prevent router timeout
+- Fixed host disconnect detection (game now ends properly)
+- Smart NAT: Prefers LAN address when on same subnet
 
 ---
 
