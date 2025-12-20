@@ -1,5 +1,8 @@
 # Dune Legacy Project Configuration for Cursor
 
+## Workflow
+- Follow `.analysis/development-approach.md` (2-doc feature process under `.analysis/features/`).
+
 ## Project Overview
 This is Dune Legacy, a modernized clone of Westwood Studios' "Dune 2" real-time strategy game.
 
