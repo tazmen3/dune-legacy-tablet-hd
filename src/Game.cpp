@@ -1012,12 +1012,28 @@ void Game::makeHostBudgetDecision() {
     // Track desync status
     bool allClientsSynced = true;
     
+    // Grace period for budget changes: clients have 375 cycles (one budget interval)
+    // to report the old budget after a change, since their stats may be from before the change
+    constexpr Uint32 BUDGET_CHANGE_GRACE_PERIOD = 375;
+    
     for(const auto& [clientId, stats] : clientStats) {
-        // Validate budget synchronization (sanity check)
-        if(stats.currentBudget != negotiatedBudget) {
+        // Validate budget synchronization with grace period for recent changes
+        bool budgetMatches = (stats.currentBudget == negotiatedBudget);
+        bool withinGracePeriod = (gameCycleCount - lastBudgetChangeCycle) < BUDGET_CHANGE_GRACE_PERIOD;
+        bool matchesPrevious = (stats.currentBudget == previousNegotiatedBudget);
+        bool clientReportFromBeforeChange = (stats.lastUpdateCycle < lastBudgetChangeCycle);
+        
+        // Budget is valid if:
+        // 1. It matches current budget, OR
+        // 2. We're within grace period AND it matches previous budget AND client's report is from before change
+        bool budgetValid = budgetMatches || 
+                           (withinGracePeriod && matchesPrevious && clientReportFromBeforeChange);
+        
+        if(!budgetValid) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                "[PathBudget] DESYNC DETECTED! Client %d budget=%d but host=%zu - triggering re-sync",
-                clientId, stats.currentBudget, negotiatedBudget);
+                "[PathBudget] DESYNC DETECTED! Client %d budget=%d but host=%zu (prev=%zu, grace=%s, clientCycle=%d, changeCycle=%d)",
+                clientId, stats.currentBudget, negotiatedBudget, previousNegotiatedBudget,
+                withinGracePeriod ? "yes" : "no", stats.lastUpdateCycle, lastBudgetChangeCycle);
             logPerformance("[DESYNC CRITICAL] Client %d has budget=%d but host has %zu - re-syncing immediately",
                     clientId, stats.currentBudget, negotiatedBudget);
             
@@ -1222,6 +1238,12 @@ void Game::applyPendingBudgetChanges() {
         if(gameCycleCount >= it->applyCycle) {
             // Apply budget change NOW
             size_t oldBudget = negotiatedBudget;
+            
+            // Track previous budget for DESYNC grace period
+            // Clients may still report the old budget for up to 375 cycles after a change
+            previousNegotiatedBudget = oldBudget;
+            lastBudgetChangeCycle = gameCycleCount;
+            
             negotiatedBudget = std::clamp(it->newBudget, kMinBudget, kMaxBudget);
             
             // CRITICAL FOR SYNC: Reset carry-over tokens on budget change

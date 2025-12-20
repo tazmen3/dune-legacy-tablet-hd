@@ -890,6 +890,11 @@ private:
     std::vector<PendingBudgetChange> pendingBudgetChanges;
     std::map<Uint32, ClientPerformanceStats> clientStats;  // Host only
     
+    // Track previous budget to avoid false DESYNC detection
+    // When budget changes, clients may report the old budget for 1 interval (375 cycles)
+    size_t previousNegotiatedBudget = 0;   // Budget before last change
+    Uint32 lastBudgetChangeCycle = 0;      // Cycle when budget last changed
+    
     // Multiplayer budget negotiation functions
     void checkBudgetAdjustment();
     void sendStatsToHost(float avgFps, float simMsAvg, size_t queueDepth, size_t currentBudget);
