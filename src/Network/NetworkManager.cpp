@@ -94,6 +94,9 @@ NetworkManager::~NetworkManager() {
 }
 
 void NetworkManager::startServer(bool bLANServer, const std::string& serverName, const std::string& playerName, GameInitSettings* pGameInitSettings, int numPlayers, int maxPlayers) {
+    // Reset game-in-progress flag for new game
+    bGameInProgress = false;
+    
     if(bLANServer == true) {
         if(pLANGameFinderAndAnnouncer != nullptr) {
             pLANGameFinderAndAnnouncer->startAnnounce(serverName, host->address.port, pGameInitSettings->getFilename(), numPlayers, maxPlayers);
@@ -213,7 +216,8 @@ void NetworkManager::stopServer() {
     // Fully stop the server (called when leaving a game or menu)
     bIsServer = false;
     bLANServer = false;
-    bGameInProgress = false;
+    // NOTE: Do NOT reset bGameInProgress here - it should remain true while game is active
+    // It will be reset when NetworkManager is destroyed or when a new server is started
     pGameInitSettings = nullptr;
 }
 
