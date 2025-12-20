@@ -1023,28 +1023,27 @@ void Game::makeHostBudgetDecision() {
     // Track desync status
     bool allClientsSynced = true;
     
-    // Grace period for budget changes: clients have 375 cycles (one budget interval)
-    // to report the old budget after a change, since their stats may be from before the change
-    constexpr Uint32 BUDGET_CHANGE_GRACE_PERIOD = 375;
-    
     for(const auto& [clientId, stats] : clientStats) {
-        // Validate budget synchronization with grace period for recent changes
+        // Validate budget synchronization using cycle-based comparison
+        // See: .analysis/features/pathbudget-sync/design.md for protocol contract
+        
         bool budgetMatches = (stats.currentBudget == negotiatedBudget);
-        bool withinGracePeriod = (gameCycleCount - lastBudgetChangeCycle) < BUDGET_CHANGE_GRACE_PERIOD;
-        bool matchesPrevious = (stats.currentBudget == previousNegotiatedBudget);
+        
+        // Defense-in-depth: Allow previous budget ONLY if client's report is from BEFORE the change
+        // This is a tight cycle-based check, not an arbitrary time window
         bool clientReportFromBeforeChange = (stats.lastUpdateCycle < lastBudgetChangeCycle);
+        bool matchesPrevious = (stats.currentBudget == previousNegotiatedBudget);
         
         // Budget is valid if:
-        // 1. It matches current budget, OR
-        // 2. We're within grace period AND it matches previous budget AND client's report is from before change
-        bool budgetValid = budgetMatches || 
-                           (withinGracePeriod && matchesPrevious && clientReportFromBeforeChange);
+        // 1. It matches current budget (normal case), OR
+        // 2. Client's report is from before the last change AND matches previous budget
+        bool budgetValid = budgetMatches || (clientReportFromBeforeChange && matchesPrevious);
         
         if(!budgetValid) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                "[PathBudget] DESYNC DETECTED! Client %d budget=%d but host=%zu (prev=%zu, grace=%s, clientCycle=%d, changeCycle=%d)",
+                "[PathBudget] DESYNC DETECTED! Client %d budget=%d but host=%zu (prev=%zu, clientCycle=%d, changeCycle=%d)",
                 clientId, stats.currentBudget, negotiatedBudget, previousNegotiatedBudget,
-                withinGracePeriod ? "yes" : "no", stats.lastUpdateCycle, lastBudgetChangeCycle);
+                stats.lastUpdateCycle, lastBudgetChangeCycle);
             logPerformance("[DESYNC CRITICAL] Client %d has budget=%d but host has %zu - re-syncing immediately",
                     clientId, stats.currentBudget, negotiatedBudget);
             
