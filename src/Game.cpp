@@ -2127,11 +2127,8 @@ void Game::runMainLoop() {
                     frameTiming.networkWaitMsThisFrame += networkWaitMs;
                     if(networkWaitMs > frameTiming.maxNetworkWaitMs) frameTiming.maxNetworkWaitMs = networkWaitMs;
                     
-                    // CRITICAL: Reset frameTime when waiting for network to prevent 
-                    // catch-up bursts. In lockstep, we wait for all players - we don't
-                    // try to "catch up" on missed cycles as that causes stutter.
-                    // Cap frameTime to at most one cycle worth to allow gradual recovery.
-                    frameTime = std::min(frameTime, getGameSpeed());
+                    // Don't reset frameTime - let the game catch up naturally.
+                    // The guardrail (10 cycles/frame max) prevents excessive catch-up.
                 }
                 else if (bPause){
                     // Pause in single player shouldn't jump after resuming
