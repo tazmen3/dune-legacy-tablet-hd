@@ -749,7 +749,18 @@ void Game::checkBudgetAdjustment() {
         // This ensures the host has fresh data when it makes its decision
         if((gameCycleCount + 1) % kBudgetCheckInterval == 0 && frameTiming.frameCount > 0) {
             const double avgFps = (frameTiming.frameCount * 1000.0 / frameTiming.totalMs);
-            sendStatsToHost(avgFps, frameTiming.simMsAvg, pathRequestQueue.size(), negotiatedBudget);
+            
+            // Send the budget we'll have at decision time (next cycle), not current budget
+            // This avoids false DESYNC detection when a budget change is pending
+            size_t budgetAtDecisionTime = negotiatedBudget;
+            for (const auto& pending : pendingBudgetChanges) {
+                if (pending.applyCycle == gameCycleCount + 1) {
+                    budgetAtDecisionTime = pending.newBudget;
+                    break;  // Use the first pending change for next cycle
+                }
+            }
+            
+            sendStatsToHost(avgFps, frameTiming.simMsAvg, pathRequestQueue.size(), budgetAtDecisionTime);
         }
     }
     else if(gameCycleCount % kBudgetCheckInterval == 0 && frameTiming.frameCount > 0) {
