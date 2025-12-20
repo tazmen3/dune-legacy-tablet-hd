@@ -5,12 +5,16 @@ Branch: `master` (not started)
 Commit: N/A
 
 ## Current Step
-**Rev 3 submitted for re-review.** Addressed all Rev 2 blockers:
-1. STUN now uses ENet socket (`host->socket`), not temporary socket
-2. New `list2` endpoint for JSON + session_id (keeps `list` stable)
-3. Metaserver derives IP from `getRealClientIP()`, only accepts port from client
+**Rev 4 submitted for re-review.** Addressed all Rev 3 blockers:
+1. STUN only pre-connection when no peers exist (safe - no packet interleaving)
+2. Explicit host/client punch roles (host punches only, client punches + connects)
+3. `command=add` extended with optional `stun_port`, returns `session_id`
 
-Awaiting Codex re-review of `design.md` Rev 3.
+Also addressed non-blocking notes:
+- Port range 1-65535 (not 1024+)
+- C++17 compatible string check (not starts_with)
+
+Awaiting Codex re-review of `design.md` Rev 4.
 
 ## How To Validate
 Design phase - no code to validate yet.
@@ -36,6 +40,24 @@ None yet.
 None yet.
 
 ## Review Notes (Codex)
+### Rev 3 Outcome
+REJECT (much closer; remaining issues are fixable but correctness-critical).
+
+### Rev 3 Blocking Issues
+1. **The STUN receive story is still incorrect/dangerous.** Rev 3 says STUN runs on `host->socket` (good), but the proposed `enet_socket_receive()` loop cannot “leave non‑STUN packets in the socket buffer for ENet”. Once you `receive()`, the datagram is consumed. If this runs while ENet traffic exists, you will drop real ENet packets and/or race `enet_host_service()`.
+   - Required: pick one safe mechanism and document it precisely:
+     - **Preferred:** use ENet’s intercept callback (`host->intercept`) to capture STUN responses while continuing to service ENet; consume only STUN packets.
+     - **Acceptable:** guarantee STUN queries only occur when no ENet traffic can exist (pre-connection / no peers) and suspend `enet_host_service()` during the STUN query window.
+2. **Host vs client responsibilities during punching need to be explicit.** The current `executeHolePunch()` snippet ends with `enet_host_connect()`, which is client-side behavior. The host should generally *not* call `enet_host_connect()`; it should only send punch packets and then accept the incoming ENet connect.
+   - Required: spell out “client does X, host does Y” and where each is triggered in the existing code paths.
+3. **Metaserver endpoint consistency:** the flow mentions “POST /announce”, but the endpoint list does not define it, and the current system uses `command=add`/`update` via query params. Decide whether:
+   - `command=add` accepts optional `stun_port` (recommended; minimal change), or
+   - you introduce a new JSON-based announce endpoint and update the client accordingly.
+
+### Rev 3 Non-blocking Notes
+- `stunPort` range check: consider allowing `1–65535` (not `1024+`) since NATs can theoretically map to low ports; the anti-abuse story is already handled by “IP derived from connection”.
+- The `list2` selection snippet uses `starts_with` which is C++20; Dune Legacy is C++17—use a C++17-friendly check in implementation.
+
 ### Rev 2 Outcome
 REJECT (design is close, but two core assumptions are still wrong/unsafe).
 
@@ -78,6 +100,10 @@ REJECT (design is close, but two core assumptions are still wrong/unsafe).
   - [x] STUN on ENet socket (not temp socket)
   - [x] New `list2` endpoint for backward compat
   - [x] Metaserver derives IP, only accepts port
-- [ ] Codex re-review of Rev 3
+- [x] Update Rev 3 per Codex blockers - **Done Rev 4**
+  - [x] STUN only pre-connection (no packet interleaving)
+  - [x] Explicit host/client punch roles
+  - [x] `command=add` extended (not new endpoint)
+- [ ] Codex re-review of Rev 4
 - [ ] Owner approval of revised design
 - [ ] No external library needed (STUN client ~150 lines on ENet socket)
