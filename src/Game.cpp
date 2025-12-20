@@ -2452,7 +2452,13 @@ void Game::initializeNetwork() {
             std::bind(&Game::handleSetPathBudget, this,
             std::placeholders::_1, std::placeholders::_2));
         
-        cmdManager.setNetworkCycleBuffer(MILLI2CYCLES(pNetworkManager->getMaxPeerRoundTripTime()) + 5);
+        // Network buffer: RTT-based + 5 cycles padding, with minimum of 10 cycles for internet play
+        // This provides ~200ms buffer to handle latency spikes and jitter
+        const int rttBasedBuffer = MILLI2CYCLES(pNetworkManager->getMaxPeerRoundTripTime()) + 5;
+        const int minInternetBuffer = 10;  // ~200ms at 50Hz
+        cmdManager.setNetworkCycleBuffer(std::max(rttBasedBuffer, minInternetBuffer));
+        SDL_Log("Network buffer set to %d cycles (RTT-based: %d, min: %d)", 
+                std::max(rttBasedBuffer, minInternetBuffer), rttBasedBuffer, minInternetBuffer);
     }
 }
 
