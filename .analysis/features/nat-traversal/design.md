@@ -1,7 +1,7 @@
 # NAT Traversal via STUN + Coordinated Hole Punching
 
 ## Status
-IN_REVIEW (Rev 4 - addressing Codex feedback)
+IN_REVIEW (Rev 5 - addressing Codex feedback)
 
 ## Revision History
 | Rev | Date | Changes |
@@ -9,7 +9,8 @@ IN_REVIEW (Rev 4 - addressing Codex feedback)
 | 1 | 2024-12-15 | Initial design with libjuice/ICE |
 | 2 | 2024-12-20 | Dropped ICE, STUN + hole punch |
 | 3 | 2024-12-20 | STUN on ENet socket, `list2` endpoint, IP derived server-side |
-| 4 | 2024-12-20 | **Fixes**: (1) STUN only pre-connection with no peers, (2) Explicit host/client punch roles, (3) `command=add` takes optional `stun_port` |
+| 4 | 2024-12-20 | STUN only pre-connection, explicit host/client roles, extend `command=add` |
+| 5 | 2024-12-20 | **Fixes**: (1) session_id stable per secret, (2) No JSON - all GET + line-based responses |
 
 ## Problem / Goal
 
@@ -22,439 +23,462 @@ IN_REVIEW (Rev 4 - addressing Codex feedback)
 - Full ICE implementation
 - TURN relay server (future work)
 - Modifying ENet internals
-- Supporting symmetric NAT ↔ symmetric NAT
+- Adding JSON parsing library (v1 keeps line-based protocols)
 
-## STUN Receive Safety (Rev 4 - CORRECTED)
+## session_id Stability (Rev 5 - CORRECTED)
 
-### Problem (from Rev 3 review)
-The proposed `enet_socket_receive()` loop cannot "leave non-STUN packets in the socket buffer for ENet" - once you `receive()`, the datagram is consumed. Running this while ENet traffic exists will drop real packets.
+### Problem (from Rev 4 review)
+The `handleAdd()` snippet regenerated `session_id` unconditionally. But clients can call `command=add` again (e.g., on `update` failure fallback), which would break in-flight punch flows:
+- Host polls by `secret` → replies stored by `session_id`
+- Client polls by `session_id` seen in `list2`
+- If `session_id` changes mid-lobby, `punch_status` never reaches "ready"
 
-### Solution: STUN Only Pre-Connection (Option B)
-
-**Guarantee:** STUN queries only occur when:
-1. No ENet peers are connected (`peerList.empty()` and `awaitingConnectionList.empty()`)
-2. `enet_host_service()` is NOT being called during the STUN window
-
-**Implementation:**
-
-```cpp
-// HOST: STUN runs immediately after enet_host_create(), before any peers can connect
-void NetworkManager::startServer(...) {
-    // 1. Create ENet host
-    host = enet_host_create(&address, 32, 2, 0, 0);
-    
-    // 2. STUN query NOW - no peers exist yet, no enet_host_service() running
-    //    Safe to use enet_socket_receive() exclusively
-    if (!bLANServer && settings.network.enableHolePunch) {
-        stunResult = StunClient::queryOnSocket(host->socket, stunServer, stunPort, 3000);
-        if (stunResult.success) {
-            externalStunPort = stunResult.externalPort;
-            SDL_Log("STUN: External address %s:%d", stunResult.externalIP.c_str(), externalStunPort);
-        }
-    }
-    
-    // 3. NOW start announcing and accepting connections
-    //    From this point, enet_host_service() owns the socket
-    bIsServer = true;
-    // ... announce to metaserver with stun_port
-}
-
-// CLIENT: STUN runs before initiating connection
-void NetworkManager::connectWithHolePunch(const GameServerInfo& gameInfo) {
-    // Precondition: not connected to anything yet
-    assert(peerList.empty() && connectPeer == nullptr);
-    
-    // 1. STUN query - safe, no ENet traffic
-    stunResult = StunClient::queryOnSocket(host->socket, stunServer, stunPort, 3000);
-    
-    // 2. Request hole punch via metaserver
-    //    (metaserver derives our IP, we provide stun_port)
-    requestHolePunch(gameInfo.sessionId, stunResult.externalPort);
-    
-    // 3. Wait for punch_ready, then punch + connect
-    // ... (see Host/Client Punch Roles below)
-}
-```
-
-### StunClient Implementation (Safe Version)
-
-```cpp
-StunClient::Result StunClient::queryOnSocket(
-    ENetSocket socket,
-    const std::string& stunServer,
-    uint16_t stunPort,
-    int timeoutMs
-) {
-    // PRECONDITION: Caller guarantees no concurrent enet_host_service()
-    //               and no peers connected. All received packets are ours.
-    
-    ENetAddress stunAddr;
-    enet_address_set_host(&stunAddr, stunServer.c_str());
-    stunAddr.port = stunPort;
-    
-    // Build and send STUN Binding Request
-    uint8_t request[20];
-    uint8_t transactionId[12];
-    generateTransactionId(transactionId);
-    buildBindingRequest(request, transactionId);
-    
-    ENetBuffer sendBuf = { request, 20 };
-    if (enet_socket_send(socket, &stunAddr, &sendBuf, 1) < 0) {
-        return { false, "", 0, "send failed" };
-    }
-    
-    // Receive response - we OWN the socket during this window
-    uint8_t response[256];
-    ENetAddress fromAddr;
-    ENetBuffer recvBuf = { response, sizeof(response) };
-    
-    Uint32 deadline = SDL_GetTicks() + timeoutMs;
-    while (SDL_GetTicks() < deadline) {
-        // Set socket to non-blocking for polling
-        enet_socket_set_option(socket, ENET_SOCKOPT_NONBLOCK, 1);
-        int len = enet_socket_receive(socket, &fromAddr, &recvBuf, 1);
-        
-        if (len >= 20) {
-            // Verify it's our STUN response (magic cookie + transaction ID)
-            if (isStunBindingResponse(response, len, transactionId)) {
-                return parseXorMappedAddress(response, len);
-            }
-            // Else: unexpected packet (shouldn't happen pre-connection)
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, 
-                "STUN: Unexpected %d-byte packet during STUN query (dropped)", len);
-        }
-        
-        SDL_Delay(50);  // Poll every 50ms
-    }
-    
-    return { false, "", 0, "timeout" };
-}
-```
-
-### Safety Guarantees Summary
-
-| Phase | Who owns socket? | STUN safe? | ENet traffic? |
-|-------|------------------|------------|---------------|
-| Before `enet_host_create()` | Nobody | N/A | No |
-| After create, before announce | STUN query | **Yes** | No |
-| After announce, accepting peers | `enet_host_service()` | **No** | Yes |
-| Client before connect | STUN query | **Yes** | No |
-| Client after `enet_host_connect()` | `enet_host_service()` | **No** | Yes |
-
-## Host vs Client Punch Roles (Rev 4 - EXPLICIT)
-
-### Host Responsibilities
-
-```cpp
-// In NetworkManager (host side)
-
-void NetworkManager::handlePunchPoll() {
-    // Called periodically while hosting, before game starts
-    auto requests = pollPunchRequests();  // GET /punch_poll?secret=X
-    
-    for (const auto& req : requests) {
-        // Store client address for punching
-        pendingPunchClients.push_back({
-            .clientId = req.clientId,
-            .clientIP = req.clientIP,
-            .clientPort = req.clientPort
-        });
-        
-        // Signal ready to metaserver
-        sendPunchReady(req.clientId);  // POST /punch_ready
-        
-        // Schedule punch execution
-        schedulePunch(req, SDL_GetTicks() + 2000);  // 2 seconds from now
-    }
-}
-
-void NetworkManager::executePunchAsHost(const PunchTarget& target) {
-    // HOST: Send punch packets but DO NOT call enet_host_connect()
-    // The CLIENT will connect to us; we just create the NAT mapping
-    
-    ENetAddress clientAddr;
-    enet_address_set_host(&clientAddr, target.clientIP.c_str());
-    clientAddr.port = target.clientPort;
-    
-    SDL_Log("HOST: Punching to %s:%d", target.clientIP.c_str(), target.clientPort);
-    
-    // Send punch packets to create NAT mapping for return traffic
-    for (int i = 0; i < 10; i++) {
-        ENetBuffer buffer = { (void*)HOLE_PUNCH_MARKER, 4 };
-        enet_socket_send(host->socket, &clientAddr, &buffer, 1);
-        SDL_Delay(200);
-    }
-    
-    // DO NOT connect - wait for client's ENet connect to arrive
-    // ENet will handle incoming connection via enet_host_service()
-    SDL_Log("HOST: Punch complete, awaiting client connection");
-}
-```
-
-### Client Responsibilities
-
-```cpp
-// In NetworkManager or MultiPlayerMenu (client side)
-
-void NetworkManager::connectWithHolePunch(const GameServerInfo& gameInfo) {
-    // 1. STUN query (pre-connection, safe)
-    auto stunResult = StunClient::queryOnSocket(host->socket, ...);
-    
-    // 2. Request punch from metaserver
-    auto clientId = requestPunchRequest(gameInfo.sessionId, stunResult.externalPort);
-    
-    // 3. Poll for ready signal
-    while (!timedOut) {
-        auto status = pollPunchStatus(gameInfo.sessionId, clientId);
-        if (status.ready) {
-            hostAddr = status.hostAddr;
-            punchInSeconds = status.punchInSeconds;
-            break;
-        }
-        SDL_Delay(500);
-    }
-    
-    // 4. Wait for coordinated punch time
-    SDL_Delay(punchInSeconds * 1000);
-    
-    // 5. Execute punch AND connect (client initiates connection)
-    executePunchAsClient(hostAddr);
-}
-
-void NetworkManager::executePunchAsClient(const ENetAddress& hostAddr) {
-    // CLIENT: Send punch packets AND initiate ENet connection
-    
-    SDL_Log("CLIENT: Punching to %s:%d", Address2String(hostAddr).c_str(), hostAddr.port);
-    
-    // Send punch packets to create NAT mapping
-    for (int i = 0; i < 10; i++) {
-        ENetBuffer buffer = { (void*)HOLE_PUNCH_MARKER, 4 };
-        enet_socket_send(host->socket, &hostAddr, &buffer, 1);
-        SDL_Delay(200);
-    }
-    
-    // CLIENT initiates ENet connection (host accepts)
-    connectPeer = enet_host_connect(host, &hostAddr, 2, 0);
-    if (connectPeer == nullptr) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "CLIENT: enet_host_connect failed");
-        return;
-    }
-    
-    SDL_Log("CLIENT: Punch complete, ENet connect initiated");
-    // Normal ENet connection flow continues from here
-}
-```
-
-### Role Summary
-
-| Action | Host | Client |
-|--------|------|--------|
-| STUN query | Before announce | Before punch request |
-| Register with metaserver | `command=add` with `stun_port` | `command=punch_request` |
-| Poll metaserver | `punch_poll` for client requests | `punch_status` for ready signal |
-| Signal ready | `punch_ready` | (waits) |
-| Send punch packets | Yes | Yes |
-| Call `enet_host_connect()` | **NO** | **YES** |
-| Accept connection | Via `enet_host_service()` | N/A |
-
-## Metaserver Endpoint Consistency (Rev 4 - CORRECTED)
-
-### Problem (from Rev 3 review)
-Flow mentioned "POST /announce" but endpoints didn't define it. Current system uses `command=add`.
-
-### Solution: Extend `command=add` with optional `stun_port`
-
-**Minimal change to existing endpoint:**
+### Solution: Preserve session_id per secret
 
 ```php
-// metaserver.php - handleAdd() modification
-
 function handleAdd() {
-    // ... existing validation ...
-    
-    // NEW: Optional stun_port parameter
+    $secret = $_GET['secret'] ?? '';
     $stunPort = isset($_GET['stun_port']) ? intval($_GET['stun_port']) : null;
-    if ($stunPort !== null && ($stunPort < 1 || $stunPort > 65535)) {
-        echo "ERROR: Invalid stun_port\n";
-        return;
+    
+    // Check if this secret already has a game registered
+    $existingGame = getGameBySecret($secret);
+    
+    if ($existingGame) {
+        // RE-ADD: Preserve existing session_id and stun_port (unless new stun_port provided)
+        $sessionId = $existingGame['session_id'];
+        $stunPort = $stunPort ?? $existingGame['stun_port'];
+        
+        // Update other fields (name, map, players, etc.) but keep IDs stable
+        updateGame($secret, [
+            // ... updated fields from request ...
+            'session_id' => $sessionId,  // PRESERVED
+            'stun_port' => $stunPort,    // PRESERVED or updated
+            'lastUpdate' => time()
+        ]);
+    } else {
+        // NEW GAME: Generate new session_id
+        $sessionId = bin2hex(random_bytes(6));  // 12 hex chars
+        
+        createGame([
+            'secret' => $secret,
+            'session_id' => $sessionId,  // NEW
+            'stun_port' => $stunPort ?? $port,
+            // ... other fields ...
+        ]);
     }
-    
-    // Generate session_id for hole punch signaling
-    $sessionId = bin2hex(random_bytes(6));  // 12 hex chars
-    
-    $game = [
-        // ... existing fields ...
-        'session_id' => $sessionId,
-        'stun_port' => $stunPort ?? $port,  // Fall back to game port if no STUN
-    ];
-    
-    // ... rest of existing logic ...
     
     echo "OK\n";
     echo $secret . "\n";
-    echo $sessionId . "\n";  // NEW: Return session_id to host
+    echo $sessionId . "\n";
 }
 ```
 
-**Client change:**
+### Lifecycle Guarantees
+
+| Event | session_id | stun_port |
+|-------|------------|-----------|
+| First `command=add` | Generated | From STUN or port |
+| Re-add (same secret) | **Preserved** | Preserved (unless new value) |
+| `command=remove` | Deleted | Deleted |
+| Game timeout | Deleted | Deleted |
+
+## No JSON - All GET + Line-Based Responses (Rev 5 - SIMPLIFIED)
+
+### Problem (from Rev 4 review)
+- Game has no JSON parsing library
+- `ENetHttp.cpp` only supports GET with query params
+- Adding JSON library is scope creep for v1
+
+### Solution: Keep everything GET + line-based
+
+All punch endpoints use:
+- **Request:** GET with query parameters
+- **Response:** Line-based text (`OK\n` or `ERROR\n` followed by data lines)
+
+This matches existing metaserver protocol style and requires no new dependencies.
+
+## Metaserver Endpoints (Rev 5 - Complete Specification)
+
+### Existing Endpoints (Unchanged)
+| Endpoint | Format |
+|----------|--------|
+| `command=list` | Tab-separated, 12 fields |
+| `command=update` | `OK\n` or `ERROR\n` |
+| `command=remove` | `OK\n` or `ERROR\n` |
+
+### Modified Endpoints
+
+#### `command=add` (Extended)
+
+**Request:**
+```
+GET /metaserver.php?command=add&port=28747&name=...&stun_port=28747&...
+```
+
+New optional parameter: `stun_port` (external port from STUN discovery)
+
+**Response:**
+```
+OK
+<secret>
+<session_id>
+```
+
+Line 3 (`session_id`) is new. Old clients ignore extra lines.
+
+#### `command=list2` (New - Tab-Separated, NOT JSON)
+
+**Request:**
+```
+GET /metaserver.php?command=list2
+```
+
+**Response:**
+```
+OK
+<ip>\t<port>\t<name>\t<version>\t<map>\t<numplayers>\t<maxplayers>\t<pwd>\t<lastupdate>\t<localip>\t<modname>\t<modversion>\t<session_id>\t<stun_port>
+...
+```
+
+Same format as `list`, but with 2 additional fields (14 total):
+- Field 13: `session_id` (12 hex chars)
+- Field 14: `stun_port` (external port for hole punch)
+
+**Client parsing:**
 ```cpp
-// MetaServerClient.cpp - announce with stun_port
-parameters["stun_port"] = std::to_string(externalStunPort);
-
-// Parse response
-// Line 1: OK
-// Line 2: secret
-// Line 3: session_id (NEW)
-```
-
-### Complete Endpoint List
-
-| Endpoint | Method | Auth | Purpose | Changes in Rev 4 |
-|----------|--------|------|---------|------------------|
-| `command=add` | GET | None | Register game | + optional `stun_port`, returns `session_id` |
-| `command=update` | GET | secret | Update player count | Unchanged |
-| `command=remove` | GET | secret | Remove game | Unchanged |
-| `command=list` | GET | None | Tab-separated list | Unchanged (backward compat) |
-| `command=list2` | GET | None | JSON list | **NEW** - includes `sessionId`, `stunPort` |
-| `command=punch_request` | POST | None | Client requests punch | **NEW** |
-| `command=punch_poll` | GET | secret | Host polls for requests | **NEW** |
-| `command=punch_ready` | POST | secret | Host signals ready | **NEW** |
-| `command=punch_status` | GET | session_id+client_id | Client polls for ready | **NEW** |
-
-### Port Validation (Rev 4 - relaxed per review)
-
-```php
-// Allow full port range 1-65535 (NATs can map to any port)
-// Anti-abuse handled by IP derivation from connection
-if ($stunPort < 1 || $stunPort > 65535) {
-    echo "ERROR: Invalid port\n";
-    return;
+// MetaServerClient.cpp
+if (parts.size() >= 14) {
+    gameServerInfo.sessionId = parts[12];
+    gameServerInfo.stunPort = static_cast<uint16_t>(std::stoi(parts[13]));
+    gameServerInfo.holePunchAvailable = true;
+} else {
+    gameServerInfo.holePunchAvailable = false;
 }
 ```
 
-## High-Level Flow (Rev 4)
+### New Punch Endpoints (All GET + Line-Based)
+
+#### `command=punch_request`
+
+Client requests hole punch coordination.
+
+**Request:**
+```
+GET /metaserver.php?command=punch_request&session_id=abc123&stun_port=28747
+```
+
+Server derives `client_ip` from `getRealClientIP()`.
+
+**Response (success):**
+```
+OK
+<client_id>
+```
+
+**Response (error):**
+```
+ERROR
+<message>
+```
+
+**Server-side:**
+```php
+function handlePunchRequest() {
+    $sessionId = sanitize($_GET['session_id'] ?? '');
+    $stunPort = intval($_GET['stun_port'] ?? 0);
+    
+    if (!validateSessionId($sessionId) || $stunPort < 1 || $stunPort > 65535) {
+        echo "ERROR\nInvalid parameters\n";
+        return;
+    }
+    
+    $game = getGameBySessionId($sessionId);
+    if (!$game) {
+        echo "ERROR\nGame not found\n";
+        return;
+    }
+    
+    // Rate limit: 10/min per IP
+    if (isRateLimited('punch_request', getRealClientIP(), 10, 60)) {
+        echo "ERROR\nRate limited\n";
+        return;
+    }
+    
+    $clientId = bin2hex(random_bytes(8));  // 16 hex chars
+    $clientIP = getRealClientIP();  // DERIVED, not from request
+    
+    storePunchRequest($sessionId, [
+        'client_id' => $clientId,
+        'client_ip' => $clientIP,
+        'client_port' => $stunPort,
+        'timestamp' => time()
+    ]);
+    
+    echo "OK\n";
+    echo $clientId . "\n";
+}
+```
+
+#### `command=punch_poll`
+
+Host polls for pending punch requests.
+
+**Request:**
+```
+GET /metaserver.php?command=punch_poll&secret=<host_secret>
+```
+
+**Response (with pending requests):**
+```
+OK
+<client_id>\t<client_ip>\t<client_port>
+<client_id>\t<client_ip>\t<client_port>
+...
+```
+
+**Response (no pending):**
+```
+OK
+```
+
+**Server-side:**
+```php
+function handlePunchPoll() {
+    $secret = sanitize($_GET['secret'] ?? '');
+    $game = getGameBySecret($secret);
+    
+    if (!$game) {
+        echo "ERROR\nInvalid secret\n";
+        return;
+    }
+    
+    $requests = getPunchRequests($game['session_id']);
+    
+    echo "OK\n";
+    foreach ($requests as $req) {
+        echo $req['client_id'] . "\t" . $req['client_ip'] . "\t" . $req['client_port'] . "\n";
+    }
+    
+    // Mark as delivered (so not returned again)
+    markPunchRequestsDelivered($game['session_id']);
+}
+```
+
+#### `command=punch_ready`
+
+Host signals ready to punch a specific client.
+
+**Request:**
+```
+GET /metaserver.php?command=punch_ready&secret=<host_secret>&client_id=<client_id>
+```
+
+**Response:**
+```
+OK
+```
+
+**Server-side:**
+```php
+function handlePunchReady() {
+    $secret = sanitize($_GET['secret'] ?? '');
+    $clientId = sanitize($_GET['client_id'] ?? '');
+    
+    $game = getGameBySecret($secret);
+    if (!$game) {
+        echo "ERROR\nInvalid secret\n";
+        return;
+    }
+    
+    // Store ready signal with host address
+    storePunchReady($game['session_id'], $clientId, [
+        'host_ip' => $game['ip'],
+        'host_port' => $game['stun_port'] ?? $game['port'],
+        'ready_at' => time()
+    ]);
+    
+    echo "OK\n";
+}
+```
+
+#### `command=punch_status`
+
+Client polls for punch readiness.
+
+**Request:**
+```
+GET /metaserver.php?command=punch_status&session_id=<session_id>&client_id=<client_id>
+```
+
+**Response (waiting):**
+```
+WAITING
+```
+
+**Response (ready):**
+```
+READY
+<host_ip>
+<host_port>
+<punch_in_seconds>
+```
+
+**Server-side:**
+```php
+function handlePunchStatus() {
+    $sessionId = sanitize($_GET['session_id'] ?? '');
+    $clientId = sanitize($_GET['client_id'] ?? '');
+    
+    $readyInfo = getPunchReady($sessionId, $clientId);
+    
+    if (!$readyInfo) {
+        echo "WAITING\n";
+        return;
+    }
+    
+    // Calculate punch delay (2 seconds from now, relative)
+    $punchInSeconds = 2;
+    
+    echo "READY\n";
+    echo $readyInfo['host_ip'] . "\n";
+    echo $readyInfo['host_port'] . "\n";
+    echo $punchInSeconds . "\n";
+    
+    // Clean up - one-time read
+    deletePunchReady($sessionId, $clientId);
+}
+```
+
+## Client-Side HTTP (No Changes Needed)
+
+Since all endpoints are GET with query params and line-based responses, the existing `loadFromHttp()` function in `ENetHttp.cpp` works as-is:
+
+```cpp
+// Existing function signature - no changes needed
+std::string loadFromHttp(const std::string& url, 
+                         const std::map<std::string, std::string>& params);
+
+// Usage for punch_request
+std::map<std::string, std::string> params;
+params["command"] = "punch_request";
+params["session_id"] = gameInfo.sessionId;
+params["stun_port"] = std::to_string(stunResult.externalPort);
+
+std::string response = loadFromHttp(metaServerURL, params);
+
+// Parse line-based response
+std::vector<std::string> lines = splitString(response, '\n');
+if (lines.size() >= 2 && lines[0] == "OK") {
+    clientId = lines[1];
+}
+```
+
+## STUN Safety (unchanged from Rev 4)
+
+STUN queries only run pre-connection when no ENet peers exist:
+- Host: After `enet_host_create()`, before `command=add`
+- Client: Before `punch_request`, while no `connectPeer`
+
+No concurrent `enet_host_service()` during STUN window.
+
+## Host/Client Punch Roles (unchanged from Rev 4)
+
+| Action | Host | Client |
+|--------|------|--------|
+| STUN query | Before add | Before punch_request |
+| Send punch packets | Yes | Yes |
+| `enet_host_connect()` | **NO** | **YES** |
+
+## High-Level Flow (Rev 5 - All GET)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      HOLE PUNCH COORDINATION (Rev 4)                         │
+│                      HOLE PUNCH COORDINATION (Rev 5)                         │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  HOST                         METASERVER                        CLIENT      │
 │   │                               │                               │         │
-│   │── 1. enet_host_create() ─────>│                               │         │
+│   │── 1. STUN query (pre-conn) ──>│                               │         │
+│   │<─ External stunPort ──────────│                               │         │
 │   │                               │                               │         │
-│   │── 2. STUN query ─────────────>│ (on ENet socket,              │         │
-│   │      (no peers yet = safe)    │  no peers = safe)             │         │
-│   │<─ 3. External stunPort ───────│                               │         │
+│   │── 2. GET add&stun_port=X ────>│                               │         │
+│   │<─ OK\nsecret\nsession_id ─────│                               │         │
 │   │                               │                               │         │
-│   │── 4. command=add&stun_port=X >│                               │         │
-│   │<─ 5. OK + secret + session_id │                               │         │
-│   │                               │                               │         │
-│   │                               │<── 6. command=list2 ──────────│         │
-│   │                               │─── 7. JSON [{sessionId,...}] >│         │
+│   │                               │<── 3. GET list2 ──────────────│         │
+│   │                               │─── OK\n<tab-separated rows> ─>│         │
+│   │                               │    (includes session_id)      │         │
 │   │                               │                               │         │
 │   │                               │                ┌──────────────│         │
-│   │                               │                │ 8. STUN query│         │
-│   │                               │                │ (no peers)   │         │
+│   │                               │                │ 4. STUN query│         │
 │   │                               │                └──────────────│         │
 │   │                               │                               │         │
-│   │                               │<── 9. punch_request ──────────│         │
-│   │                               │    {session_id, stun_port}    │         │
-│   │                               │    IP from getRealClientIP()  │         │
+│   │                               │<── 5. GET punch_request ──────│         │
+│   │                               │    &session_id&stun_port      │         │
+│   │                               │─── OK\nclient_id ────────────>│         │
 │   │                               │                               │         │
-│   │<── 10. punch_poll ────────────│                               │         │
-│   │    → {client_ip, client_port} │                               │         │
+│   │<── 6. GET punch_poll ─────────│                               │         │
+│   │    &secret                    │                               │         │
+│   │    OK\nclient_id\tip\tport ──>│                               │         │
 │   │                               │                               │         │
-│   │── 11. punch_ready ───────────>│                               │         │
-│   │    {secret, client_id}        │                               │         │
+│   │── 7. GET punch_ready ────────>│                               │         │
+│   │    &secret&client_id          │                               │         │
+│   │<── OK ────────────────────────│                               │         │
 │   │                               │                               │         │
-│   │                               │<── 12. punch_status ──────────│         │
-│   │                               │─── 13. {ready, host_ip:port,  │         │
-│   │                               │        punch_in_seconds: 2}  >│         │
+│   │                               │<── 8. GET punch_status ───────│         │
+│   │                               │    &session_id&client_id      │         │
+│   │                               │─── READY\nhost_ip\nport\n2 ──>│         │
 │   │                               │                               │         │
 │   │         (both wait 2 seconds, then punch simultaneously)      │         │
 │   │                               │                               │         │
-│   │── 14. Punch packets ─────────────────────────────────────────>│         │
-│   │       (NO enet_host_connect)  │                               │         │
+│   │── 9. Punch packets (no connect) ─────────────────────────────>│         │
+│   │<───────────────────────────────── 10. Punch + enet_connect ───│         │
 │   │                               │                               │         │
-│   │<───────────────────────────────────────── 15. Punch packets ──│         │
-│   │                               │                 + enet_host_connect()   │
-│   │                               │                               │         │
-│   │<─────────────── 16. ENet connection (client initiated) ──────>│         │
+│   │<─────────────── 11. ENet connection established ─────────────>│         │
 │   │                               │                               │         │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Implementation Notes
+## Ops Safeguards (unchanged)
 
-### C++17 Compatibility (from review)
-`std::string::starts_with()` is C++20. Use C++17-compatible check:
-
-```cpp
-// Instead of: if (result.starts_with("{"))
-if (result.length() > 0 && result[0] == '{')
-```
-
-### Hole Punch Packet Handling
-ENet may log warnings for the 4-byte "DLHP" packets. This is expected:
-- Packets are too small to be valid ENet protocol
-- ENet discards them safely
-- Document in release notes as expected behavior
+- TTL: 60s for punch requests, 30s for ready signals
+- Max 5 punch requests per session
+- Rate limit: 10 punch_request/min per IP
 
 ## Acceptance Criteria
 
-- [ ] Host STUN query completes before announcing (no ENet traffic interference)
-- [ ] Client STUN query completes before punch request (no ENet traffic interference)  
-- [ ] Host does NOT call `enet_host_connect()` - only punches and waits
-- [ ] Client calls `enet_host_connect()` after punching
-- [ ] `command=add` accepts optional `stun_port`, returns `session_id`
-- [ ] `command=list2` returns JSON with `sessionId` and `stunPort`
-- [ ] Old clients using `command=list` continue to work (no hole punch)
-- [ ] Connection succeeds for compatible NAT types (~80%)
-- [ ] Clear error for incompatible NAT types
+- [ ] `session_id` preserved on re-add (same secret)
+- [ ] All punch endpoints use GET + line-based responses
+- [ ] No JSON library required
+- [ ] Existing `loadFromHttp()` function works for all endpoints
+- [ ] `list2` returns 14 tab-separated fields
+- [ ] Old clients using `list` continue to work
 
 ## Test Plan
 
 ### Unit Tests
-- [ ] STUN query on empty ENet host (no peers) succeeds
-- [ ] STUN query returns valid external port
-- [ ] `command=add` with `stun_port` returns `session_id`
-- [ ] `command=list2` includes `sessionId` and `stunPort`
+- [ ] `command=add` with existing secret preserves session_id
+- [ ] `command=add` with new secret generates session_id
+- [ ] `command=list2` returns 14 fields
+- [ ] `punch_request` returns client_id on success
+- [ ] `punch_status` returns READY with host info after punch_ready
 
 ### Integration Tests
-- [ ] Full flow: host STUN → add → client list2 → client STUN → punch → connect
-- [ ] Host punch does NOT call enet_host_connect
-- [ ] Client punch DOES call enet_host_connect
-- [ ] Old client (uses `list`) falls back to direct connect
-
-### Manual Tests
-- Two machines behind different cone NATs → connects via hole punch
-- Host behind NAT, client on open internet → connects (punch optional)
-- Both behind symmetric NAT → fails with clear error message
+- [ ] Full flow using only existing HTTP helper
+- [ ] Re-add doesn't break punch flow
+- [ ] Old client with new server (uses list, no punch)
 
 ## Rollout / Rollback
 
-Same as Rev 3:
+Same as previous revisions:
 - `EnableHolePunch = false` disables feature
-- `command=list` unchanged for old clients
-- All new endpoints are additive
-
-## Risks
-
-| Risk | Mitigation |
-|------|------------|
-| STUN timeout delays server start | 3 second timeout, async possible in future |
-| Symmetric NAT still fails | Clear error message, suggest port forward |
-| Unexpected packets during STUN | Log and drop (shouldn't happen pre-connection) |
+- `command=list` unchanged
+- New endpoints are additive
 
 ## Resolved Issues
 
 | Rev | Issue | Resolution |
 |-----|-------|------------|
-| 1 | ICE socket ownership | Dropped ICE, use STUN only |
-| 2 | Separate STUN socket wrong port | STUN on ENet socket |
-| 2 | `list` field breaks compat | New `list2` endpoint |
-| 2 | IP spoofing | Metaserver derives IP |
-| 3 | STUN receive drops ENet packets | STUN only pre-connection |
-| 3 | Host calls enet_host_connect | Host only punches, client connects |
-| 3 | "POST /announce" undefined | Extend `command=add` with `stun_port` |
+| 1-3 | (see previous) | (see previous) |
+| 4 | session_id regenerated on re-add | Preserve per secret |
+| 4 | JSON library required | All GET + line-based (no JSON) |
+| 4 | POST not supported | All endpoints use GET |

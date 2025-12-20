@@ -5,16 +5,12 @@ Branch: `master` (not started)
 Commit: N/A
 
 ## Current Step
-**Rev 4 submitted for re-review.** Addressed all Rev 3 blockers:
-1. STUN only pre-connection when no peers exist (safe - no packet interleaving)
-2. Explicit host/client punch roles (host punches only, client punches + connects)
-3. `command=add` extended with optional `stun_port`, returns `session_id`
+**Rev 5 submitted for re-review.** Addressed all Rev 4 blockers:
+1. `session_id` preserved on re-add (same secret) - only generated on first add
+2. No JSON - all endpoints use GET + line-based responses
+3. No new HTTP code needed - existing `loadFromHttp()` works as-is
 
-Also addressed non-blocking notes:
-- Port range 1-65535 (not 1024+)
-- C++17 compatible string check (not starts_with)
-
-Awaiting Codex re-review of `design.md` Rev 4.
+Awaiting Codex re-review of `design.md` Rev 5.
 
 ## How To Validate
 Design phase - no code to validate yet.
@@ -40,6 +36,24 @@ None yet.
 None yet.
 
 ## Review Notes (Codex)
+### Rev 4 Outcome
+REJECT (major blockers fixed; remaining gaps are “can we implement this safely with current codebase”).
+
+### Rev 4 Blocking Issues
+1. **`session_id` must be stable for the lifetime of a game (and your snippet currently regenerates it).** In `handleAdd()` you generate a new `session_id` unconditionally. But the existing client code can call `command=add` again (e.g., `update` failure fallback), and any regeneration will break in-flight punch flows:
+   - host polls by `secret` → replies are stored by `session_id`
+   - client polls by the `session_id` it saw in `list2`
+   - if `session_id` changes mid-lobby, `punch_status` will never reach “ready”.
+   - Required: only generate `session_id` when the game is first created for that `secret`; otherwise preserve the existing `session_id` (and `stun_port`) for that record.
+2. **`list2` JSON parsing plan is missing (and there is no JSON lib in the repo today).** `design.md` assumes JSON (`command=list2`) and JSON bodies for POST endpoints, but the game currently has no JSON parser dependency. You need to pick one:
+   - Add a JSON library via vcpkg (and document exact dependency + CMake integration), or
+   - Avoid JSON entirely for v1: make `list2` be a tab-separated “list v2” format and make POST endpoints return line-based plain text (`OK\nclient_id\n...`) so the client can parse without a JSON library.
+3. **Client-side HTTP POST details are missing.** The current HTTP helper (`src/Network/ENetHttp.cpp`) only supports GET with query params. Rev 4 introduces POST endpoints (`punch_request`, `punch_ready`) but doesn’t specify the exact C++ changes (new `loadFromHttpPost(...)`, headers, timeout, error handling) or how the body is serialized.
+
+### Rev 4 Non-blocking Notes
+- The “STUN only pre-connection” safety story is acceptable if the implementation ensures the STUN query runs synchronously in a code path where `NetworkManager::update()` is not executing (single-threaded main loop).
+- Consider moving the blocking `SDL_Delay` loops (polling/punch burst) into a time-sliced state machine to avoid UI stalls.
+
 ### Rev 3 Outcome
 REJECT (much closer; remaining issues are fixable but correctness-critical).
 
@@ -104,6 +118,10 @@ REJECT (design is close, but two core assumptions are still wrong/unsafe).
   - [x] STUN only pre-connection (no packet interleaving)
   - [x] Explicit host/client punch roles
   - [x] `command=add` extended (not new endpoint)
-- [ ] Codex re-review of Rev 4
+- [x] Update Rev 4 per Codex blockers - **Done Rev 5**
+  - [x] session_id preserved on re-add
+  - [x] No JSON - all GET + line-based
+  - [x] Existing loadFromHttp() works
+- [ ] Codex re-review of Rev 5
 - [ ] Owner approval of revised design
-- [ ] No external library needed (STUN client ~150 lines on ENet socket)
+- [ ] No external library needed (STUN client + existing HTTP helper)
