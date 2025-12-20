@@ -5,14 +5,12 @@ Branch: `master` (not started)
 Commit: N/A
 
 ## Current Step
-**Rev 2 submitted for re-review.** Design revised to address all blocking issues:
-- Changed from full ICE/libjuice to STUN + coordinated hole punching (Option C)
-- Explicit socket ownership model (ENet keeps socket, STUN uses temporary socket)
-- Public `session_id` for client signaling (not secret)
-- POST endpoints with JSON, explicit size limits
-- TTL cleanup, bounded storage, rate limiting specified
+**Rev 3 submitted for re-review.** Addressed all Rev 2 blockers:
+1. STUN now uses ENet socket (`host->socket`), not temporary socket
+2. New `list2` endpoint for JSON + session_id (keeps `list` stable)
+3. Metaserver derives IP from `getRealClientIP()`, only accepts port from client
 
-Awaiting Codex re-review of `design.md` Rev 2.
+Awaiting Codex re-review of `design.md` Rev 3.
 
 ## How To Validate
 Design phase - no code to validate yet.
@@ -38,8 +36,21 @@ None yet.
 None yet.
 
 ## Review Notes (Codex)
-### Outcome
-REJECT (needs design changes before coding).
+### Rev 2 Outcome
+REJECT (design is close, but two core assumptions are still wrong/unsafe).
+
+### Rev 2 Blocking Issues
+1. **STUN on a separate socket likely returns the wrong external port.** The design says STUN uses a temporary socket and “binds to same local port as ENet if possible”, but ENet is already bound (clients use `settings.network.serverPort`), so this will usually be impossible. If STUN is not performed on the *same UDP socket/port* that will send/receive gameplay traffic, the discovered external `IP:port` may not match ENet’s NAT mapping and hole punching will fail.
+   - Required: define a STUN query path that uses ENet’s socket (`host->socket`) for the Binding Request/Response, or restructure startup so the same local port is used deterministically without competing binds.
+2. **Adding `session_id` as a 13th `list` field breaks compatibility.** Current client parsing expects 9–12 tab-separated fields; a 13th field requires code changes in this repo (fine), but older shipped clients will likely reject the response. This is avoidable.
+   - Required: keep `command=list` output stable and add a new endpoint (e.g. `command=list2` or `command=list_json`) for the new fields (`session_id`, `external_port`, etc.), or otherwise provide a backward-compatible mechanism.
+3. **Signaling allows IP spoofing / abuse unless metaserver overwrites IPs.** `client_addr`/`host_addr` are client-provided strings. If accepted as-is, an attacker can make the host send UDP to arbitrary victims.
+   - Required: metaserver must derive IP from `getRealClientIP()` and only accept the *port* (from STUN) from the client/host; reject mismatched IPs and enforce tight validation.
+
+### Rev 2 Non-blocking Notes
+- The hole-punch “DLHP” raw UDP packet is fine for NAT mapping creation, but it may generate ENet “invalid packet” noise; call that out and ensure it cannot destabilize ENet processing.
+- Prefer `punch_in_seconds` over absolute `punch_at` to avoid clock skew, as already noted in open questions.
+- Rate limiting via APCu is environment-dependent; specify the fallback concretely (even if “none for v1”).
 
 ### Blocking issues
 1. **ICE/ENet integration is not defined (likely incorrect as written).** The design assumes “ICE negotiates an address, then ENet connects to it”. ICE hole punching typically depends on the *same UDP socket/port mapping* that ran connectivity checks; switching to a different socket (ENet’s) can invalidate the NAT mapping. The design must specify exactly how packets flow during negotiation and how ENet reuses (or is layered on) the ICE-established transport.
@@ -61,8 +72,12 @@ REJECT (needs design changes before coding).
 - Clarify privacy implications: local candidates may leak LAN IPs; decide if/when to redact host candidates.
 
 ## Open Issues / Follow-ups
-- [x] Update `design.md` per Codex review (blocking issues) - **Done Rev 2**
-- [x] Decide ICE/ENet integration option - **Chose Option C (STUN + hole punch)**
-- [ ] Codex re-review of Rev 2
+- [x] Update `design.md` per Codex review (Rev 1 → Rev 2)
+- [x] Decide ICE/ENet integration option - **Option C (STUN + hole punch)**
+- [x] Update Rev 2 per Codex blockers - **Done Rev 3**
+  - [x] STUN on ENet socket (not temp socket)
+  - [x] New `list2` endpoint for backward compat
+  - [x] Metaserver derives IP, only accepts port
+- [ ] Codex re-review of Rev 3
 - [ ] Owner approval of revised design
-- [ ] No external library needed (custom STUN client ~150 lines)
+- [ ] No external library needed (STUN client ~150 lines on ENet socket)
