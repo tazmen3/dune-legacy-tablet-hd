@@ -187,6 +187,11 @@ void NetworkManager::stopAnnouncing() {
         }
     }
     // NOTE: bIsServer remains TRUE so the host can continue managing the game
+    
+    // Mark game as in progress - this disables lobby-only features like NAT hole punch polling
+    // (which uses blocking HTTP calls that would cause major stutter during gameplay)
+    bGameInProgress = true;
+    SDL_Log("NetworkManager: Game in progress - lobby features disabled");
 }
 
 void NetworkManager::stopServer() {
@@ -208,6 +213,7 @@ void NetworkManager::stopServer() {
     // Fully stop the server (called when leaving a game or menu)
     bIsServer = false;
     bLANServer = false;
+    bGameInProgress = false;
     pGameInitSettings = nullptr;
 }
 
@@ -329,8 +335,9 @@ void NetworkManager::update()
     }
     
     // NAT Hole Punch: Non-blocking state machine for host-side punching
-    // Only when hosting an internet game (not LAN)
-    if (bIsServer && !bLANServer && pMetaServerClient != nullptr) {
+    // Only when hosting an internet game (not LAN) and NOT in an active game
+    // CRITICAL: This uses blocking HTTP calls - MUST NOT run during gameplay!
+    if (bIsServer && !bLANServer && !bGameInProgress && pMetaServerClient != nullptr) {
         Uint32 now = SDL_GetTicks();
         
         // Step 1: Poll for new punch requests (every 1 second)

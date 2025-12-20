@@ -350,6 +350,7 @@ private:
     ENetHost* host = nullptr;
     bool bIsServer = false;
     bool bLANServer = false;
+    bool bGameInProgress = false;  // Set true when game starts - disables lobby-only features
     GameInitSettings* pGameInitSettings = nullptr;
     int numPlayers = 0;
     int maxPlayers = 0;
