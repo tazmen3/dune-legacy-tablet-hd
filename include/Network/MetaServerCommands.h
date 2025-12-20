@@ -48,9 +48,10 @@ public:
 class MetaServerAdd : public MetaServerCommand {
 public:
     MetaServerAdd(const std::string& serverName, int serverPort, const std::string& secret, const std::string& mapName, 
-                  Uint8 numPlayers, Uint8 maxPlayers, const std::string& modName = "vanilla", const std::string& modVersion = "")
+                  Uint8 numPlayers, Uint8 maxPlayers, const std::string& modName = "vanilla", const std::string& modVersion = "",
+                  uint16_t stunPort = 0)
      : MetaServerCommand(METASERVERCOMMAND_ADD), serverName(serverName), serverPort(serverPort), secret(secret),
-       mapName(mapName), numPlayers(numPlayers), maxPlayers(maxPlayers), modName(modName), modVersion(modVersion) {
+       mapName(mapName), numPlayers(numPlayers), maxPlayers(maxPlayers), modName(modName), modVersion(modVersion), stunPort(stunPort) {
     }
 
     bool operator==(const MetaServerCommand& metaServerCommand) const override
@@ -67,7 +68,8 @@ public:
                      && (numPlayers == pMetaServerAdd->numPlayers)
                      && (maxPlayers == pMetaServerAdd->maxPlayers)
                      && (modName == pMetaServerAdd->modName)
-                     && (modVersion == pMetaServerAdd->modVersion));
+                     && (modVersion == pMetaServerAdd->modVersion)
+                     && (stunPort == pMetaServerAdd->stunPort));
         }
     }
 
@@ -79,6 +81,7 @@ public:
     Uint8 maxPlayers;
     std::string modName;
     std::string modVersion;
+    uint16_t stunPort;  // STUN-discovered external port for NAT traversal
 };
 
 class MetaServerUpdate : public MetaServerCommand {

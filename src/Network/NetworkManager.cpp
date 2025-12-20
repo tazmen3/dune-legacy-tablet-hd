@@ -20,6 +20,7 @@
 #include <config.h>
 
 #include <Network/ENetHelper.h>
+#include <Network/StunClient.h>
 
 #include <GameInitSettings.h>
 
@@ -129,8 +130,25 @@ void NetworkManager::startServer(bool bLANServer, const std::string& serverName,
         if(pMetaServerClient != nullptr) {
             // Get active mod info
             ModInfo activeModInfo = ModManager::instance().getModInfo(ModManager::instance().getActiveModName());
+            
+            // NAT traversal: Perform STUN query to discover external IP:port
+            // SAFETY: STUN only runs here because peerList is empty (pre-connection)
+            uint16_t stunPort = 0;
+            if (host != nullptr && host->socket != ENET_SOCKET_NULL && peerList.empty()) {
+                SDL_Log("NetworkManager: Performing STUN query for NAT traversal...");
+                StunClient::StunResult stunResult = StunClient::performStunQuery(host->socket);
+                if (stunResult.success) {
+                    stunPort = stunResult.externalPort;
+                    SDL_Log("NetworkManager: STUN discovered external address %s:%d", 
+                            stunResult.externalIP.c_str(), stunResult.externalPort);
+                } else {
+                    SDL_Log("NetworkManager: STUN query failed: %s (will announce without STUN port)", 
+                            stunResult.errorMessage.c_str());
+                }
+            }
+            
             pMetaServerClient->startAnnounce(serverName, host->address.port, pGameInitSettings->getFilename(), numPlayers, maxPlayers,
-                                             activeModInfo.name, activeModInfo.version);
+                                             activeModInfo.name, activeModInfo.version, stunPort);
         }
     }
 

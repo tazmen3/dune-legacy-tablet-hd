@@ -36,6 +36,11 @@ public:
     bool bPasswordProtected;
     Uint32 lastUpdate;
     std::string localIP;          // Local IP as string (from metaserver)
+    
+    // NAT traversal fields (from list2)
+    std::string sessionId;        // Public game identifier for hole punch coordination
+    uint16_t stunPort = 0;        // STUN-discovered external port
+    bool holePunchAvailable = false;  // True if sessionId and stunPort are valid
 
     /**
         Do not compare numPlayers, bPasswordProtected and lastUpdate

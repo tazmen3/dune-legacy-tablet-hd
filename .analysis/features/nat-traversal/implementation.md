@@ -5,15 +5,18 @@ Branch: `master` (not started)
 Commit: N/A
 
 ## Current Step
-**Metaserver done** - Now implement game client STUN client:
+**STUN + MetaServerClient done** - Now wire up hole punch flow:
 
 1. ✅ Metaserver protocol changes complete
-2. **NEXT:** Create `StunClient` class in `src/Network/StunClient.cpp`
-   - STUN Binding Request/Response on ENet socket
-   - Discover external IP:port
-   - Call from `NetworkManager::startServer()` before announce
-3. Extend `MetaServerClient` to parse `list2` and handle punch endpoints
-4. Wire up hole punch flow in `MultiPlayerMenu`
+2. ✅ STUN client implemented and integrated
+3. ✅ MetaServerClient extended for list2 and session_id
+4. **NEXT:** Wire up hole punch flow in `MultiPlayerMenu`
+   - Client: punch_request before connect
+   - Poll punch_status, then send punch packets
+   - Host: poll punch_poll, send punch_ready, send punch packets
+   - Both: coordinate timing for simultaneous punch
+
+Build verified: `cmake --build build -j8` succeeds
 
 ## How To Validate
 Design phase - no code to validate yet.
@@ -44,6 +47,35 @@ tail -f "~/Library/Application Support/Dune Legacy/Dune Legacy.log" | grep -iE "
   - Added punch data storage functions with TTL cleanup
   - Added rate limiting for punch requests (10/min per IP)
   - Updated `handleRemove()` to clean up punch data
+
+- `include/Network/StunClient.h`, `src/Network/StunClient.cpp`:
+  - New STUN client implementation (no external library)
+  - Performs STUN Binding Request/Response on ENet socket
+  - Parses XOR-MAPPED-ADDRESS and MAPPED-ADDRESS attributes
+  - Returns external IP and port
+
+- `include/Network/GameServerInfo.h`:
+  - Added `sessionId`, `stunPort`, `holePunchAvailable` fields
+
+- `include/Network/MetaServerCommands.h`:
+  - Extended `MetaServerAdd` with `stunPort` parameter
+
+- `include/Network/MetaServerClient.h`:
+  - Extended `startAnnounce()` with `stunPort` parameter
+  - Added `getSessionId()` accessor
+  - Added `stunPort` and `sessionId` member variables
+
+- `src/Network/MetaServerClient.cpp`:
+  - Updated `startAnnounce()` to pass `stunPort`
+  - Updated METASERVERCOMMAND_ADD to send `stun_port` and parse `session_id`
+  - Updated METASERVERCOMMAND_LIST to use `list2` and parse NAT traversal fields
+
+- `src/Network/NetworkManager.cpp`:
+  - Added STUN query in `startServer()` before announcing
+  - Passes discovered `stunPort` to metaserver
+
+- `src/CMakeLists.txt`:
+  - Added `Network/StunClient.cpp` to build
 
 ## Tests Added / Updated
 None yet.

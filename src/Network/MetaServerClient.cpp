@@ -102,7 +102,7 @@ MetaServerClient::~MetaServerClient() {
 
 
 void MetaServerClient::startAnnounce(const std::string& serverName, int serverPort, const std::string& mapName, Uint8 numPlayers, Uint8 maxPlayers,
-                                     const std::string& modName, const std::string& modVersion) {
+                                     const std::string& modName, const std::string& modVersion, uint16_t stunPort) {
 
     stopAnnounce();
 
@@ -114,8 +114,10 @@ void MetaServerClient::startAnnounce(const std::string& serverName, int serverPo
     this->maxPlayers = maxPlayers;
     this->modName = modName;
     this->modVersion = modVersion;
+    this->stunPort = stunPort;
+    this->sessionId = "";  // Will be set by response
 
-    enqueueMetaServerCommand(std::make_unique<MetaServerAdd>(serverName, serverPort, secret, mapName, numPlayers, maxPlayers, modName, modVersion));
+    enqueueMetaServerCommand(std::make_unique<MetaServerAdd>(serverName, serverPort, secret, mapName, numPlayers, maxPlayers, modName, modVersion, stunPort));
     lastAnnounceUpdate = SDL_GetTicks();
 }
 
@@ -305,6 +307,12 @@ int MetaServerClient::connectionThreadMain(void* data) {
                     parameters["modname"] = pMetaServerAdd->modName;
                     parameters["modversion"] = pMetaServerAdd->modVersion;
                     
+                    // NAT traversal: Add STUN-discovered external port
+                    if (pMetaServerAdd->stunPort > 0) {
+                        parameters["stun_port"] = std::to_string(pMetaServerAdd->stunPort);
+                        SDL_Log("Announcing game with STUN port: %d", pMetaServerAdd->stunPort);
+                    }
+                    
                     // Add local IP for NAT traversal (allows clients on same LAN to connect directly)
                     std::string localIP = getLocalIPAddress();
                     if (!localIP.empty()) {
@@ -326,6 +334,27 @@ int MetaServerClient::connectionThreadMain(void* data) {
                         const std::string errorMsg = result.substr(result.find_first_not_of("\x0D\x0A",5), std::string::npos);
 
                         pMetaServerClient->setErrorMessage(METASERVERCOMMAND_ADD, errorMsg);
+                    } else {
+                        // Parse session_id from response (line 3)
+                        // Response format: OK\n<secret>\n<session_id>\n
+                        std::istringstream resultStream(result);
+                        std::string line;
+                        int lineNum = 0;
+                        while (std::getline(resultStream, line)) {
+                            lineNum++;
+                            // Trim CR if present
+                            if (!line.empty() && line.back() == '\r') {
+                                line.pop_back();
+                            }
+                            if (lineNum == 3 && !line.empty()) {
+                                // Store session_id (thread-safe via mutex)
+                                SDL_LockMutex(pMetaServerClient->sharedDataMutex);
+                                pMetaServerClient->sessionId = line;
+                                SDL_UnlockMutex(pMetaServerClient->sharedDataMutex);
+                                SDL_Log("MetaServerClient: Received session_id: %s", line.c_str());
+                                break;
+                            }
+                        }
                     }
 
 
@@ -414,7 +443,9 @@ int MetaServerClient::connectionThreadMain(void* data) {
                 case METASERVERCOMMAND_LIST: {
                     std::map<std::string, std::string> parameters;
 
-                    parameters["command"] = "list";
+                    // Use list2 for NAT traversal fields (session_id, stun_port)
+                    // Falls back to list if list2 not available
+                    parameters["command"] = "list2";
                     parameters["gameversion"] = VERSION;
 
                     std::string result;
@@ -422,8 +453,15 @@ int MetaServerClient::connectionThreadMain(void* data) {
                     try {
                         result = loadFromHttp(pMetaServerClient->metaServerURL, parameters);
                     } catch(std::exception& e) {
-                        pMetaServerClient->setErrorMessage(METASERVERCOMMAND_LIST, e.what());
-                        break;
+                        // Try fallback to list if list2 fails
+                        SDL_Log("MetaServerClient: list2 failed, trying list: %s", e.what());
+                        parameters["command"] = "list";
+                        try {
+                            result = loadFromHttp(pMetaServerClient->metaServerURL, parameters);
+                        } catch(std::exception& e2) {
+                            pMetaServerClient->setErrorMessage(METASERVERCOMMAND_LIST, e2.what());
+                            break;
+                        }
                     }
 
                     std::istringstream resultstream(result);
@@ -451,7 +489,8 @@ int MetaServerClient::connectionThreadMain(void* data) {
                             // - Intermediate: 10 fields (with localIP, no mod)
                             // - New: 11 fields (with localIP, modname, empty modversion - trailing field dropped by regex)
                             // - New: 12 fields (with localIP, modname, modversion)
-                            if(parts.size() < 9 || parts.size() > 12) {
+                            // - list2: 14 fields (with session_id, stun_port)
+                            if(parts.size() < 9 || parts.size() > 14) {
                                 break;
                             }
 
@@ -501,6 +540,20 @@ int MetaServerClient::connectionThreadMain(void* data) {
                             } else {
                                 gameServerInfo.modName = "vanilla";
                                 gameServerInfo.modVersion = "";
+                            }
+                            
+                            // Parse NAT traversal fields if available (13th and 14th fields from list2)
+                            if(parts.size() >= 14) {
+                                gameServerInfo.sessionId = parts[12];
+                                int stunPortVal = 0;
+                                if(parseString(parts[13], stunPortVal) && stunPortVal > 0 && stunPortVal <= 65535) {
+                                    gameServerInfo.stunPort = static_cast<uint16_t>(stunPortVal);
+                                    gameServerInfo.holePunchAvailable = !gameServerInfo.sessionId.empty();
+                                }
+                            } else {
+                                gameServerInfo.sessionId = "";
+                                gameServerInfo.stunPort = 0;
+                                gameServerInfo.holePunchAvailable = false;
                             }
 
                             if(resultstream.good() == false) {

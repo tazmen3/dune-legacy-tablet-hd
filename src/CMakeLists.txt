@@ -200,6 +200,7 @@ target_sources(dunelegacy
         Network/MetaServerClient.cpp
         Network/VersionChecker.cpp
         Network/UPnPManager.cpp
+        Network/StunClient.cpp
 
         # Players
         players/Player.cpp

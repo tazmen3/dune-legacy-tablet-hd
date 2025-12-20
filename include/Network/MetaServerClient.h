@@ -57,7 +57,14 @@ public:
     }
 
     void startAnnounce(const std::string& serverName, int serverPort, const std::string& mapName, Uint8 numPlayers, Uint8 maxPlayers,
-                       const std::string& modName = "vanilla", const std::string& modVersion = "");
+                       const std::string& modName = "vanilla", const std::string& modVersion = "",
+                       uint16_t stunPort = 0);
+    
+    /**
+        Get the session ID assigned by the metaserver (for hole punch coordination)
+        \return session ID or empty string if not available
+    */
+    const std::string& getSessionId() const { return sessionId; }
 
     void updateAnnounce(Uint8 numPlayers);
 
@@ -138,6 +145,8 @@ private:
     Uint8 maxPlayers = 0;                                                       ///< The maximum number of players in the currently set up game
     std::string modName = "vanilla";                                            ///< The active mod name
     std::string modVersion = "";                                                ///< The active mod version
+    uint16_t stunPort = 0;                                                      ///< STUN-discovered external port (for NAT traversal)
+    std::string sessionId = "";                                                 ///< Session ID from metaserver (for hole punch coordination)
 
     Uint32 lastAnnounceUpdate = 0;                                              ///< The last time the game was announced
     Uint32 lastServerInfoListUpdate = 0;                                        ///< The last time the server list was updated by a request to the metaserver
