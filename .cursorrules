@@ -7,7 +7,7 @@
 This is Dune Legacy, a modernized clone of Westwood Studios' "Dune 2" real-time strategy game.
 
 ### Current Development
-- **Version**: 0.99.4 (see `CMakeLists.txt` line 4)
+- **Version**: 0.99.5 (see `CMakeLists.txt` line 4)
 - **Path**: `/Users/stefanvanderwel/development/dune/dunelegacy/`
 - Platform: Cross-platform (Windows, macOS, Linux)
 - Language: C++17
@@ -83,7 +83,7 @@ cd /Users/stefanvanderwel/development/dune/dunelegacy
 cmake --build build --target dmg --config Release
 ```
 
-**Output**: `build/DuneLegacy-0.99.4-macOS.dmg`
+**Output**: `build/DuneLegacy-0.99.5-macOS.dmg`
 
 **What this does automatically:**
 1. Cleans CPack cache to prevent stale files
@@ -136,8 +136,8 @@ cmake --build build --target installer --config Release
 ```
 
 **Output**: 
-- `build/DuneLegacy-0.99.4-Windows-x64.exe` (NSIS installer)
-- `build/DuneLegacy-0.99.4-Windows-x64.zip` (portable zip)
+- `build/DuneLegacy-0.99.5-Windows-x64.exe` (NSIS installer)
+- `build/DuneLegacy-0.99.5-Windows-x64.zip` (portable zip)
 
 ### Building for Linux
 
