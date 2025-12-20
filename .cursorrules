@@ -154,9 +154,38 @@ cmake --build build --target package --config Release
 ```
 
 ### Running Tests
+
+Unit tests use the Catch2 framework. See `tests/README.md` for full documentation.
+
 ```bash
-./runUnitTests.sh
+# Install Catch2 (one-time setup)
+brew install catch2  # macOS
+# sudo apt-get install catch2  # Debian/Ubuntu
+
+# Configure with tests enabled
+cmake -B build \
+  -DCMAKE_TOOLCHAIN_FILE=/Users/stefanvanderwel/development/dune/dunelegacy/vcpkg/scripts/buildsystems/vcpkg.cmake \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DDUNELEGACY_BUILD_TESTS=ON
+
+# Build tests
+cmake --build build --target dunelegacy_tests
+
+# Run all tests
+./build/dunelegacy_tests
+
+# Run specific test suites
+./build/dunelegacy_tests "[pathbudget]"  # PathBudget sync tests
+./build/dunelegacy_tests "[network]"     # NetworkManager tests
+./build/dunelegacy_tests "[desync]"      # DESYNC detection tests
+
+# List available tests
+./build/dunelegacy_tests --list-tests
 ```
+
+**Test Suites:**
+- **PathBudgetTestCase** - Tests for multiplayer budget synchronization protocol (see `.analysis/features/pathbudget-sync/design.md`)
+- **NetworkManagerTestCase** - Tests for packet types, address utilities, serialization, keep-alive, NAT traversal
 
 ### Updating Localizations
 ```bash
