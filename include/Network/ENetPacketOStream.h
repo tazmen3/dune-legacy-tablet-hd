@@ -50,7 +50,7 @@ public:
         if(this != &p) {
             ENetPacket* packetCopy = enet_packet_create(p.packet->data,p.packet->dataLength,p.packet->flags);
             if(packetCopy == nullptr) {
-                THROW(InputStream::error, "ENetPacketOStream::operator=(): enet_packet_create() failed!");
+                THROW(OutputStream::error, "ENetPacketOStream::operator=(): enet_packet_create() failed!");
             }
 
             if(packet != nullptr) {

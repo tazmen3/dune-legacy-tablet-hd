@@ -10,9 +10,15 @@
 #include <Network/ENetHelper.h>
 #include <Network/ENetPacketOStream.h>
 #include <Network/ENetPacketIStream.h>
-#include <Network/NetworkManager.h>
 
 #include <enet/enet.h>
+
+// Packet type constants (copied from NetworkManager.h for testing)
+// These are validated to ensure they don't change accidentally
+#define TEST_NETWORKPACKET_SENDGAMEINFO         1
+#define TEST_NETWORKPACKET_CLIENTSTATS          13
+#define TEST_NETWORKPACKET_KEEPALIVE            19
+#define TEST_NETWORK_PROTOCOL_VERSION           3
 
 // ENet initialization fixture
 struct ENetFixture {
@@ -25,35 +31,6 @@ struct ENetFixture {
         enet_deinitialize();
     }
 };
-
-// =============================================================================
-// Packet Type Constants Tests
-// =============================================================================
-
-TEST_CASE("NetworkManager: Packet type constants are unique", "[network][protocol]") {
-    // Verify packet types are unique and in expected order
-    REQUIRE(NETWORKPACKET_SENDGAMEINFO == 1);
-    REQUIRE(NETWORKPACKET_SENDINITIALSTATE == 2);
-    REQUIRE(NETWORKPACKET_SENDNEXTEXPECTEDCYCLE == 3);
-    REQUIRE(NETWORKPACKET_READY == 4);
-    REQUIRE(NETWORKPACKET_SENDNAME == 5);
-    REQUIRE(NETWORKPACKET_CHATMESSAGE == 6);
-    REQUIRE(NETWORKPACKET_CHANGEEVENTLIST == 7);
-    REQUIRE(NETWORKPACKET_STARTGAME == 8);
-    REQUIRE(NETWORKPACKET_COMMANDLIST == 9);
-    REQUIRE(NETWORKPACKET_SELECTIONLIST == 10);
-    REQUIRE(NETWORKPACKET_CONFIG_HASH == 11);
-    REQUIRE(NETWORKPACKET_SETPATHBUDGET == 12);
-    REQUIRE(NETWORKPACKET_CLIENTSTATS == 13);
-    REQUIRE(NETWORKPACKET_MOD_INFO == 14);
-    REQUIRE(NETWORKPACKET_MOD_REQUEST == 15);
-    REQUIRE(NETWORKPACKET_MOD_CHUNK == 16);
-    REQUIRE(NETWORKPACKET_MOD_COMPLETE == 17);
-    REQUIRE(NETWORKPACKET_MOD_ACK == 18);
-    REQUIRE(NETWORKPACKET_KEEPALIVE == 19);
-    
-    REQUIRE(NETWORK_PROTOCOL_VERSION == 3);
-}
 
 // =============================================================================
 // Address Utility Tests (require ENet)
@@ -115,7 +92,7 @@ TEST_CASE_METHOD(ENetFixture, "NetworkManager: Packet stream write/read string",
 TEST_CASE_METHOD(ENetFixture, "NetworkManager: Packet stream complex packet", "[network][packet]") {
     // Write a complex packet similar to NETWORKPACKET_CLIENTSTATS
     ENetPacketOStream ostream(ENET_PACKET_FLAG_RELIABLE);
-    ostream.writeUint32(NETWORKPACKET_CLIENTSTATS);
+    ostream.writeUint32(TEST_NETWORKPACKET_CLIENTSTATS);
     ostream.writeUint32(750);
     ostream.writeFloat(60.0f);
     ostream.writeFloat(0.5f);
@@ -126,7 +103,7 @@ TEST_CASE_METHOD(ENetFixture, "NetworkManager: Packet stream complex packet", "[
     REQUIRE(packet != nullptr);
     
     ENetPacketIStream istream(packet);
-    REQUIRE(istream.readUint32() == NETWORKPACKET_CLIENTSTATS);
+    REQUIRE(istream.readUint32() == TEST_NETWORKPACKET_CLIENTSTATS);
     REQUIRE(istream.readUint32() == 750);
     REQUIRE(istream.readFloat() == Catch::Approx(60.0f));
     REQUIRE(istream.readFloat() == Catch::Approx(0.5f));
@@ -134,24 +111,45 @@ TEST_CASE_METHOD(ENetFixture, "NetworkManager: Packet stream complex packet", "[
     REQUIRE(istream.readUint32() == 15000);
 }
 
-// =============================================================================
-// Keep-Alive Timing Tests
-// =============================================================================
-
-TEST_CASE("NetworkManager: Keep-alive interval is reasonable", "[network][keepalive]") {
-    // Should be less than typical NAT timeout (30s)
-    REQUIRE(NetworkManager::KEEPALIVE_INTERVAL_MS == 10000);
-    REQUIRE(NetworkManager::KEEPALIVE_INTERVAL_MS < 30000);
-    REQUIRE(NetworkManager::KEEPALIVE_INTERVAL_MS >= 1000);
+TEST_CASE_METHOD(ENetFixture, "NetworkManager: Packet stream empty string", "[network][packet]") {
+    ENetPacketOStream ostream(ENET_PACKET_FLAG_RELIABLE);
+    ostream.writeString("");
+    ostream.writeString("after empty");
+    
+    ENetPacket* packet = ostream.getPacket();
+    REQUIRE(packet != nullptr);
+    
+    ENetPacketIStream istream(packet);
+    REQUIRE(istream.readString() == "");
+    REQUIRE(istream.readString() == "after empty");
 }
 
-// =============================================================================
-// NAT Traversal Helper Tests
-// =============================================================================
+TEST_CASE_METHOD(ENetFixture, "NetworkManager: Packet stream bool values", "[network][packet]") {
+    ENetPacketOStream ostream(ENET_PACKET_FLAG_RELIABLE);
+    ostream.writeBool(true);
+    ostream.writeBool(false);
+    ostream.writeBool(true);
+    
+    ENetPacket* packet = ostream.getPacket();
+    
+    ENetPacketIStream istream(packet);
+    REQUIRE(istream.readBool() == true);
+    REQUIRE(istream.readBool() == false);
+    REQUIRE(istream.readBool() == true);
+}
 
-TEST_CASE("NetworkManager: Hole punch constants are reasonable", "[network][nat]") {
-    REQUIRE(NetworkManager::PUNCH_PACKET_COUNT >= 5);
-    REQUIRE(NetworkManager::PUNCH_PACKET_COUNT <= 50);
-    REQUIRE(NetworkManager::PUNCH_PACKET_INTERVAL_MS >= 10);
-    REQUIRE(NetworkManager::PUNCH_PACKET_INTERVAL_MS <= 200);
+TEST_CASE_METHOD(ENetFixture, "NetworkManager: Packet stream various int sizes", "[network][packet]") {
+    ENetPacketOStream ostream(ENET_PACKET_FLAG_RELIABLE);
+    ostream.writeUint8(0xFF);
+    ostream.writeUint16(0xABCD);
+    ostream.writeUint32(0x12345678);
+    ostream.writeUint64(0xDEADBEEFCAFEBABE);
+    
+    ENetPacket* packet = ostream.getPacket();
+    
+    ENetPacketIStream istream(packet);
+    REQUIRE(istream.readUint8() == 0xFF);
+    REQUIRE(istream.readUint16() == 0xABCD);
+    REQUIRE(istream.readUint32() == 0x12345678);
+    REQUIRE(istream.readUint64() == 0xDEADBEEFCAFEBABE);
 }

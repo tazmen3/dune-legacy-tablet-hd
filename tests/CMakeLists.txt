@@ -20,6 +20,8 @@ target_sources(dunelegacy_tests
         ${CMAKE_SOURCE_DIR}/src/enet/protocol.c
         $<$<NOT:$<PLATFORM_ID:Windows>>:${CMAKE_SOURCE_DIR}/src/enet/unix.c>
         $<$<PLATFORM_ID:Windows>:${CMAKE_SOURCE_DIR}/src/enet/win32.c>
+        # fmt library (needed for THROW macro in ENet headers)
+        ${CMAKE_SOURCE_DIR}/src/misc/format.cpp
 )
 
 # Include directories
@@ -32,13 +34,12 @@ target_include_directories(dunelegacy_tests
 )
 
 # Link libraries
+# Only SDL2 is needed for ENet types (Uint32, etc.)
+# SDL2_mixer and SDL2_ttf are NOT needed for these tests
 target_link_libraries(dunelegacy_tests
     PRIVATE
         Catch2::Catch2WithMain
         SDL2::SDL2
-        SDL2::SDL2main
-        SDL2_mixer::SDL2_mixer
-        SDL2_ttf::SDL2_ttf
 )
 
 if(WIN32)
