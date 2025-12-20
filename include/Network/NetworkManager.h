@@ -33,6 +33,7 @@
 #include <enet/enet.h>
 #include <string>
 #include <list>
+#include <vector>
 #include <functional>
 #include <stdarg.h>
 
@@ -399,6 +400,22 @@ private:
     // NAT keep-alive: send reliable ping every 10 seconds to prevent NAT timeout
     Uint32                                      lastKeepAliveTime = 0;
     static constexpr int                        KEEPALIVE_INTERVAL_MS = 10000;   // 10 seconds
+    
+    // NAT Hole Punch: Non-blocking state machine for host-side punching
+    struct PendingPunch {
+        std::string clientId;
+        std::string clientIP;
+        uint16_t clientPort = 0;
+        Uint32 punchAtTime = 0;       // SDL_GetTicks() when to start punching
+        int packetsRemaining = 0;     // Packets left to send
+        Uint32 lastPacketTime = 0;    // For pacing packets
+    };
+    std::vector<PendingPunch>                   pendingPunches;
+    Uint32                                      lastPunchPollTime = 0;
+    static constexpr int                        PUNCH_POLL_INTERVAL_MS = 1000;   // Poll every 1s
+    static constexpr int                        PUNCH_DELAY_MS = 2000;           // Delay before punching
+    static constexpr int                        PUNCH_PACKET_COUNT = 10;         // Packets per punch
+    static constexpr int                        PUNCH_PACKET_INTERVAL_MS = 50;   // Interval between packets
 
 public:
     /**

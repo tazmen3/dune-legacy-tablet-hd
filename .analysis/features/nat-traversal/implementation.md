@@ -5,17 +5,20 @@ Branch: `master` (not started)
 Commit: N/A
 
 ## Current Step
-**Implementation complete** - Ready for testing:
+**Ready for deployment and testing:**
 
 1. ✅ Metaserver protocol changes complete
 2. ✅ STUN client implemented and integrated
 3. ✅ MetaServerClient extended for list2, session_id, and punch endpoints
 4. ✅ Client-side hole punch flow in `MultiPlayerMenu::onJoin()`
 5. ✅ Host-side punch polling in `NetworkManager::update()`
+6. ✅ Host-side punching refactored to non-blocking state machine
 
 Build verified: `cmake --build build -j8` succeeds
 
-**Next:** Manual testing of NAT traversal between two internet-connected hosts
+**Next:** 
+1. Deploy dunelegacy.com (metaserver) first
+2. Manual testing between two internet-connected hosts
 
 ## How To Validate
 Design phase - no code to validate yet.
@@ -88,6 +91,22 @@ tail -f "~/Library/Application Support/Dune Legacy/Dune Legacy.log" | grep -iE "
 None yet.
 
 ## Review Notes (Codex)
+
+### Implementation Review (Post 4d47cc8)
+**Metaserver review:** Consistent with Rev 5 - add accepts stun_port + returns sessionId, list2 adds 2 fields, punch endpoints are GET + line-based, IP derived server-side.
+
+**Non-blocking concerns (metaserver):**
+1. `punch_request` only checks "sessionId exists", not "game still active" (lastUpdate within SERVER_TIMEOUT). Consider rejecting punch for expired servers.
+2. `punch.dat` read/modify/write isn't locked end-to-end (writes are LOCK_EX but no flock around whole transaction). Probably fine at low volume.
+
+**Client review:**
+- StunClient is IPv4-only - acknowledged as fine
+- ~~**BLOCKER:** Host-side punching blocks main loop~~ **FIXED**
+  - Refactored to time-sliced state machine:
+    - `PendingPunch` struct stores scheduled punches
+    - No SDL_Delay() - sends 1 packet per 50ms across update() calls
+    - Punch polling happens in background, punches scheduled for T+2000ms
+
 ### Rev 5 Outcome
 APPROVE (design is implementable in this repo with no new dependencies).
 

@@ -328,12 +328,13 @@ void NetworkManager::update()
         }
     }
     
-    // NAT Hole Punch: Host polls for punch requests and responds
-    // Only poll when hosting an internet game (not LAN)
-    static Uint32 lastPunchPollTime = 0;
+    // NAT Hole Punch: Non-blocking state machine for host-side punching
+    // Only when hosting an internet game (not LAN)
     if (bIsServer && !bLANServer && pMetaServerClient != nullptr) {
         Uint32 now = SDL_GetTicks();
-        if (now - lastPunchPollTime >= 1000) {  // Poll every 1 second
+        
+        // Step 1: Poll for new punch requests (every 1 second)
+        if (now - lastPunchPollTime >= PUNCH_POLL_INTERVAL_MS) {
             lastPunchPollTime = now;
             
             std::vector<std::tuple<std::string, std::string, uint16_t>> punchRequests;
@@ -346,13 +347,63 @@ void NetworkManager::update()
                     SDL_Log("NAT Hole Punch: Received punch request from %s:%d (id: %s)",
                             clientIP.c_str(), clientPort, clientId.c_str());
                     
-                    // Signal ready to punch
+                    // Signal ready to punch (non-blocking - just HTTP GET)
                     if (pMetaServerClient->signalPunchReady(clientId)) {
-                        // Wait coordinated time (2 seconds), then send punch packets
-                        SDL_Delay(2000);
-                        sendHolePunchPackets(clientIP, clientPort, 10, 50);
+                        // Schedule punch for PUNCH_DELAY_MS from now (no blocking!)
+                        PendingPunch pending;
+                        pending.clientId = clientId;
+                        pending.clientIP = clientIP;
+                        pending.clientPort = clientPort;
+                        pending.punchAtTime = now + PUNCH_DELAY_MS;
+                        pending.packetsRemaining = PUNCH_PACKET_COUNT;
+                        pending.lastPacketTime = 0;
+                        pendingPunches.push_back(pending);
+                        
+                        SDL_Log("NAT Hole Punch: Scheduled punch to %s:%d in %dms",
+                                clientIP.c_str(), clientPort, PUNCH_DELAY_MS);
                     }
                 }
+            }
+        }
+        
+        // Step 2: Process pending punches (send 1 packet per interval, no blocking)
+        for (auto it = pendingPunches.begin(); it != pendingPunches.end(); ) {
+            PendingPunch& pending = *it;
+            
+            // Check if it's time to start/continue punching
+            if (now >= pending.punchAtTime && pending.packetsRemaining > 0) {
+                // Check if enough time passed since last packet
+                if (now - pending.lastPacketTime >= PUNCH_PACKET_INTERVAL_MS) {
+                    // Send one punch packet
+                    if (host != nullptr && host->socket != ENET_SOCKET_NULL) {
+                        ENetAddress targetAddress;
+                        if (enet_address_set_host(&targetAddress, pending.clientIP.c_str()) == 0) {
+                            targetAddress.port = pending.clientPort;
+                            
+                            const uint8_t punchData[] = {'D', 'L', 'H', 'P'};
+                            ENetBuffer sendBuffer;
+                            sendBuffer.data = const_cast<uint8_t*>(punchData);
+                            sendBuffer.dataLength = sizeof(punchData);
+                            
+                            enet_socket_send(host->socket, &targetAddress, &sendBuffer, 1);
+                        }
+                    }
+                    
+                    pending.packetsRemaining--;
+                    pending.lastPacketTime = now;
+                    
+                    if (pending.packetsRemaining == 0) {
+                        SDL_Log("NAT Hole Punch: Completed punch to %s:%d",
+                                pending.clientIP.c_str(), pending.clientPort);
+                    }
+                }
+            }
+            
+            // Remove completed punches
+            if (pending.packetsRemaining <= 0) {
+                it = pendingPunches.erase(it);
+            } else {
+                ++it;
             }
         }
     }
