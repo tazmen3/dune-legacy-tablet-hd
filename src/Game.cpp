@@ -2453,12 +2453,16 @@ void Game::initializeNetwork() {
             std::placeholders::_1, std::placeholders::_2));
         
         // Network buffer: RTT-based + 5 cycles padding
-        // On LAN (1-5ms RTT): ~5 cycles = 100ms
-        // On Internet (50-100ms RTT): ~8-10 cycles = 160-200ms
-        const int networkBuffer = MILLI2CYCLES(pNetworkManager->getMaxPeerRoundTripTime()) + 5;
+        // LAN games: Use RTT-based (typically 5 cycles = 100ms)
+        // Internet games: Use minimum of 10 cycles (200ms) to handle jitter
+        const int rttBuffer = MILLI2CYCLES(pNetworkManager->getMaxPeerRoundTripTime()) + 5;
+        const int minInternetBuffer = 10;  // 200ms minimum for internet
+        const bool isLAN = pNetworkManager->isLANServer();
+        const int networkBuffer = isLAN ? rttBuffer : std::max(rttBuffer, minInternetBuffer);
         cmdManager.setNetworkCycleBuffer(networkBuffer);
-        SDL_Log("Network buffer set to %d cycles (RTT: %dms)", 
-                networkBuffer, pNetworkManager->getMaxPeerRoundTripTime());
+        SDL_Log("Network buffer set to %d cycles (RTT: %dms, %s)", 
+                networkBuffer, pNetworkManager->getMaxPeerRoundTripTime(),
+                isLAN ? "LAN" : "Internet");
     }
 }
 

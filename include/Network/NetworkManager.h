@@ -83,6 +83,7 @@ public:
     ~NetworkManager();
 
     bool isServer() const { return bIsServer; };
+    bool isLANServer() const { return bLANServer; };
 
     void startServer(bool bLANServer, const std::string& serverName, const std::string& playerName, GameInitSettings* pGameInitSettings, int numPlayers, int maxPlayers);
     void updateServer(int numPlayers);
