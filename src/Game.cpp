@@ -1249,8 +1249,8 @@ void Game::applyPendingBudgetChanges() {
             // Apply budget change NOW
             size_t oldBudget = negotiatedBudget;
             
-            // Track previous budget for DESYNC grace period
-            // Clients may still report the old budget for up to 375 cycles after a change
+            // Track previous budget for DESYNC defense-in-depth:
+            // allow the previous budget only when the client report cycle is before this change cycle.
             previousNegotiatedBudget = oldBudget;
             lastBudgetChangeCycle = gameCycleCount;
             

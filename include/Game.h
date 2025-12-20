@@ -890,8 +890,8 @@ private:
     std::vector<PendingBudgetChange> pendingBudgetChanges;
     std::map<Uint32, ClientPerformanceStats> clientStats;  // Host only
     
-    // Track previous budget to avoid false DESYNC detection
-    // When budget changes, clients may report the old budget for 1 interval (375 cycles)
+    // Track previous budget to avoid false DESYNC detection.
+    // A client report can legitimately reflect the previous budget if the report cycle is before the change cycle.
     size_t previousNegotiatedBudget = 0;   // Budget before last change
     Uint32 lastBudgetChangeCycle = 0;      // Cycle when budget last changed
     

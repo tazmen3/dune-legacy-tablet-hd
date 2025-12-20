@@ -1,6 +1,7 @@
 # PathBudget Synchronization Protocol
 
-## Status: Implemented (bugfix)
+## Status
+DONE
 
 ## Problem Statement
 
@@ -177,4 +178,3 @@ Then: DESYNC detected, re-sync triggered
 1. Add explicit `reportedCycle` field to stats packet (currently inferred from `lastUpdateCycle`)
 2. Add deterministic simulation harness for multiplayer protocol testing
 3. Consider versioning the stats packet format for future protocol changes
-
