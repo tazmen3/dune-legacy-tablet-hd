@@ -1,11 +1,8 @@
+/*
+ *  Dune Legacy Unit Tests - Main entry point
+ *
+ *  Uses Catch2 test framework
+ */
 
-#include <cppunit/extensions/TestFactoryRegistry.h>
-#include <cppunit/ui/text/TestRunner.h>
-
-int main(int argc, char** argv) {
-  CppUnit::TextUi::TestRunner testrunner;
-  CppUnit::TestFactoryRegistry &registry = CppUnit::TestFactoryRegistry::getRegistry();
-  testrunner.addTest(registry.makeTest());
-  return !testrunner.run("", false, true, false);
-}
-
+#define CATCH_CONFIG_MAIN
+#include <catch2/catch_all.hpp>
