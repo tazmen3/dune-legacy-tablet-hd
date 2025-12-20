@@ -5,14 +5,15 @@ Branch: `master` (not started)
 Commit: N/A
 
 ## Current Step
-**APPROVED** - Begin implementation. Start with metaserver protocol changes:
+**Metaserver done** - Now implement game client STUN client:
 
-1. `command=list2` endpoint (14 tab-separated fields with session_id, stun_port)
-2. `command=add` extended to accept `stun_port`, return `session_id`
-3. Punch endpoints: `punch_request`, `punch_poll`, `punch_ready`, `punch_status`
-4. Storage + TTL cleanup for punch data
-
-Then client-side: STUN client, MetaServerClient extensions, hole punch flow.
+1. ✅ Metaserver protocol changes complete
+2. **NEXT:** Create `StunClient` class in `src/Network/StunClient.cpp`
+   - STUN Binding Request/Response on ENet socket
+   - Discover external IP:port
+   - Call from `NetworkManager::startServer()` before announce
+3. Extend `MetaServerClient` to parse `list2` and handle punch endpoints
+4. Wire up hole punch flow in `MultiPlayerMenu`
 
 ## How To Validate
 Design phase - no code to validate yet.
@@ -32,7 +33,17 @@ tail -f "~/Library/Application Support/Dune Legacy/Dune Legacy.log" | grep -iE "
 ```
 
 ## Changes Made
-None yet.
+- `dunelegacy.com/metaserver/metaserver.php`:
+  - Added `PUNCH_FILE`, `PUNCH_REQUEST_TTL`, `PUNCH_READY_TTL`, `MAX_PUNCH_REQUESTS_PER_SESSION`, `PUNCH_RATE_LIMIT_PER_IP` constants
+  - Extended `handleAdd()` to accept `stun_port`, return `session_id` (preserved on re-add)
+  - Added `handleList2()` - 14 tab-separated fields with `session_id` and `stun_port`
+  - Added `handlePunchRequest()` - client requests punch coordination
+  - Added `handlePunchPoll()` - host polls for pending requests
+  - Added `handlePunchReady()` - host signals ready to punch
+  - Added `handlePunchStatus()` - client polls for readiness
+  - Added punch data storage functions with TTL cleanup
+  - Added rate limiting for punch requests (10/min per IP)
+  - Updated `handleRemove()` to clean up punch data
 
 ## Tests Added / Updated
 None yet.
