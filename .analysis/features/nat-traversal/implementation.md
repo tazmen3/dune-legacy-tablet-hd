@@ -5,18 +5,17 @@ Branch: `master` (not started)
 Commit: N/A
 
 ## Current Step
-**STUN + MetaServerClient done** - Now wire up hole punch flow:
+**Implementation complete** - Ready for testing:
 
 1. ✅ Metaserver protocol changes complete
 2. ✅ STUN client implemented and integrated
-3. ✅ MetaServerClient extended for list2 and session_id
-4. **NEXT:** Wire up hole punch flow in `MultiPlayerMenu`
-   - Client: punch_request before connect
-   - Poll punch_status, then send punch packets
-   - Host: poll punch_poll, send punch_ready, send punch packets
-   - Both: coordinate timing for simultaneous punch
+3. ✅ MetaServerClient extended for list2, session_id, and punch endpoints
+4. ✅ Client-side hole punch flow in `MultiPlayerMenu::onJoin()`
+5. ✅ Host-side punch polling in `NetworkManager::update()`
 
 Build verified: `cmake --build build -j8` succeeds
+
+**Next:** Manual testing of NAT traversal between two internet-connected hosts
 
 ## How To Validate
 Design phase - no code to validate yet.
@@ -73,6 +72,14 @@ tail -f "~/Library/Application Support/Dune Legacy/Dune Legacy.log" | grep -iE "
 - `src/Network/NetworkManager.cpp`:
   - Added STUN query in `startServer()` before announcing
   - Passes discovered `stunPort` to metaserver
+  - Added `sendHolePunchPackets()` - sends DLHP packets to create NAT mappings
+  - Added `performStunQuery()` - public method for client-side STUN
+  - Added host-side punch polling in `update()` - polls every 1s, responds to requests
+
+- `src/Menu/MultiPlayerMenu.cpp`:
+  - Extended `onJoin()` with hole punch flow for internet games:
+    - STUN query, punch_request, poll punch_status, send punch packets
+  - Falls back to direct connect if hole punch unavailable or fails
 
 - `src/CMakeLists.txt`:
   - Added `Network/StunClient.cpp` to build

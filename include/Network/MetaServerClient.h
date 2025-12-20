@@ -28,6 +28,8 @@
 #include <enet/enet.h>
 #include <string>
 #include <list>
+#include <vector>
+#include <tuple>
 
 #define SERVERLIST_UPDATE_INTERVAL  (8*1000)
 #define GAMESERVER_UPDATE_INTERVAL  (10*1000)
@@ -77,6 +79,42 @@ public:
         \param  players     Player details in format "House1:Player1,House2:Player2,..."
     */
     void announceGameStart(const std::string& mapName, const std::string& modName, const std::string& players);
+    
+    // NAT Traversal / Hole Punch methods (synchronous - for use in connection flow)
+    
+    /**
+        Request hole punch coordination from metaserver (client side)
+        \param  sessionId   The session ID of the game to join
+        \param  stunPort    The client's STUN-discovered external port
+        \return Client ID if successful, empty string on failure
+    */
+    std::string requestHolePunch(const std::string& sessionId, uint16_t stunPort);
+    
+    /**
+        Poll for punch readiness (client side)
+        \param  sessionId   The session ID of the game
+        \param  clientId    The client ID from requestHolePunch
+        \param  hostIP      Output: host's external IP
+        \param  hostPort    Output: host's external port
+        \param  waitSeconds Output: seconds to wait before punching
+        \return true if ready, false if still waiting or error
+    */
+    bool pollPunchStatus(const std::string& sessionId, const std::string& clientId,
+                         std::string& hostIP, uint16_t& hostPort, int& waitSeconds);
+    
+    /**
+        Poll for pending punch requests (host side)
+        \param  requests    Output: list of (clientId, clientIP, clientPort) tuples
+        \return true on success, false on error
+    */
+    bool pollPunchRequests(std::vector<std::tuple<std::string, std::string, uint16_t>>& requests);
+    
+    /**
+        Signal ready to punch a client (host side)
+        \param  clientId    The client ID to punch
+        \return true on success, false on error
+    */
+    bool signalPunchReady(const std::string& clientId);
 
     void update();
 

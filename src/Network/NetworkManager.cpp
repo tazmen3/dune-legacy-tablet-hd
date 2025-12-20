@@ -211,6 +211,65 @@ void NetworkManager::stopServer() {
     pGameInitSettings = nullptr;
 }
 
+void NetworkManager::sendHolePunchPackets(const std::string& targetIP, uint16_t targetPort, int count, int intervalMs) {
+    if (host == nullptr || host->socket == ENET_SOCKET_NULL) {
+        SDL_Log("NetworkManager::sendHolePunchPackets - No socket available");
+        return;
+    }
+    
+    // Resolve target address
+    ENetAddress targetAddress;
+    if (enet_address_set_host(&targetAddress, targetIP.c_str()) < 0) {
+        SDL_Log("NetworkManager::sendHolePunchPackets - Failed to resolve %s", targetIP.c_str());
+        return;
+    }
+    targetAddress.port = targetPort;
+    
+    // Send punch packets - "DLHP" (Dune Legacy Hole Punch) signature
+    const uint8_t punchData[] = {'D', 'L', 'H', 'P'};
+    
+    SDL_Log("NetworkManager: Sending %d hole punch packets to %s:%d", count, targetIP.c_str(), targetPort);
+    
+    for (int i = 0; i < count; i++) {
+        ENetBuffer sendBuffer;
+        sendBuffer.data = const_cast<uint8_t*>(punchData);
+        sendBuffer.dataLength = sizeof(punchData);
+        
+        int sent = enet_socket_send(host->socket, &targetAddress, &sendBuffer, 1);
+        if (sent < 0) {
+            SDL_Log("NetworkManager::sendHolePunchPackets - Send failed on packet %d", i + 1);
+        }
+        
+        if (i < count - 1 && intervalMs > 0) {
+            SDL_Delay(intervalMs);
+        }
+    }
+    
+    SDL_Log("NetworkManager: Hole punch packets sent");
+}
+
+uint16_t NetworkManager::performStunQuery() {
+    if (host == nullptr || host->socket == ENET_SOCKET_NULL) {
+        SDL_Log("NetworkManager::performStunQuery - No socket available");
+        return 0;
+    }
+    
+    if (!peerList.empty()) {
+        SDL_Log("NetworkManager::performStunQuery - Cannot run with active peers");
+        return 0;
+    }
+    
+    StunClient::StunResult result = StunClient::performStunQuery(host->socket);
+    if (result.success) {
+        SDL_Log("NetworkManager::performStunQuery - External: %s:%d", 
+                result.externalIP.c_str(), result.externalPort);
+        return result.externalPort;
+    } else {
+        SDL_Log("NetworkManager::performStunQuery - Failed: %s", result.errorMessage.c_str());
+        return 0;
+    }
+}
+
 void NetworkManager::connect(const std::string& hostname, int port, const std::string& playerName) {
     ENetAddress address;
 
@@ -265,6 +324,35 @@ void NetworkManager::update()
                 SDL_Log("NetworkManager: UPnP lease renewed successfully");
             } else {
                 SDL_Log("NetworkManager: Warning - UPnP lease renewal failed");
+            }
+        }
+    }
+    
+    // NAT Hole Punch: Host polls for punch requests and responds
+    // Only poll when hosting an internet game (not LAN)
+    static Uint32 lastPunchPollTime = 0;
+    if (bIsServer && !bLANServer && pMetaServerClient != nullptr) {
+        Uint32 now = SDL_GetTicks();
+        if (now - lastPunchPollTime >= 1000) {  // Poll every 1 second
+            lastPunchPollTime = now;
+            
+            std::vector<std::tuple<std::string, std::string, uint16_t>> punchRequests;
+            if (pMetaServerClient->pollPunchRequests(punchRequests) && !punchRequests.empty()) {
+                for (const auto& request : punchRequests) {
+                    std::string clientId = std::get<0>(request);
+                    std::string clientIP = std::get<1>(request);
+                    uint16_t clientPort = std::get<2>(request);
+                    
+                    SDL_Log("NAT Hole Punch: Received punch request from %s:%d (id: %s)",
+                            clientIP.c_str(), clientPort, clientId.c_str());
+                    
+                    // Signal ready to punch
+                    if (pMetaServerClient->signalPunchReady(clientId)) {
+                        // Wait coordinated time (2 seconds), then send punch packets
+                        SDL_Delay(2000);
+                        sendHolePunchPackets(clientIP, clientPort, 10, 50);
+                    }
+                }
             }
         }
     }

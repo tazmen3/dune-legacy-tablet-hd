@@ -265,10 +265,10 @@ void MultiPlayerMenu::onJoin() {
         // Note: The local IP is only useful if both players are behind the same router,
         // which would be detected via LAN broadcast anyway.
         ENetAddress connectAddress = pGameServerInfo->serverAddress;
+        bool foundOnLAN = false;
         
         if(internetGamesButton.getToggleState()) {
             // Check if this game is also on LAN (UDP broadcast discovery)
-            bool foundOnLAN = false;
             for(const GameServerInfo& lanGame : LANGameList) {
                 if(lanGame.serverName == pGameServerInfo->serverName &&
                    lanGame.serverAddress.port == pGameServerInfo->serverAddress.port &&
@@ -283,10 +283,75 @@ void MultiPlayerMenu::onJoin() {
             }
             
             if(!foundOnLAN) {
-                // Not found on LAN - use the external IP from metaserver
-                SDL_Log("Connecting to internet game via external IP: %s:%d",
-                        Address2String(pGameServerInfo->serverAddress).c_str(), pGameServerInfo->serverAddress.port);
-                // connectAddress is already set to serverAddress (external IP)
+                // Not found on LAN - try hole punch if available
+                if (pGameServerInfo->holePunchAvailable && !pGameServerInfo->sessionId.empty()) {
+                    SDL_Log("NAT Hole Punch: Attempting hole punch for internet game");
+                    
+                    // Step 1: Perform STUN query to get our external port
+                    uint16_t clientStunPort = pNetworkManager->performStunQuery();
+                    if (clientStunPort > 0) {
+                        MetaServerClient* pMetaServer = pNetworkManager->getMetaServerClient();
+                        if (pMetaServer) {
+                            // Step 2: Request hole punch coordination
+                            std::string clientId = pMetaServer->requestHolePunch(
+                                pGameServerInfo->sessionId, clientStunPort);
+                            
+                            if (!clientId.empty()) {
+                                // Step 3: Poll for punch readiness (with timeout)
+                                openWindow(MsgBox::create(_("Establishing NAT connection...")));
+                                
+                                std::string hostIP;
+                                uint16_t hostPort = 0;
+                                int waitSeconds = 0;
+                                bool punchReady = false;
+                                
+                                Uint32 pollStart = SDL_GetTicks();
+                                constexpr Uint32 PUNCH_TIMEOUT_MS = 10000;  // 10 second timeout
+                                
+                                while (SDL_GetTicks() - pollStart < PUNCH_TIMEOUT_MS) {
+                                    if (pMetaServer->pollPunchStatus(pGameServerInfo->sessionId, clientId,
+                                                                     hostIP, hostPort, waitSeconds)) {
+                                        punchReady = true;
+                                        break;
+                                    }
+                                    SDL_Delay(500);  // Poll every 500ms
+                                }
+                                
+                                closeChildWindow();
+                                
+                                if (punchReady) {
+                                    SDL_Log("NAT Hole Punch: Ready - host at %s:%d, waiting %d sec",
+                                            hostIP.c_str(), hostPort, waitSeconds);
+                                    
+                                    // Step 4: Wait coordinated time
+                                    if (waitSeconds > 0) {
+                                        SDL_Delay(waitSeconds * 1000);
+                                    }
+                                    
+                                    // Step 5: Send punch packets
+                                    pNetworkManager->sendHolePunchPackets(hostIP, hostPort, 10, 50);
+                                    
+                                    // Step 6: Update connect address to punched address
+                                    if (enet_address_set_host(&connectAddress, hostIP.c_str()) == 0) {
+                                        connectAddress.port = hostPort;
+                                        SDL_Log("NAT Hole Punch: Connecting to punched address %s:%d",
+                                                hostIP.c_str(), hostPort);
+                                    }
+                                } else {
+                                    SDL_Log("NAT Hole Punch: Timeout - falling back to direct connect");
+                                }
+                            } else {
+                                SDL_Log("NAT Hole Punch: Failed to get client ID - falling back to direct connect");
+                            }
+                        }
+                    } else {
+                        SDL_Log("NAT Hole Punch: STUN query failed - falling back to direct connect");
+                    }
+                } else {
+                    // No hole punch available - use direct connection
+                    SDL_Log("Connecting to internet game via external IP: %s:%d",
+                            Address2String(pGameServerInfo->serverAddress).c_str(), pGameServerInfo->serverAddress.port);
+                }
             }
         }
 

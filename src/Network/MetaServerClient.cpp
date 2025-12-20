@@ -160,6 +160,172 @@ void MetaServerClient::announceGameStart(const std::string& mapName, const std::
     enqueueMetaServerCommand(std::make_unique<MetaServerGameStart>(secret, mapName, modName, players, VERSIONSTRING));
 }
 
+// NAT Traversal / Hole Punch methods (synchronous)
+
+std::string MetaServerClient::requestHolePunch(const std::string& sessionId, uint16_t stunPort) {
+    std::map<std::string, std::string> parameters;
+    parameters["command"] = "punch_request";
+    parameters["session_id"] = sessionId;
+    parameters["stun_port"] = std::to_string(stunPort);
+    
+    try {
+        std::string result = loadFromHttp(metaServerURL, parameters);
+        
+        // Parse: OK\n<client_id>\n
+        std::istringstream stream(result);
+        std::string status;
+        std::getline(stream, status);
+        
+        // Trim CR
+        if (!status.empty() && status.back() == '\r') status.pop_back();
+        
+        if (status == "OK") {
+            std::string clientId;
+            std::getline(stream, clientId);
+            if (!clientId.empty() && clientId.back() == '\r') clientId.pop_back();
+            SDL_Log("MetaServerClient::requestHolePunch - got client_id: %s", clientId.c_str());
+            return clientId;
+        } else {
+            SDL_Log("MetaServerClient::requestHolePunch - failed: %s", result.c_str());
+            return "";
+        }
+    } catch (std::exception& e) {
+        SDL_Log("MetaServerClient::requestHolePunch - exception: %s", e.what());
+        return "";
+    }
+}
+
+bool MetaServerClient::pollPunchStatus(const std::string& sessionId, const std::string& clientId,
+                                       std::string& hostIP, uint16_t& hostPort, int& waitSeconds) {
+    std::map<std::string, std::string> parameters;
+    parameters["command"] = "punch_status";
+    parameters["session_id"] = sessionId;
+    parameters["client_id"] = clientId;
+    
+    try {
+        std::string result = loadFromHttp(metaServerURL, parameters);
+        
+        // Parse: WAITING\n or READY\n<host_ip>\n<host_port>\n<punch_in_seconds>\n
+        std::istringstream stream(result);
+        std::string status;
+        std::getline(stream, status);
+        
+        // Trim CR
+        if (!status.empty() && status.back() == '\r') status.pop_back();
+        
+        if (status == "READY") {
+            std::string line;
+            
+            std::getline(stream, line);
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            hostIP = line;
+            
+            std::getline(stream, line);
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            hostPort = static_cast<uint16_t>(std::stoi(line));
+            
+            std::getline(stream, line);
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            waitSeconds = std::stoi(line);
+            
+            SDL_Log("MetaServerClient::pollPunchStatus - READY: %s:%d in %d sec", 
+                    hostIP.c_str(), hostPort, waitSeconds);
+            return true;
+        } else if (status == "WAITING") {
+            return false;
+        } else {
+            SDL_Log("MetaServerClient::pollPunchStatus - unexpected: %s", result.c_str());
+            return false;
+        }
+    } catch (std::exception& e) {
+        SDL_Log("MetaServerClient::pollPunchStatus - exception: %s", e.what());
+        return false;
+    }
+}
+
+bool MetaServerClient::pollPunchRequests(std::vector<std::tuple<std::string, std::string, uint16_t>>& requests) {
+    if (secret.empty()) {
+        return false;  // Not hosting
+    }
+    
+    std::map<std::string, std::string> parameters;
+    parameters["command"] = "punch_poll";
+    parameters["secret"] = secret;
+    
+    try {
+        std::string result = loadFromHttp(metaServerURL, parameters);
+        
+        // Parse: OK\n[<client_id>\t<client_ip>\t<client_port>\n...]
+        std::istringstream stream(result);
+        std::string status;
+        std::getline(stream, status);
+        
+        // Trim CR
+        if (!status.empty() && status.back() == '\r') status.pop_back();
+        
+        if (status != "OK") {
+            SDL_Log("MetaServerClient::pollPunchRequests - failed: %s", result.c_str());
+            return false;
+        }
+        
+        requests.clear();
+        std::string line;
+        while (std::getline(stream, line)) {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (line.empty()) continue;
+            
+            std::vector<std::string> parts = splitStringToStringVector(line, "\\t");
+            if (parts.size() >= 3) {
+                std::string clientId = parts[0];
+                std::string clientIP = parts[1];
+                uint16_t clientPort = static_cast<uint16_t>(std::stoi(parts[2]));
+                requests.push_back(std::make_tuple(clientId, clientIP, clientPort));
+                SDL_Log("MetaServerClient::pollPunchRequests - request from %s:%d (id: %s)", 
+                        clientIP.c_str(), clientPort, clientId.c_str());
+            }
+        }
+        
+        return true;
+    } catch (std::exception& e) {
+        SDL_Log("MetaServerClient::pollPunchRequests - exception: %s", e.what());
+        return false;
+    }
+}
+
+bool MetaServerClient::signalPunchReady(const std::string& clientId) {
+    if (secret.empty()) {
+        return false;  // Not hosting
+    }
+    
+    std::map<std::string, std::string> parameters;
+    parameters["command"] = "punch_ready";
+    parameters["secret"] = secret;
+    parameters["client_id"] = clientId;
+    
+    try {
+        std::string result = loadFromHttp(metaServerURL, parameters);
+        
+        // Parse: OK\n or ERROR\n<message>
+        std::istringstream stream(result);
+        std::string status;
+        std::getline(stream, status);
+        
+        // Trim CR
+        if (!status.empty() && status.back() == '\r') status.pop_back();
+        
+        if (status == "OK") {
+            SDL_Log("MetaServerClient::signalPunchReady - signaled ready for %s", clientId.c_str());
+            return true;
+        } else {
+            SDL_Log("MetaServerClient::signalPunchReady - failed: %s", result.c_str());
+            return false;
+        }
+    } catch (std::exception& e) {
+        SDL_Log("MetaServerClient::signalPunchReady - exception: %s", e.what());
+        return false;
+    }
+}
+
 
 void MetaServerClient::update() {
 

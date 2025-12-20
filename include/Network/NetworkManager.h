@@ -408,6 +408,27 @@ public:
     bool isUPnPPortMapped() const { return upnpPortMapped; }
     std::string getUPnPStatus() const { return pUPnPManager ? pUPnPManager->getStatusString() : "Not initialized"; }
     std::string getExternalIPAddress() const { return pUPnPManager ? pUPnPManager->getExternalIPAddress() : ""; }
+    
+    /**
+     * NAT Hole Punch: Send UDP punch packets to an address to create NAT mappings.
+     * @param targetIP   Target IP address
+     * @param targetPort Target port
+     * @param count      Number of packets to send (default: 5)
+     * @param intervalMs Interval between packets in ms (default: 50)
+     */
+    void sendHolePunchPackets(const std::string& targetIP, uint16_t targetPort, int count = 5, int intervalMs = 50);
+    
+    /**
+     * Perform STUN query to discover external IP:port.
+     * SAFETY: Only call when no ENet peers exist (peerList empty).
+     * @return External port if successful, 0 on failure
+     */
+    uint16_t performStunQuery();
+    
+    /**
+     * Get the ENet host (for STUN queries)
+     */
+    ENetHost* getHost() const { return host; }
 };
 
 #endif // NETWORKMANAGER_H

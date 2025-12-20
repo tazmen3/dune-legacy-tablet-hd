@@ -1,7 +1,7 @@
 # NAT Traversal via STUN + Coordinated Hole Punching
 
 ## Status
-APPROVED (Rev 5)
+IN_PROGRESS (Implementation complete, pending testing)
 
 ## Revision History
 | Rev | Date | Changes |
