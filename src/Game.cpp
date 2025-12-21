@@ -2042,6 +2042,15 @@ void Game::runMainLoop() {
         const int frameEnd = SDL_GetTicks();
         const int actualFrameTime = frameEnd - frameStart;  // Actual time for this frame
         frameTime += actualFrameTime;
+        
+        // CAP frameTime to prevent excessive catch-up bursts during network stalls
+        // Allow up to 3 cycles worth of catch-up per frame for smoother gameplay
+        // This trades off "real-time accuracy" for "smooth gameplay feel"
+        const int maxFrameTime = getGameSpeed() * 3;
+        if (frameTime > maxFrameTime) {
+            frameTime = maxFrameTime;
+        }
+        
         frameStart = frameEnd;  // Reset for next frame's game logic timing
 
         if(bShowFPS) {
