@@ -445,6 +445,15 @@ public:
     uint16_t performStunQuery();
     
     /**
+     * Perform STUN query and return both external IP and port.
+     * SAFETY: Only call when no ENet peers exist (peerList empty).
+     * @param outIP  Will be set to the external IP if successful
+     * @param outPort Will be set to the external port if successful
+     * @return true if successful, false on failure
+     */
+    bool performStunQueryFull(std::string& outIP, uint16_t& outPort);
+    
+    /**
      * Get the ENet host (for STUN queries)
      */
     ENetHost* getHost() const { return host; }

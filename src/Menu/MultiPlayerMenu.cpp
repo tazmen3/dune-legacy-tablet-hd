@@ -283,12 +283,35 @@ void MultiPlayerMenu::onJoin() {
             }
             
             if(!foundOnLAN) {
-                // Not found on LAN - try hole punch if available
-                if (pGameServerInfo->holePunchAvailable && !pGameServerInfo->sessionId.empty()) {
-                    SDL_Log("NAT Hole Punch: Attempting hole punch for internet game");
+                // Not found on LAN - check if we're behind the same NAT (same external IP)
+                // If so, use local IP to avoid hairpin NAT issues
+                std::string clientExternalIP;
+                uint16_t clientStunPort = 0;
+                bool sameNAT = false;
+                
+                if (pNetworkManager->performStunQueryFull(clientExternalIP, clientStunPort)) {
+                    // Get server's external IP from the address
+                    std::string serverExternalIP = Address2String(pGameServerInfo->serverAddress);
                     
-                    // Step 1: Perform STUN query to get our external port
-                    uint16_t clientStunPort = pNetworkManager->performStunQuery();
+                    if (clientExternalIP == serverExternalIP && !pGameServerInfo->localIP.empty()) {
+                        // Same external IP = behind same NAT, use local IP
+                        SDL_Log("Same-NAT detected: client=%s, server=%s - using local IP %s",
+                                clientExternalIP.c_str(), serverExternalIP.c_str(), 
+                                pGameServerInfo->localIP.c_str());
+                        
+                        if (enet_address_set_host(&connectAddress, pGameServerInfo->localIP.c_str()) == 0) {
+                            // Keep the same port (local port = external port for most routers)
+                            sameNAT = true;
+                        } else {
+                            SDL_Log("Same-NAT: Failed to resolve local IP %s, falling back",
+                                    pGameServerInfo->localIP.c_str());
+                        }
+                    }
+                }
+                
+                // If not same-NAT, try hole punch if available
+                if (!sameNAT && pGameServerInfo->holePunchAvailable && !pGameServerInfo->sessionId.empty()) {
+                    SDL_Log("NAT Hole Punch: Attempting hole punch for internet game");
                     if (clientStunPort > 0) {
                         MetaServerClient* pMetaServer = pNetworkManager->getMetaServerClient();
                         if (pMetaServer) {

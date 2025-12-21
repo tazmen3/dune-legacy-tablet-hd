@@ -280,6 +280,30 @@ uint16_t NetworkManager::performStunQuery() {
     }
 }
 
+bool NetworkManager::performStunQueryFull(std::string& outIP, uint16_t& outPort) {
+    if (host == nullptr || host->socket == ENET_SOCKET_NULL) {
+        SDL_Log("NetworkManager::performStunQueryFull - No socket available");
+        return false;
+    }
+    
+    if (!peerList.empty()) {
+        SDL_Log("NetworkManager::performStunQueryFull - Cannot run with active peers");
+        return false;
+    }
+    
+    StunClient::StunResult result = StunClient::performStunQuery(host->socket);
+    if (result.success) {
+        outIP = result.externalIP;
+        outPort = result.externalPort;
+        SDL_Log("NetworkManager::performStunQueryFull - External: %s:%d", 
+                outIP.c_str(), outPort);
+        return true;
+    } else {
+        SDL_Log("NetworkManager::performStunQueryFull - Failed: %s", result.errorMessage.c_str());
+        return false;
+    }
+}
+
 void NetworkManager::connect(const std::string& hostname, int port, const std::string& playerName) {
     ENetAddress address;
 
