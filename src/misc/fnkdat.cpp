@@ -59,6 +59,10 @@
 
 #include "config.h"
 
+#ifdef __ANDROID__
+#include <SDL.h>
+#endif
+
 #ifndef PACKAGE
 #   error PACKAGE is not defined
 #endif
@@ -438,7 +442,30 @@ int fnkdat(const char* target, char* buffer, int len, int flags) {
 
    if (rawflags == FNKDAT_USER) {
 
-#ifdef __APPLE__
+#ifdef __ANDROID__
+      /* Android applications do not have a reliable passwd entry or home
+       * directory. SDL returns the app-private files directory and owns the
+       * platform-specific JNI interaction needed to discover it. */
+      char* pref_path = SDL_GetPrefPath(PACKAGE, "Dune Legacy");
+      if (pref_path == NULL) {
+         errno = EIO;
+         return -1;
+      }
+
+      size_t pref_path_len = strlen(pref_path);
+      while (pref_path_len > 1 && pref_path[pref_path_len - 1] == '/')
+         pref_path_len--;
+
+      if (pref_path_len >= (size_t)len) {
+         SDL_free(pref_path);
+         errno = ENOMEM;
+         return -1;
+      }
+
+      memcpy(buffer, pref_path, pref_path_len);
+      buffer[pref_path_len] = '\0';
+      SDL_free(pref_path);
+#elif defined(__APPLE__)
       getMacApplicationSupportFolder(buffer, len);
       FNKDAT_S(strncat(buffer, "/Dune Legacy", len));
 #else
