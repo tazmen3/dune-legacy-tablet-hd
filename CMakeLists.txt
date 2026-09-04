@@ -330,6 +330,10 @@ elseif(APPLE)
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "Building macOS DMG installer (manual hdiutil - bypasses CPack caching issues)..."
     )
+elseif(ANDROID)
+    # Android application packaging is handled by Gradle. Defining a custom
+    # target named "package" here conflicts with CPack's reserved target and
+    # does not produce an APK.
 else()
     set(CPACK_GENERATOR "DEB;RPM;TGZ")
     set(CPACK_DEBIAN_PACKAGE_SECTION "games")
@@ -358,4 +362,6 @@ else()
     )
 endif()
 
-include(CPack) 
+if(NOT ANDROID)
+    include(CPack)
+endif()
