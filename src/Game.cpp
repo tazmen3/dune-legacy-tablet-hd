@@ -47,6 +47,7 @@ std::mutex Game::performanceLogMutex;
 #include <misc/format.h>
 #include <misc/SDL2pp.h>
 #include <misc/DiscordManager.h>
+#include <misc/TouchInput.h>
 
 #include <players/HumanPlayer.h>
 
@@ -1601,7 +1602,7 @@ void Game::drawScreen()
 void Game::doInput()
 {
     SDL_Event event;
-    while(SDL_PollEvent(&event)) {
+    while(TouchInput::pollEvent(&event)) {
         // check for a key press
 
         // first of all update mouse
@@ -1884,10 +1885,11 @@ void Game::doInput()
     if((pInGameMenu == nullptr) && (pInGameMentat == nullptr) && (pWaitingForOtherPlayers == nullptr) && (SDL_GetWindowFlags(window) & SDL_WINDOW_MOUSE_FOCUS)) {
 
         const Uint8 *keystate = SDL_GetKeyboardState(nullptr);
-        scrollDownMode =  (drawnMouseY >= getRendererHeight()-1-SCROLLBORDER) || keystate[SDL_SCANCODE_DOWN];
-        scrollLeftMode = (drawnMouseX <= SCROLLBORDER) || keystate[SDL_SCANCODE_LEFT];
-        scrollRightMode = (drawnMouseX >= getRendererWidth()-1-SCROLLBORDER) || keystate[SDL_SCANCODE_RIGHT];
-        scrollUpMode = (drawnMouseY <= SCROLLBORDER) || keystate[SDL_SCANCODE_UP];
+        const bool mouseEdgeScrolling = TouchInput::allowsMouseEdgeScrolling();
+        scrollDownMode =  (mouseEdgeScrolling && drawnMouseY >= getRendererHeight()-1-SCROLLBORDER) || keystate[SDL_SCANCODE_DOWN];
+        scrollLeftMode = (mouseEdgeScrolling && drawnMouseX <= SCROLLBORDER) || keystate[SDL_SCANCODE_LEFT];
+        scrollRightMode = (mouseEdgeScrolling && drawnMouseX >= getRendererWidth()-1-SCROLLBORDER) || keystate[SDL_SCANCODE_RIGHT];
+        scrollUpMode = (mouseEdgeScrolling && drawnMouseY <= SCROLLBORDER) || keystate[SDL_SCANCODE_UP];
 
         if(scrollLeftMode && scrollRightMode) {
             // do nothing

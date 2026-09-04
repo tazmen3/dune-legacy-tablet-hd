@@ -316,6 +316,10 @@ target_sources(dunelegacy
         misc/Scaler.cpp
 )
 
+if(ANDROID)
+    target_sources(dunelegacy PRIVATE misc/TouchInput.cpp)
+endif()
+
 # C source files
 target_sources(dunelegacy
     PRIVATE

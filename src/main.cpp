@@ -668,6 +668,11 @@ std::string getUserLanguage() {
 
 
 int main(int argc, char *argv[]) {
+#ifdef __ANDROID__
+    // Touch gestures are normalized by TouchInput; reject SDL's duplicate mouse synthesis.
+    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+#endif
+
     SDL_LogSetOutputFunction(logOutputFunction, nullptr);
     SDL_LogSetAllPriority(SDL_LOG_PRIORITY_WARN);
     SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_VERBOSE);

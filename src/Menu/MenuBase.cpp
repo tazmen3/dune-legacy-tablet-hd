@@ -24,6 +24,7 @@
 #include <misc/FileSystem.h>
 #include <misc/draw_util.h>
 #include <misc/DiscordManager.h>
+#include <misc/TouchInput.h>
 
 #include <globals.h>
 
@@ -75,7 +76,7 @@ int MenuBase::showMenu() {
         draw();
         SDL_RenderPresent(renderer);
 
-        while(SDL_PollEvent(&event)) {
+        while(TouchInput::pollEvent(&event)) {
             //check the events
             if(doInput(event) == false) {
                 break;
