@@ -7,8 +7,19 @@ build/
 build-*/
 vcpkg/
 dist/
+
+# Local Android and CMake build outputs
+/out/
+/android/.gradle/
+/android/.gradle-user-home/
+/android/app/.cxx/
+/android/app/build/
+/local.properties
+/.vcpkg-installed/
 install/
-external/
+external/*
+!external/SDL2
+!external/SDL2/
 docs/
 missing
 aclocal.m4
