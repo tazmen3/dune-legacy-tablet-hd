@@ -2,6 +2,45 @@ plugins {
     id "com.android.application"
 }
 
+def androidVersionName = "0.99.5-android2"
+def bundledAssetRoot = "dunelegacy-data"
+def generatedAssetsDir = layout.buildDirectory.dir("generated/duneLegacyAssets/main")
+def proprietaryDuneDataFiles = [
+    "DUNE.PAK", "SCENARIO.PAK", "MENTAT.PAK", "VOC.PAK", "MERC.PAK",
+    "FINALE.PAK", "INTRO.PAK", "INTROVOC.PAK", "SOUND.PAK",
+    "ENGLISH.PAK", "HARK.PAK", "ATRE.PAK", "ORDOS.PAK"
+]
+
+def verifyNoProprietaryDuneData = tasks.register("verifyNoProprietaryDuneData") {
+    inputs.dir(file("../../data"))
+    inputs.dir(file("../../config"))
+    doLast {
+        def packagedFiles = files(fileTree("../../data"), fileTree("../../config")).files
+        def forbidden = packagedFiles.findAll { candidate ->
+            proprietaryDuneDataFiles.any { it.equalsIgnoreCase(candidate.name) }
+        }
+        if (!forbidden.isEmpty()) {
+            throw new GradleException("Refusing to package proprietary Dune II data: ${forbidden*.name.join(', ')}")
+        }
+    }
+}
+
+def prepareDuneLegacyAssets = tasks.register("prepareDuneLegacyAssets", Sync) {
+    dependsOn verifyNoProprietaryDuneData
+    inputs.property("assetVersion", androidVersionName)
+    into generatedAssetsDir
+    from(file("../../data")) {
+        into bundledAssetRoot
+    }
+    from(file("../../config")) {
+        into "${bundledAssetRoot}/config"
+    }
+    doLast {
+        def marker = new File(generatedAssetsDir.get().asFile, "${bundledAssetRoot}/asset-version.txt")
+        marker.text = "${androidVersionName}\n"
+    }
+}
+
 def vcpkgRoot = System.getenv("VCPKG_ROOT")
 if (vcpkgRoot == null || vcpkgRoot.isBlank()) {
     throw new GradleException("VCPKG_ROOT must point to the pinned vcpkg checkout")
@@ -25,8 +64,8 @@ android {
         applicationId "org.dunelegacy.tablethd"
         minSdk 28
         targetSdk 35
-        versionCode 1
-        versionName "0.99.5-android1"
+        versionCode 2
+        versionName androidVersionName
 
         ndk {
             abiFilters "arm64-v8a"
@@ -64,7 +103,11 @@ android {
     sourceSets {
         main {
             java.srcDir "../../external/SDL2/android-project/app/src/main/java"
-            assets.srcDir "../../data"
+            assets.srcDir generatedAssetsDir
         }
     }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn prepareDuneLegacyAssets
 }

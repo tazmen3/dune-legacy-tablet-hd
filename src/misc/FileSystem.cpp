@@ -25,6 +25,9 @@
 #include <ctype.h>
 
 #include <SDL_filesystem.h>
+#ifdef __ANDROID__
+#include <SDL_system.h>
+#endif
 
 #ifdef _WIN32
 #include <io.h>
@@ -598,6 +601,16 @@ std::string getDuneLegacyDataDir() {
     if(duneLegacyDataDir.empty()) {
 
         std::string dataDir;
+#ifdef __ANDROID__
+        /* APK assets are not a POSIX directory, and SDL_GetBasePath() is not
+         * supported on Android. MainActivity extracts the redistributable
+         * engine resources into this app-private directory before SDL_main(). */
+        const char* internalStoragePath = SDL_AndroidGetInternalStoragePath();
+        if(internalStoragePath == nullptr) {
+            THROW(sdl_error, "SDL_AndroidGetInternalStoragePath() failed: %s!", SDL_GetError());
+        }
+        dataDir = std::string(internalStoragePath) + "/engine-data";
+#else
 #ifdef DUNELEGACY_DATADIR
         dataDir = DUNELEGACY_DATADIR;
 #endif
@@ -628,6 +641,7 @@ std::string getDuneLegacyDataDir() {
             }
 #endif
         }
+#endif
 
         duneLegacyDataDir = dataDir;
     }

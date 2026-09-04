@@ -83,6 +83,8 @@ android/app/build/outputs/apk/debug/app-debug.apk
 
 The repository does not distribute the proprietary Dune II data files. Producing an APK validates the Android packaging and native engine build; a complete play-through still requires legally obtained compatible game data and a real-device test.
 
+On Android, the APK's assets are not treated as a desktop/POSIX directory. At startup, the Java host extracts only the redistributable engine resources to the app-private `files/engine-data` directory before `SDL_main()` starts. Logs, settings, saves, and other writable user files use the app-private `files` directory. Proprietary Dune II data supplied later by the user belongs in the separate `files/data` search directory; the Gradle build fails if a known proprietary PAK filename is found in the packaged source directories.
+
 ## Native-only cross-compilation
 
 For a direct CMake test, configure with vcpkg as the primary toolchain and the NDK as its chainloaded toolchain:
