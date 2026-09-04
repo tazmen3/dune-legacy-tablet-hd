@@ -11,6 +11,8 @@
     #include <windows.h>
     #include <dbghelp.h>
     #pragma comment(lib, "dbghelp.lib")
+#elif defined(__ANDROID__)
+    #include <unistd.h>
 #else
     #include <execinfo.h>  // For backtrace (POSIX)
     #include <unistd.h>
@@ -151,6 +153,10 @@ static void signalHandler(int sig) {
     
     SymCleanup(process);
     
+#elif defined(__ANDROID__)
+    // Android's Bionic libc does not provide the execinfo backtrace API.
+    // Native crash stacks are recorded by Android's tombstone/logcat tooling.
+    writeCrashLog("Stack Trace: unavailable in-process on Android; inspect logcat/tombstone\n");
 #else
     // POSIX (macOS/Linux): Get stack trace using backtrace
     writeCrashLog("Stack Trace:\n");
