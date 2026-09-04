@@ -10,7 +10,10 @@
     "sdl2-ttf",
     "curl",
     "miniupnpc",
-    "discord-rpc"
+    {
+      "name": "discord-rpc",
+      "platform": "!android"
+    }
   ],
   "builtin-baseline": "0804e3b55b7e435c593707071052363fa876f170",
   "overrides": [

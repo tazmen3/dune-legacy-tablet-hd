@@ -4,8 +4,11 @@ configure_file(
     ${CMAKE_BINARY_DIR}/include/config.h
 )
 
-# Main executable
-if(APPLE)
+# Main executable / Android native library
+if(ANDROID)
+    # SDLActivity loads the game as a native shared library on Android.
+    add_library(dunelegacy SHARED)
+elseif(APPLE)
     # Create macOS application bundle
     add_executable(dunelegacy MACOSX_BUNDLE)
     
@@ -372,8 +375,14 @@ endif()
 # Find miniupnpc for UPnP support
 find_package(miniupnpc CONFIG REQUIRED)
 
-# Find discord-rpc for Discord Rich Presence
-find_library(DISCORD_RPC_LIBRARY discord-rpc PATHS ${CMAKE_PREFIX_PATH}/lib)
+# Discord Rich Presence is a desktop integration and is disabled by default on Android.
+if(DUNELEGACY_ENABLE_DISCORD_RPC)
+    find_library(DISCORD_RPC_LIBRARY discord-rpc PATHS ${CMAKE_PREFIX_PATH}/lib)
+    if(NOT DISCORD_RPC_LIBRARY)
+        message(FATAL_ERROR "DUNELEGACY_ENABLE_DISCORD_RPC is ON, but discord-rpc was not found")
+    endif()
+    target_compile_definitions(dunelegacy PRIVATE DUNELEGACY_ENABLE_DISCORD_RPC=1)
+endif()
 
 # Link libraries
 # vcpkg provides modern CMake targets for SDL2
@@ -385,8 +394,11 @@ target_link_libraries(dunelegacy
         $<IF:$<TARGET_EXISTS:SDL2_ttf::SDL2_ttf>,SDL2_ttf::SDL2_ttf,SDL2_ttf::SDL2_ttf-static>
         CURL::libcurl
         miniupnpc::miniupnpc
-        ${DISCORD_RPC_LIBRARY}
 )
+
+if(DUNELEGACY_ENABLE_DISCORD_RPC)
+    target_link_libraries(dunelegacy PRIVATE ${DISCORD_RPC_LIBRARY})
+endif()
 
 if(WIN32)
     target_link_libraries(dunelegacy
@@ -528,6 +540,10 @@ elseif(APPLE)
     install(TARGETS dunelegacy
         BUNDLE DESTINATION .
     )
+elseif(ANDROID)
+    install(TARGETS dunelegacy
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    )
 else()
     # Linux: install to bin directory
     install(TARGETS dunelegacy
@@ -537,7 +553,7 @@ endif()
 
 # Define data directory path for runtime
 # On macOS bundles, don't define DUNELEGACY_DATADIR so SDL_GetBasePath() is used (points to Resources/)
-if(NOT APPLE)
+if(NOT APPLE AND NOT ANDROID)
     if(WIN32)
         # Windows: data files are in the same directory as the executable (root install dir)
         # Don't define DUNELEGACY_DATADIR so it uses SDL_GetBasePath() which points to executable directory

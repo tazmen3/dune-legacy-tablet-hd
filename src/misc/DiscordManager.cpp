@@ -19,7 +19,9 @@
 #include <SDL2/SDL_log.h>
 #include <SDL2/SDL_timer.h>
 
+#if DUNELEGACY_ENABLE_DISCORD_RPC
 #include <discord_rpc.h>
+#endif
 #include <curl/curl.h>
 #include <thread>
 
@@ -35,6 +37,7 @@ DiscordManager::~DiscordManager() {
     shutdown();
 }
 
+#if DUNELEGACY_ENABLE_DISCORD_RPC
 static void handleDiscordReady(const DiscordUser* user) {
     SDL_Log("Discord: Connected as %s#%s", user->username, user->discriminator);
 }
@@ -46,8 +49,10 @@ static void handleDiscordDisconnected(int errorCode, const char* message) {
 static void handleDiscordError(int errorCode, const char* message) {
     SDL_Log("Discord: Error (%d: %s)", errorCode, message);
 }
+#endif
 
 void DiscordManager::initialize() {
+#if DUNELEGACY_ENABLE_DISCORD_RPC
     if (initialized) {
         return;
     }
@@ -73,9 +78,11 @@ void DiscordManager::initialize() {
     
     // Set initial presence
     setMainMenu();
+#endif
 }
 
 void DiscordManager::shutdown() {
+#if DUNELEGACY_ENABLE_DISCORD_RPC
     if (!initialized) {
         return;
     }
@@ -87,9 +94,11 @@ void DiscordManager::shutdown() {
     connected = false;
     
     SDL_Log("Discord: Shutdown");
+#endif
 }
 
 void DiscordManager::update() {
+#if DUNELEGACY_ENABLE_DISCORD_RPC
     if (!initialized) {
         return;
     }
@@ -98,6 +107,7 @@ void DiscordManager::update() {
     Discord_UpdateConnection();
 #endif
     Discord_RunCallbacks();
+#endif
 }
 
 void DiscordManager::updatePresence(const std::string& state, const std::string& details,
@@ -106,6 +116,7 @@ void DiscordManager::updatePresence(const std::string& state, const std::string&
                                      const std::string& smallImageKey,
                                      const std::string& smallImageText,
                                      int partySize, int partyMax) {
+#if DUNELEGACY_ENABLE_DISCORD_RPC
     if (!initialized) {
         return;
     }
@@ -128,6 +139,16 @@ void DiscordManager::updatePresence(const std::string& state, const std::string&
     }
     
     Discord_UpdatePresence(&presence);
+#else
+    (void)state;
+    (void)details;
+    (void)largeImageKey;
+    (void)largeImageText;
+    (void)smallImageKey;
+    (void)smallImageText;
+    (void)partySize;
+    (void)partyMax;
+#endif
 }
 
 void DiscordManager::setMainMenu() {
@@ -205,11 +226,13 @@ void DiscordManager::setMapEditor(const std::string& mapName) {
 }
 
 void DiscordManager::clear() {
+#if DUNELEGACY_ENABLE_DISCORD_RPC
     if (!initialized) {
         return;
     }
     
     Discord_ClearPresence();
+#endif
 }
 
 void DiscordManager::sendWebhookMessage(const std::string& title, const std::string& description, int color) {

@@ -53,6 +53,12 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 option(DUNELEGACY_BUILD_TESTS "Build test suite" OFF)
 option(DUNELEGACY_ENABLE_PCH "Enable precompiled headers" ON)
 option(DUNELEGACY_STATIC_RUNTIME "Use static runtime libraries" OFF)
+if(ANDROID)
+    set(DUNELEGACY_DISCORD_RPC_DEFAULT OFF)
+else()
+    set(DUNELEGACY_DISCORD_RPC_DEFAULT ON)
+endif()
+option(DUNELEGACY_ENABLE_DISCORD_RPC "Enable Discord Rich Presence" ${DUNELEGACY_DISCORD_RPC_DEFAULT})
 
 # Find required packages
 # When using vcpkg, these will be automatically found via CMAKE_TOOLCHAIN_FILE
