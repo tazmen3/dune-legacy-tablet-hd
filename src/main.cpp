@@ -118,6 +118,13 @@ static void printUsage() {
 }
 
 int getLogicalToPhysicalResolutionFactor(int physicalWidth, int physicalHeight) {
+#ifdef __ANDROID__
+    // Tablet controls need a larger physical size than desktop controls.
+    // Keep an integer scale and enough logical space for the existing UI.
+    if(physicalWidth >= SCREEN_MIN_WIDTH*3 && physicalHeight >= SCREEN_MIN_HEIGHT*3) {
+        return 3;
+    }
+#endif
     if(physicalWidth >= 1280*3 && physicalHeight >= 720*3) {
         return 3;
     } else if(physicalWidth >= 640*2 && physicalHeight >= 480*2) {
