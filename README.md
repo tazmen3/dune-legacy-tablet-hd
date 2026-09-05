@@ -8,7 +8,35 @@ priorité absolue est d'obtenir une base Android ARM64 stable, reproductible et
 facile à compiler, sans casser la compatibilité Windows et Linux héritée de
 Dune Legacy.
 
-## Première phase
+## État actuel — commandes tactiles
+
+La branche `touch-ui` contient l'adaptation tablette. L'APK
+`0.99.5-android5` a été testé sur Samsung Galaxy Tab S9 le 5 septembre 2026 :
+zoom, dézoom et déplacement de caméra fonctionnent selon le retour utilisateur,
+sans ralentissement perceptible pendant ce test. L'affichage agrandi a également
+été jugé confortable. Ce retour ne remplace pas un benchmark de performances ni
+la validation d'une partie complète.
+
+| Geste | Action |
+| --- | --- |
+| Tap à un doigt | Sélection ou action principale, boutons et menus |
+| Glisser un doigt | Sélection rectangulaire, appliquée au relâchement |
+| Glisser deux doigts ensemble | Déplacer la carte sous les doigts |
+| Écarter deux doigts | Zoomer sur la carte |
+| Rapprocher deux doigts | Dézoomer sur la carte |
+
+Les gestes à deux doigts commencent sur la carte. Le zoom utilise les **trois
+niveaux existants**, sans modifier la taille des menus et boutons. Le point sous
+le centre du geste est conservé dans la limite des bords de carte.
+Après retrait d'un doigt ou ajout d'un troisième, relâcher tous les doigts avant
+de commencer un nouveau geste. La sélection rectangulaire n'a pas encore
+d'aperçu continu. L'alternative tactile au clic droit reste à développer.
+
+Pour compiler et installer l'APK, consulter [ANDROID_BUILD.md](ANDROID_BUILD.md).
+Le [tableau Trello](https://trello.com/b/7mAO3AhC/dune-legacy-tablet-hd-modernisation-tablette)
+est la référence du suivi du projet.
+
+## Première phase — historique du cadrage initial
 
 La première phase vise uniquement à :
 
@@ -19,32 +47,27 @@ La première phase vise uniquement à :
 5. identifier les problèmes liés à l'interface tactile ;
 6. préparer ensuite une vraie interface pensée pour tablette.
 
-Le dépôt amont ne fournit actuellement ni projet Gradle Android, ni cible APK,
-ni procédure Android prête à l'emploi. Le premier jalon consiste donc à établir
-et documenter une chaîne de compilation Android minimale autour du code
-existant, avant toute modification fonctionnelle.
+Le dépôt amont ne fournissait pas de chaîne APK prête à l'emploi lors de la
+création du fork. Cette chaîne Android ARM64 est désormais disponible dans ce
+dépôt ; l'adaptation tactile a ensuite commencé sur `touch-ui`.
 
-## Hors périmètre pour le moment
+## Étapes suivantes
 
-Aucune des fonctions avancées suivantes ne doit être développée pendant la
-première phase :
+Les améliorations restantes sont suivies dans Trello, notamment :
 
-- interface tactile complète ;
-- sélection d'unités adaptée au doigt ;
-- déplacement de caméra tactile ;
-- pinch-to-zoom ;
-- interface adaptée aux tablettes de 10 à 13 pouces ;
+- alternative tactile au clic droit et aperçu continu de sélection ;
+- validation sur d'autres tablettes de 10 à 13 pouces ;
 - rendu haute résolution ;
 - nouveaux assets HD ;
 - amélioration des détails graphiques ;
 - modernisation du multijoueur et du lobby Internet.
 
-Ces améliorations sont prévues pour des phases ultérieures, après validation
-d'un APK ARM64 stable et d'une partie complète sur tablette.
+La validation d'une partie complète reste à documenter.
 
 ## Principes de développement
 
 - La branche `android` porte le travail Android initial.
+- La branche `touch-ui` porte les commandes tactiles et le confort d'affichage.
 - Les changements doivent rester minimaux et isolés par plateforme.
 - Les builds Windows et Linux existants doivent continuer à fonctionner.
 - Le code du jeu ne doit pas être remanié avant d'avoir caractérisé la
@@ -53,17 +76,15 @@ d'un APK ARM64 stable et d'une partie complète sur tablette.
   ce projet. Les contributeurs et utilisateurs doivent fournir leurs propres
   fichiers obtenus légalement.
 
-## État initial de la cible Android
+## Base technique Android
 
 La base amont utilise CMake, C++17 et SDL2. Ses dépendances déclarées sont SDL2,
-SDL2_mixer, SDL2_ttf, libcurl, miniupnpc et discord-rpc. Une chaîne Android
-devra au minimum fournir le SDK Android, le NDK, CMake, Ninja, Gradle/JDK et des
-versions Android compatibles de ces bibliothèques.
+SDL2_mixer, SDL2_ttf, libcurl, miniupnpc et discord-rpc. La chaîne Android utilise
+le SDK Android, le NDK, CMake, Ninja et Gradle/JDK ; les versions exactes sont
+documentées dans [ANDROID_BUILD.md](ANDROID_BUILD.md).
 
-Avant d'ajouter du code tactile ou graphique, le premier travail technique sera
-de vérifier chaque dépendance sur `arm64-v8a`, de désactiver proprement les
-intégrations de bureau non pertinentes sur Android si nécessaire, puis
-d'encapsuler l'exécutable SDL dans une application Android minimale.
+Le moteur est empaqueté dans une application SDL Android pour `arm64-v8a`.
+Discord Rich Presence est désactivé sur Android ; miniupnpc reste disponible.
 
 ## Projet amont et historique
 

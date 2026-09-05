@@ -1,6 +1,6 @@
 # Android ARM64 build
 
-This branch provides the first reproducible Android build foundation for **Dune Legacy Tablet HD**. It does not add tablet controls, HD rendering, gameplay changes, or multiplayer changes.
+This project provides a reproducible Android build foundation for **Dune Legacy Tablet HD**. The `touch-ui` branch additionally provides larger tablet display scaling, single-finger selection, two-finger camera dragging, and pinch zoom across the three existing map zoom levels. See [README.md](README.md) for the touch controls and device validation status. HD assets, gameplay changes, and multiplayer modernization are outside this update.
 
 ## Pinned toolchain
 
