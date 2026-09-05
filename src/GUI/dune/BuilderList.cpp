@@ -23,6 +23,7 @@
 #include <FileClasses/FontManager.h>
 #include <FileClasses/TextManager.h>
 #include <misc/draw_util.h>
+#include <misc/TouchInput.h>
 
 #include <Game.h>
 #include <House.h>
@@ -155,13 +156,15 @@ bool BuilderList::handleMouseRight(Sint32 x, Sint32 y, bool pressed) {
         if(mouseRightButton == getButton(x,y)) {
             // button released
             assert(pBuilder);
-            if((getItemIDFromIndex(mouseRightButton) == (int) pBuilder->getCurrentProducedItem()) && (pBuilder->isOnHold() == false)) {
+            if(!TouchInput::isLongPressDispatch()
+               && (getItemIDFromIndex(mouseRightButton) == (int) pBuilder->getCurrentProducedItem()) && (pBuilder->isOnHold() == false)) {
                 soundPlayer->playSound(Sound_ButtonClick);
                 pBuilder->handleSetOnHoldClick(true);
             } else {
                 if(getItemIDFromIndex(mouseRightButton) != ItemID_Invalid) {
                     soundPlayer->playSound(Sound_ButtonClick);
-                    pBuilder->handleCancelItemClick(getItemIDFromIndex(mouseRightButton), SDL_GetModState() & KMOD_SHIFT);
+                    pBuilder->handleCancelItemClick(getItemIDFromIndex(mouseRightButton),
+                        !TouchInput::isLongPressDispatch() && (SDL_GetModState() & KMOD_SHIFT));
                 }
             }
         }

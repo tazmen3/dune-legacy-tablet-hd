@@ -16,6 +16,13 @@ class ScreenBorder;
 
 namespace TouchInput {
 
+// True only while dispatching a right-button event from a long press.
+#ifdef __ANDROID__
+bool isLongPressDispatch();
+#else
+inline bool isLongPressDispatch() { return false; }
+#endif
+
 /**
  * Polls the next application input event. On Android, raw single-touch
  * gestures are normalized into the existing left-mouse input path.

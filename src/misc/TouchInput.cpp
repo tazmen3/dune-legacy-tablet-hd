@@ -25,6 +25,7 @@
 namespace {
 
 constexpr float MOVEMENT_THRESHOLD = 12.0f;
+constexpr Uint32 LONG_PRESS_MS = 600;
 
 using FingerKey = std::pair<SDL_TouchID, SDL_FingerID>;
 
@@ -49,6 +50,8 @@ struct TouchState {
     LogicalPoint start;
     LogicalPoint last;
     Uint32 windowID = 0;
+    Uint32 pressedAt = 0;
+    bool longPressDispatch = false;
     bool primaryActive = false;
     bool dragging = false;
     bool cancelled = false;
@@ -87,14 +90,14 @@ SDL_Event makeMouseMotion(LogicalPoint point, LogicalPoint relative, Uint32 wind
     return event;
 }
 
-SDL_Event makeMouseButton(Uint32 type, LogicalPoint point, Uint32 windowID) {
+SDL_Event makeMouseButton(Uint32 type, LogicalPoint point, Uint32 windowID, Uint8 button = SDL_BUTTON_LEFT) {
     SDL_Event event{};
     event.type = type;
     event.button.type = type;
     event.button.timestamp = SDL_GetTicks();
     event.button.windowID = windowID;
     event.button.which = SDL_TOUCH_MOUSEID;
-    event.button.button = SDL_BUTTON_LEFT;
+    event.button.button = button;
     event.button.state = (type == SDL_MOUSEBUTTONDOWN) ? SDL_PRESSED : SDL_RELEASED;
     event.button.clicks = 1;
     event.button.x = point.x;
@@ -131,6 +134,25 @@ void resetGesture() {
     state.pinch.reset(0);
 }
 
+void queueLongPressIfReady(Uint32 now) {
+    if(!state.camera || !state.primaryActive || state.cancelled || state.dragging
+       || state.fingers.size() != 1 || now - state.pressedAt < LONG_PRESS_MS) return;
+    state.pendingEvents.push_back(makeMouseMotion(state.start, {0, 0}, state.windowID, 0));
+    state.pendingEvents.push_back(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.start, state.windowID, SDL_BUTTON_RIGHT));
+    state.pendingEvents.push_back(makeMouseButton(SDL_MOUSEBUTTONUP, state.start, state.windowID, SDL_BUTTON_RIGHT));
+    state.cancelled = true; // One action only, no left click on release.
+    state.panBlocked = true;
+}
+
+bool deliverPending(SDL_Event* event) {
+    if(state.pendingEvents.empty()) return false;
+    *event = state.pendingEvents.front();
+    state.pendingEvents.pop_front();
+    state.longPressDispatch = (event->type == SDL_MOUSEBUTTONDOWN || event->type == SDL_MOUSEBUTTONUP)
+        && event->button.button == SDL_BUTTON_RIGHT;
+    return true;
+}
+
 // Twice the centroid preserves half-pixel motion when only one finger updates.
 LogicalPoint panCenter() {
     auto first = state.fingers.begin();
@@ -157,6 +179,7 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
         state.start = toLogicalPoint(finger);
         state.last = state.start;
         state.windowID = finger.windowID;
+        state.pressedAt = finger.timestamp;
         state.primaryActive = true;
         state.dragging = false;
         state.cancelled = false;
@@ -233,7 +256,8 @@ void handleFingerUp(const SDL_TouchFingerEvent& finger) {
         if((deltaX * deltaX + deltaY * deltaY) >= MOVEMENT_THRESHOLD * MOVEMENT_THRESHOLD) {
             state.dragging = true;
         }
-        queueCompletedGesture();
+        queueLongPressIfReady(finger.timestamp);
+        if(!state.cancelled) queueCompletedGesture();
     }
 
     state.fingers.erase(key);
@@ -274,6 +298,7 @@ bool isPhysicalMouseEvent(const SDL_Event& event) {
 namespace TouchInput {
 
 bool pollEvent(SDL_Event* event, ScreenBorder* camera) {
+    state.longPressDispatch = false;
     if(event == nullptr) {
         return false;
     }
@@ -288,11 +313,7 @@ bool pollEvent(SDL_Event* event, ScreenBorder* camera) {
         if(state.fingers.empty()) resetGesture();
     }
 
-    if(!state.pendingEvents.empty()) {
-        *event = state.pendingEvents.front();
-        state.pendingEvents.pop_front();
-        return true;
-    }
+    if(deliverPending(event)) return true;
 
     SDL_Event sourceEvent{};
     while(SDL_PollEvent(&sourceEvent)) {
@@ -326,15 +347,14 @@ bool pollEvent(SDL_Event* event, ScreenBorder* camera) {
                 return true;
         }
 
-        if(!state.pendingEvents.empty()) {
-            *event = state.pendingEvents.front();
-            state.pendingEvents.pop_front();
-            return true;
-        }
+        if(deliverPending(event)) return true;
     }
 
-    return false;
+    queueLongPressIfReady(SDL_GetTicks());
+    return deliverPending(event);
 }
+
+bool isLongPressDispatch() { return state.longPressDispatch; }
 
 bool allowsMouseEdgeScrolling() {
     return !state.lastPointerWasTouch;

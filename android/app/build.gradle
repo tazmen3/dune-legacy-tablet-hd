@@ -2,7 +2,7 @@ plugins {
     id "com.android.application"
 }
 
-def androidVersionName = "0.99.5-android5"
+def androidVersionName = "0.99.5-android6"
 def bundledAssetRoot = "dunelegacy-data"
 def generatedAssetsDir = layout.buildDirectory.dir("generated/duneLegacyAssets/main")
 def proprietaryDuneDataFiles = [
@@ -64,7 +64,7 @@ android {
         applicationId "org.dunelegacy.tablethd"
         minSdk 28
         targetSdk 35
-        versionCode 5
+        versionCode 6
         versionName androidVersionName
 
         ndk {
