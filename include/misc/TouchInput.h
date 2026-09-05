@@ -19,8 +19,10 @@ namespace TouchInput {
 // True only while dispatching a right-button event from a long press.
 #ifdef __ANDROID__
 bool isLongPressDispatch();
+bool allowProductionRepeat(Uint32 builder, Uint32 item);
 #else
 inline bool isLongPressDispatch() { return false; }
+inline bool allowProductionRepeat(Uint32, Uint32) { return true; }
 #endif
 
 /**

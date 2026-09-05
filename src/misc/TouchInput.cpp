@@ -26,6 +26,7 @@ namespace {
 
 constexpr float MOVEMENT_THRESHOLD = 12.0f;
 constexpr Uint32 LONG_PRESS_MS = 600;
+constexpr Uint32 REPEAT_MS = 1000;
 
 using FingerKey = std::pair<SDL_TouchID, SDL_FingerID>;
 
@@ -52,6 +53,12 @@ struct TouchState {
     Uint32 windowID = 0;
     Uint32 pressedAt = 0;
     bool longPressDispatch = false;
+    bool longPressFired = false;
+    bool repeatProduction = false;
+    bool repeatTargetSet = false;
+    Uint32 repeatBuilder = 0;
+    Uint32 repeatItem = 0;
+    Uint32 lastRepeat = 0;
     bool primaryActive = false;
     bool dragging = false;
     bool cancelled = false;
@@ -127,6 +134,9 @@ void resetGesture() {
     state.dragging = false;
     state.cancelled = false;
     state.windowID = 0;
+    state.longPressFired = false;
+    state.repeatProduction = false;
+    state.repeatTargetSet = false;
     state.panEligible = false;
     state.panning = false;
     state.panBlocked = false;
@@ -135,12 +145,17 @@ void resetGesture() {
 }
 
 void queueLongPressIfReady(Uint32 now) {
-    if(!state.camera || !state.primaryActive || state.cancelled || state.dragging
-       || state.fingers.size() != 1 || now - state.pressedAt < LONG_PRESS_MS) return;
+    if(!state.camera || !state.primaryActive || state.dragging || state.fingers.size() != 1) return;
+    if(state.longPressFired) {
+        if(!state.repeatProduction || now - state.lastRepeat < REPEAT_MS) return;
+    } else if(state.cancelled || now - state.pressedAt < LONG_PRESS_MS) return;
+    state.longPressFired = true;
+    state.repeatProduction = false; // The production widget must renew permission.
+    state.lastRepeat = now; // Never catch up with a burst after a slow frame.
     state.pendingEvents.push_back(makeMouseMotion(state.start, {0, 0}, state.windowID, 0));
     state.pendingEvents.push_back(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.start, state.windowID, SDL_BUTTON_RIGHT));
     state.pendingEvents.push_back(makeMouseButton(SDL_MOUSEBUTTONUP, state.start, state.windowID, SDL_BUTTON_RIGHT));
-    state.cancelled = true; // One action only, no left click on release.
+    state.cancelled = true; // No left click on release.
     state.panBlocked = true;
 }
 
@@ -186,6 +201,7 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
         state.panEligible = state.camera && state.camera->isScreenCoordInsideMap(point.x, point.y);
     } else {
         // No mouse event has been emitted yet, so cancellation has no side effect.
+        state.repeatProduction = false;
         state.cancelled = true;
         if(state.fingers.size() == 2 && !state.panBlocked && state.panEligible
            && key.first == state.primaryFinger.first
@@ -205,6 +221,15 @@ void handleFingerMotion(const SDL_TouchFingerEvent& finger) {
     const auto found = state.fingers.find(key);
     if(found == state.fingers.end()) return;
     found->second = toLogicalPoint(finger);
+    if(state.longPressFired) {
+        const float dx = static_cast<float>(found->second.x - state.start.x);
+        const float dy = static_cast<float>(found->second.y - state.start.y);
+        if(dx*dx + dy*dy >= MOVEMENT_THRESHOLD*MOVEMENT_THRESHOLD) {
+            state.repeatProduction = false;
+            state.dragging = true;
+        }
+        return;
+    }
     if(state.camera && state.fingers.size() == 2 && state.panEligible && !state.panBlocked) {
         const auto center = panCenter();
         const float dx = (center.x - state.panStart.x) / 2.0f;
@@ -245,6 +270,7 @@ void handleFingerMotion(const SDL_TouchFingerEvent& finger) {
 }
 
 void handleFingerUp(const SDL_TouchFingerEvent& finger) {
+    state.repeatProduction = false;
     state.lastPointerWasTouch = true;
     const FingerKey key{ finger.touchId, finger.fingerId };
     if(state.fingers.find(key) == state.fingers.end()) return;
@@ -309,6 +335,7 @@ bool pollEvent(SDL_Event* event, ScreenBorder* camera) {
         state.cancelled = true;
         state.panBlocked = true;
         state.panning = false;
+        state.repeatProduction = false;
         state.pendingEvents.clear();
         if(state.fingers.empty()) resetGesture();
     }
@@ -355,6 +382,17 @@ bool pollEvent(SDL_Event* event, ScreenBorder* camera) {
 }
 
 bool isLongPressDispatch() { return state.longPressDispatch; }
+
+bool allowProductionRepeat(Uint32 builder, Uint32 item) {
+    if(!state.longPressDispatch) return true;
+    if(state.repeatTargetSet && (state.repeatBuilder != builder || state.repeatItem != item)) return false;
+    state.repeatTargetSet = true;
+    state.repeatBuilder = builder;
+    state.repeatItem = item;
+    state.repeatProduction = state.longPressFired && state.primaryActive
+        && state.fingers.size() == 1 && !state.dragging;
+    return true;
+}
 
 bool allowsMouseEdgeScrolling() {
     return !state.lastPointerWasTouch;

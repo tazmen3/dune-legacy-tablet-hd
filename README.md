@@ -32,10 +32,15 @@ le centre du geste est conservé dans la limite des bords de carte.
 Après retrait d'un doigt ou ajout d'un troisième, relâcher tous les doigts avant
 de commencer un nouveau geste. La sélection rectangulaire n'a pas encore
 d'aperçu continu. L'appui long est disponible à partir de `0.99.5-android6`
-(validation sur tablette en attente) : maintenir le doigt sur l'icône de
+et sa répétition à partir de `0.99.5-android7` (validation tablette en attente).
+Maintenir le doigt sur l'icône de
 construction dans la liste de production annule un élément sans passer par la
-pause. Une seule annulation est envoyée par appui, sans clic gauche au
-relâchement. Un mouvement ou un second doigt avant le délai annule l'appui long.
+pause après 600 ms, puis annule un exemplaire supplémentaire chaque seconde
+tant que le doigt reste posé. Le relâchement, un déplacement du doigt, un second
+doigt ou une file vide arrêtent la répétition. Aucun clic gauche n'est envoyé au
+relâchement. La répétition reste limitée à la même production ; les actions sur
+la carte ne se répètent pas. Un mouvement ou un second doigt avant le délai
+annule l'appui long.
 Sur la carte, l'appui long conserve l'action contextuelle du clic droit,
 notamment l'annulation d'un mode de placement ; il ne démolit pas un bâtiment.
 

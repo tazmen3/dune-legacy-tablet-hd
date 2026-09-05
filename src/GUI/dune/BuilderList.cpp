@@ -162,6 +162,17 @@ bool BuilderList::handleMouseRight(Sint32 x, Sint32 y, bool pressed) {
                 pBuilder->handleSetOnHoldClick(true);
             } else {
                 if(getItemIDFromIndex(mouseRightButton) != ItemID_Invalid) {
+                    if(TouchInput::isLongPressDispatch()) {
+                        const auto item = getItemIDFromIndex(mouseRightButton);
+                        bool queued = false;
+                        for(const auto& entry : pBuilder->getBuildList()) {
+                            if(entry.itemID == item && entry.num > 0) queued = true;
+                        }
+                        if(!queued || !TouchInput::allowProductionRepeat(builderObjectID, item)) {
+                            mouseRightButton = -1;
+                            return true;
+                        }
+                    }
                     soundPlayer->playSound(Sound_ButtonClick);
                     pBuilder->handleCancelItemClick(getItemIDFromIndex(mouseRightButton),
                         !TouchInput::isLongPressDispatch() && (SDL_GetModState() & KMOD_SHIFT));
