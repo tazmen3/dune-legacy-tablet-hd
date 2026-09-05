@@ -12,16 +12,19 @@
 
 #include <SDL.h>
 
+class ScreenBorder;
+
 namespace TouchInput {
 
 /**
  * Polls the next application input event. On Android, raw single-touch
  * gestures are normalized into the existing left-mouse input path.
+ * Passing the active map camera enables two-finger panning. Menus omit it.
  */
 #ifdef __ANDROID__
-bool pollEvent(SDL_Event* event);
+bool pollEvent(SDL_Event* event, ScreenBorder* camera = nullptr);
 #else
-inline bool pollEvent(SDL_Event* event) {
+inline bool pollEvent(SDL_Event* event, ScreenBorder* = nullptr) {
     return event != nullptr && SDL_PollEvent(event) != 0;
 }
 #endif

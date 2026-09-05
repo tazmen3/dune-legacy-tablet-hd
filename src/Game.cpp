@@ -1602,7 +1602,8 @@ void Game::drawScreen()
 void Game::doInput()
 {
     SDL_Event event;
-    while(TouchInput::pollEvent(&event)) {
+    while(TouchInput::pollEvent(&event,
+            (!pInGameMenu && !pInGameMentat && !pWaitingForOtherPlayers) ? screenborder : nullptr)) {
         // check for a key press
 
         // first of all update mouse
