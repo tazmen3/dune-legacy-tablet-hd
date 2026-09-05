@@ -8,6 +8,7 @@
  */
 
 #include <misc/TouchInput.h>
+#include <misc/PinchZoom.h>
 
 #ifdef __ANDROID__
 
@@ -42,6 +43,7 @@ struct TouchState {
     LogicalPoint panLast;
     float remainderX = 0;
     float remainderY = 0;
+    TouchInput::PinchZoom pinch;
     std::deque<SDL_Event> pendingEvents;
     FingerKey primaryFinger{};
     LogicalPoint start;
@@ -126,6 +128,7 @@ void resetGesture() {
     state.panning = false;
     state.panBlocked = false;
     state.remainderX = state.remainderY = 0;
+    state.pinch.reset(0);
 }
 
 // Twice the centroid preserves half-pixel motion when only one finger updates.
@@ -133,6 +136,14 @@ LogicalPoint panCenter() {
     auto first = state.fingers.begin();
     auto second = std::next(first);
     return { first->second.x + second->second.x, first->second.y + second->second.y };
+}
+
+float fingerDistance() {
+    const auto first = state.fingers.begin();
+    const auto second = std::next(first);
+    const float dx = static_cast<float>(first->second.x - second->second.x);
+    const float dy = static_cast<float>(first->second.y - second->second.y);
+    return std::sqrt(dx*dx + dy*dy);
 }
 
 void handleFingerDown(const SDL_TouchFingerEvent& finger) {
@@ -157,6 +168,7 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
            && key.first == state.primaryFinger.first
            && state.camera && state.camera->isScreenCoordInsideMap(point.x, point.y)) {
             state.panStart = state.panLast = panCenter();
+            state.pinch.reset(fingerDistance());
         } else {
             state.panBlocked = true;
             state.panning = false;
@@ -187,6 +199,13 @@ void handleFingerMotion(const SDL_TouchFingerEvent& finger) {
             state.remainderY -= moveY;
             state.camera->setNewScreenCenter(state.camera->getCurrentCenter() + Coord(moveX, moveY));
             state.panLast = center;
+        }
+        const int zoom = state.pinch.update(fingerDistance(), currentZoomlevel, NUM_ZOOMLEVEL - 1);
+        if(zoom != currentZoomlevel) {
+            state.camera->zoomAt(center.x / 2, center.y / 2, zoom);
+            // Old fractional pan deltas belong to the previous zoom scale.
+            state.remainderX = state.remainderY = 0;
+            state.panStart = state.panLast = center;
         }
         return;
     }

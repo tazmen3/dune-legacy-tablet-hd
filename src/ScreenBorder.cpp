@@ -21,6 +21,18 @@
 
 #include <algorithm>
 
+void ScreenBorder::zoomAt(int screenX, int screenY, int level) {
+    level = std::max(0, std::min(level, NUM_ZOOMLEVEL - 1));
+    if(level == currentZoomlevel) return;
+    const Coord anchor(screen2worldX(screenX), screen2worldY(screenY));
+    const Coord center = getCurrentCenter();
+    currentZoomlevel = level;
+    adjustScreenBorderToMapsize(mapSizeX, mapSizeY);
+    setNewScreenCenter(center);
+    const Coord shiftedAnchor(screen2worldX(screenX), screen2worldY(screenY));
+    setNewScreenCenter(getCurrentCenter() + anchor - shiftedAnchor);
+}
+
 void ScreenBorder::setNewScreenCenter(const Coord& newPosition) {
     Coord currentBorderSize = bottomRightCorner - topLeftCorner;
 

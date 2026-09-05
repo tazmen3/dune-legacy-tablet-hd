@@ -8,6 +8,7 @@ add_executable(dunelegacy_tests)
 # Note: Catch2WithMain provides main(), no testmain.cpp needed
 target_sources(dunelegacy_tests
     PRIVATE
+        PinchZoomTest.cpp
         PathBudgetTestCase/PathBudgetTestCase.cpp
         NetworkManagerTestCase/NetworkManagerTestCase.cpp
         # ENet library sources (needed for NetworkManager tests)
@@ -75,4 +76,4 @@ add_custom_command(
         "${CMAKE_SOURCE_DIR}/data"
         "${CMAKE_BINARY_DIR}/tests/data"
     COMMENT "Copying test data to build directory"
-) 
+)

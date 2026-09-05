@@ -19,7 +19,7 @@ namespace TouchInput {
 /**
  * Polls the next application input event. On Android, raw single-touch
  * gestures are normalized into the existing left-mouse input path.
- * Passing the active map camera enables two-finger panning. Menus omit it.
+ * Passing the active map camera enables two-finger pan and pinch. Menus omit it.
  */
 #ifdef __ANDROID__
 bool pollEvent(SDL_Event* event, ScreenBorder* camera = nullptr);

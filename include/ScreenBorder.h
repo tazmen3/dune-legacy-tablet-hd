@@ -202,6 +202,9 @@ public:
     */
     void setNewScreenCenter(const Coord& newPosition);
 
+    /// Change map zoom while keeping the world point under the screen anchor.
+    void zoomAt(int screenX, int screenY, int level);
+
     /**
         This method scrolls left
     */
