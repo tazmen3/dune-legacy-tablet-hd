@@ -44,6 +44,8 @@ public:
     void begin(int x, int y) {
         startX_ = x;
         startY_ = y;
+        currentX_ = x;
+        currentY_ = y;
         active_ = true;
         cancelled_ = false;
         dragging_ = false;
@@ -51,6 +53,8 @@ public:
 
     void move(int x, int y) {
         if(!active_ || cancelled_) return;
+        currentX_ = x;
+        currentY_ = y;
         const auto deltaX = x - startX_;
         const auto deltaY = y - startY_;
         dragging_ = dragging_
@@ -76,10 +80,16 @@ public:
     bool isActive() const { return active_; }
     bool isCancelled() const { return cancelled_; }
     bool isDragging() const { return dragging_; }
+    int startX() const { return startX_; }
+    int startY() const { return startY_; }
+    int currentX() const { return currentX_; }
+    int currentY() const { return currentY_; }
 
 private:
     int startX_ = 0;
     int startY_ = 0;
+    int currentX_ = 0;
+    int currentY_ = 0;
     bool active_ = false;
     bool cancelled_ = false;
     bool dragging_ = false;

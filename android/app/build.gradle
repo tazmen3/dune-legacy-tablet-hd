@@ -2,7 +2,7 @@ plugins {
     id "com.android.application"
 }
 
-def androidVersionName = "0.99.5-android11"
+def androidVersionName = "0.99.5-android12"
 def bundledAssetRoot = "dunelegacy-data"
 def generatedAssetsDir = layout.buildDirectory.dir("generated/duneLegacyAssets/main")
 def assetVersionFile = "asset-version.txt"
@@ -77,7 +77,7 @@ android {
         applicationId "org.dunelegacy.tablethd"
         minSdk 28
         targetSdk 35
-        versionCode 11
+        versionCode 12
         versionName androidVersionName
 
         ndk {

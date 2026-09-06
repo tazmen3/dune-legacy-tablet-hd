@@ -1582,29 +1582,48 @@ void Game::drawScreen()
     }
 
 ///////////draw game selection rectangle
-    if(selectionMode) {
-
-        int finalMouseX = drawnMouseX;
-        int finalMouseY = drawnMouseY;
+    const auto drawSelectionRectangle = [&](int startX, int startY, int endX, int endY) {
+        int finalMouseX = endX;
+        int finalMouseY = endY;
         if(finalMouseX >= sideBarPos.x) {
             //this keeps the box on the map, and not over game bar
             finalMouseX = sideBarPos.x-1;
         }
 
         if(finalMouseY < topBarPos.y+topBarPos.h) {
-            finalMouseY = topBarPos.x+topBarPos.h;
+            finalMouseY = topBarPos.y+topBarPos.h;
         }
 
-        // draw the mouse selection rectangle
+        // SDL rectangles require normalized coordinates for up/left drags.
         renderDrawRect( renderer,
-                        screenborder->world2screenX(selectionRect.x),
-                        screenborder->world2screenY(selectionRect.y),
-                        finalMouseX,
-                        finalMouseY,
+                        std::min(startX, finalMouseX),
+                        std::min(startY, finalMouseY),
+                        std::max(startX, finalMouseX),
+                        std::max(startY, finalMouseY),
                         COLOR_WHITE);
+    };
+
+    if(selectionMode) {
+        drawSelectionRectangle(screenborder->world2screenX(selectionRect.x),
+                               screenborder->world2screenY(selectionRect.y),
+                               drawnMouseX, drawnMouseY);
+    } else {
+        SDL_Point touchStart{};
+        SDL_Point touchCurrent{};
+        if(TouchInput::getSelectionDragPreview(&touchStart, &touchCurrent)) {
+            drawSelectionRectangle(touchStart.x, touchStart.y, touchCurrent.x, touchCurrent.y);
+        }
     }
 
-
+///////////draw hostile attack target feedback
+    if(attackTargetFeedback.isActive(SDL_GetTicks())) {
+        ObjectBase* target = objectManager.getObject(attackTargetFeedback.objectID());
+        if(target == nullptr) {
+            attackTargetFeedback.clear();
+        } else if(target->isVisible(pLocalHouse->getTeamID())) {
+            target->drawAttackTargetFeedback();
+        }
+    }
 
 ///////////draw action indicator
 
@@ -4125,6 +4144,19 @@ bool Game::canIssueTouchMapAction() {
         }
     }
     return false;
+}
+
+void Game::showAttackTargetFeedback(Uint32 targetObjectID) {
+    ObjectBase* target = objectManager.getObject(targetObjectID);
+    const bool hostile = target != nullptr
+        && target->getOwner()->getTeamID() != pLocalHouse->getTeamID();
+    if(!shouldShowAttackTargetFeedback(TouchInput::isTouchDispatch(),
+                                       !cmdManager.getReadOnly(),
+                                       target != nullptr,
+                                       hostile)) {
+        return;
+    }
+    attackTargetFeedback.activate(targetObjectID, SDL_GetTicks());
 }
 
 

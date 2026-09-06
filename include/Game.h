@@ -33,6 +33,7 @@
 #include <players/HumanPlayer.h>
 #include <misc/SDL2pp.h>
 #include <misc/PlacementCandidate.h>
+#include <misc/VisualFeedback.h>
 #include <CursorManager.h>
 
 #include <DataTypes.h>
@@ -445,6 +446,9 @@ public:
     */
     void takeScreenshot() const;
 
+    /** Show touch confirmation for an actual hostile-object attack command. */
+    void showAttackTargetFeedback(Uint32 targetObjectID);
+
 private:
 
     /**
@@ -522,7 +526,6 @@ private:
 
     /** Whether a map tap should be adapted to a contextual unit action. */
     bool canIssueTouchMapAction();
-
 
     /**
         Selects the next structure of any of the types specified in itemIDs. If none of this type is currently selected the first one is selected.
@@ -775,6 +778,7 @@ private:
     int         indicatorTime = 5;
     int         indicatorTimer = 0;
     Coord       indicatorPosition = Coord::Invalid();
+    AttackTargetFeedback attackTargetFeedback;
 
     float       averageFrameTime = 31.25f;      ///< The weighted average of the frame time of all previous frames (smoothed fps = 1000.0f/averageFrameTime)
 

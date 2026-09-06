@@ -30,6 +30,7 @@
 #include <ScreenBorder.h>
 #include <players/HumanPlayer.h>
 #include <GUI/ObjectInterfaces/DefaultObjectInterface.h>
+#include <misc/draw_util.h>
 
 //structures
 #include <structures/Barracks.h>
@@ -228,6 +229,30 @@ Coord ObjectBase::getCenterPoint() const {
 
 Coord ObjectBase::getClosestCenterPoint(const Coord& objectLocation) const {
     return getCenterPoint();
+}
+
+void ObjectBase::drawAttackTargetFeedback() const {
+    const int frameWidth = getWidth(graphic[currentZoomlevel]) / numImagesX;
+    const int frameHeight = getHeight(graphic[currentZoomlevel]) / numImagesY;
+    const int centerX = screenborder->world2screenX(lround(realX));
+    const int centerY = screenborder->world2screenY(lround(realY));
+    const int padding = 2 * (currentZoomlevel + 1);
+    const int left = (isAStructure() ? centerX : centerX - frameWidth / 2) - padding;
+    const int top = (isAStructure() ? centerY : centerY - frameHeight / 2) - padding;
+    const int right = left + frameWidth + 2 * padding - 1;
+    const int bottom = top + frameHeight + 2 * padding - 1;
+    const int segment = 4 * (currentZoomlevel + 1);
+
+    for(int i = 0; i <= currentZoomlevel; ++i) {
+        renderDrawHLine(renderer, left + i, top + i, left + segment, COLOR_RED);
+        renderDrawVLine(renderer, left + i, top + i, top + segment, COLOR_RED);
+        renderDrawHLine(renderer, right - i, top + i, right - segment, COLOR_RED);
+        renderDrawVLine(renderer, right - i, top + i, top + segment, COLOR_RED);
+        renderDrawHLine(renderer, left + i, bottom - i, left + segment, COLOR_RED);
+        renderDrawVLine(renderer, left + i, bottom - i, bottom - segment, COLOR_RED);
+        renderDrawHLine(renderer, right - i, bottom - i, right - segment, COLOR_RED);
+        renderDrawVLine(renderer, right - i, bottom - i, bottom - segment, COLOR_RED);
+    }
 }
 
 

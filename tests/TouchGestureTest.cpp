@@ -71,6 +71,42 @@ TEST_CASE("Unit touch: selection drag never routes a tap action", "[touch][unit-
     REQUIRE(route(gesture) == TouchMapTapAction::LeftClick);
 }
 
+TEST_CASE("Selection preview exposes live endpoints only after the drag threshold", "[touch][selection-preview]") {
+    auto gesture = startedGesture();
+    gesture.move(107, 107);
+    REQUIRE_FALSE(gesture.isDragging());
+
+    gesture.move(88, 100);
+    REQUIRE(gesture.isDragging());
+    REQUIRE(gesture.startX() == 100);
+    REQUIRE(gesture.startY() == 100);
+    REQUIRE(gesture.currentX() == 88);
+    REQUIRE(gesture.currentY() == 100);
+}
+
+TEST_CASE("Cancelling a selection preview freezes it out of the gesture path", "[touch][selection-preview]") {
+    auto gesture = startedGesture();
+    gesture.move(112, 100);
+    gesture.cancel();
+    gesture.move(160, 140);
+
+    REQUIRE(gesture.isCancelled());
+    REQUIRE(gesture.outcome() == TouchGestureOutcome::None);
+    REQUIRE(gesture.currentX() == 112);
+    REQUIRE(gesture.currentY() == 100);
+}
+
+TEST_CASE("Finishing a selection drag disables its preview state", "[touch][selection-preview]") {
+    auto gesture = startedGesture();
+    gesture.move(112, 100);
+    REQUIRE(gesture.isDragging());
+
+    gesture.reset();
+    REQUIRE_FALSE(gesture.isActive());
+    REQUIRE_FALSE(gesture.isDragging());
+    REQUIRE(gesture.outcome() == TouchGestureOutcome::None);
+}
+
 TEST_CASE("Unit touch: natural jitter below 12 logical pixels stays contextual", "[touch][unit-command]") {
     auto gesture = startedGesture();
     gesture.move(107, 107);

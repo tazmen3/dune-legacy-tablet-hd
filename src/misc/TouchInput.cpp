@@ -458,6 +458,18 @@ bool isTapDispatch() { return state.tapDispatch; }
 
 bool tapStartedInsideMap() { return state.tapStartedInsideMap; }
 
+bool getSelectionDragPreview(SDL_Point* start, SDL_Point* current) {
+    if(start == nullptr || current == nullptr || !state.primaryActive
+       || state.fingers.size() != 1 || state.placementGesture || !state.mapTapEligible
+       || state.gesture.isCancelled() || !state.gesture.isDragging()) {
+        return false;
+    }
+
+    *start = { state.gesture.startX(), state.gesture.startY() };
+    *current = { state.gesture.currentX(), state.gesture.currentY() };
+    return true;
+}
+
 bool allowProductionRepeat(Uint32 builder, Uint32 item) {
     if(!state.longPressDispatch) return true;
     if(state.repeatTargetSet && (state.repeatBuilder != builder || state.repeatItem != item)) return false;

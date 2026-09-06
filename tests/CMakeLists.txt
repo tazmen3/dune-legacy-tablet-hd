@@ -10,6 +10,7 @@ target_sources(dunelegacy_tests
     PRIVATE
         PinchZoomTest.cpp
         TouchGestureTest.cpp
+        VisualFeedbackTest.cpp
         PlacementCandidateTest.cpp
         ProductionEconomyTest.cpp
         ProductionControlsTest.cpp

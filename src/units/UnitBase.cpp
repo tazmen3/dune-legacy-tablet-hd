@@ -831,6 +831,7 @@ void UnitBase::handleActionClick(int xPos, int yPos) {
                 if(tempTarget->getOwner()->getTeamID() != getOwner()->getTeamID()) {
                     // attack
                     currentGame->getCommandManager().addCommand(Command(pLocalPlayer->getPlayerID(), CMD_UNIT_ATTACKOBJECT,objectID,tempTarget->getObjectID()));
+                    currentGame->showAttackTargetFeedback(tempTarget->getObjectID());
                 } else {
                     // move to object/structure
                     currentGame->getCommandManager().addCommand(Command(pLocalPlayer->getPlayerID(), CMD_UNIT_MOVE2OBJECT,objectID,tempTarget->getObjectID()));
@@ -851,6 +852,7 @@ void UnitBase::handleAttackClick(int xPos, int yPos) {
                 ObjectBase* tempTarget = currentGameMap->getTile(xPos,yPos)->getObject();
 
                 currentGame->getCommandManager().addCommand(Command(pLocalPlayer->getPlayerID(), CMD_UNIT_ATTACKOBJECT,objectID,tempTarget->getObjectID()));
+                currentGame->showAttackTargetFeedback(tempTarget->getObjectID());
             } else {
                 // attack pos
                 currentGame->getCommandManager().addCommand(Command(pLocalPlayer->getPlayerID(), CMD_UNIT_ATTACKPOS,objectID,(Uint32) xPos, (Uint32) yPos, (Uint32) true));

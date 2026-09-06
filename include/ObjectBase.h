@@ -67,6 +67,7 @@ public:
 
     virtual void drawSelectionBox() { ; };
     virtual void drawOtherPlayerSelectionBox() { ; };
+    void drawAttackTargetFeedback() const;
 
     virtual void destroy() = 0;
 
