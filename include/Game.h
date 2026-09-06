@@ -32,6 +32,7 @@
 #include <players/Player.h>
 #include <players/HumanPlayer.h>
 #include <misc/SDL2pp.h>
+#include <misc/PlacementCandidate.h>
 #include <CursorManager.h>
 
 #include <DataTypes.h>
@@ -824,6 +825,7 @@ private:
     bool    bSelectionChanged = false;                  ///< Has the selected list changed (and must be retransmitted to other plays in multiplayer games)
     std::set<Uint32> selectedList;                      ///< A set of all selected units/structures
     std::set<Uint32> selectedByOtherPlayerList;         ///< This is only used in multiplayer games where two players control one house
+    TouchInput::PlacementCandidate touchPlacementCandidate; ///< Map-anchored two-tap placement preview
     RobustList<Explosion*> explosionList;               ///< A list containing all the explosions that must be drawn
 
     std::string localPlayerName;                            ///< the name of the local player

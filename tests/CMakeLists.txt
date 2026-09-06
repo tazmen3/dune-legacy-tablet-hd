@@ -9,6 +9,7 @@ add_executable(dunelegacy_tests)
 target_sources(dunelegacy_tests
     PRIVATE
         PinchZoomTest.cpp
+        PlacementCandidateTest.cpp
         PathBudgetTestCase/PathBudgetTestCase.cpp
         NetworkManagerTestCase/NetworkManagerTestCase.cpp
         # ENet library sources (needed for NetworkManager tests)
