@@ -34,14 +34,17 @@ inline void clearProductionCatalogTarget(Uint32) {}
 
 /**
  * Polls the next application input event. On Android, raw single-touch
- * gestures are normalized into the existing left-mouse input path.
+ * gestures are normalized into the existing mouse input path.
  * Passing the active map camera enables two-finger pan and pinch. Menus omit it.
  * placementPreview emits live touch motion only for a one-finger placement gesture.
+ * contextMapTap converts a validated map tap to the existing contextual right-click
+ * path; drags, UI taps and taps outside the map remain left-button input.
  */
 #ifdef __ANDROID__
-bool pollEvent(SDL_Event* event, ScreenBorder* camera = nullptr, bool placementPreview = false);
+bool pollEvent(SDL_Event* event, ScreenBorder* camera = nullptr, bool placementPreview = false,
+               bool contextMapTap = false);
 #else
-inline bool pollEvent(SDL_Event* event, ScreenBorder* = nullptr, bool = false) {
+inline bool pollEvent(SDL_Event* event, ScreenBorder* = nullptr, bool = false, bool = false) {
     return event != nullptr && SDL_PollEvent(event) != 0;
 }
 #endif

@@ -517,6 +517,12 @@ private:
     */
     bool handleSelectedObjectsActionClick(int xPos, int yPos);
 
+    /** Whether the current selection may use the ordinary contextual action path. */
+    bool canIssueSelectedObjectsAction();
+
+    /** Whether a map tap should be adapted to a contextual unit action. */
+    bool canIssueTouchMapAction();
+
 
     /**
         Selects the next structure of any of the types specified in itemIDs. If none of this type is currently selected the first one is selected.

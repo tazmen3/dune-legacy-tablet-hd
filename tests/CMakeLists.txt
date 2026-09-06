@@ -9,6 +9,7 @@ add_executable(dunelegacy_tests)
 target_sources(dunelegacy_tests
     PRIVATE
         PinchZoomTest.cpp
+        TouchGestureTest.cpp
         PlacementCandidateTest.cpp
         ProductionEconomyTest.cpp
         ProductionControlsTest.cpp

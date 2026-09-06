@@ -1682,7 +1682,8 @@ void Game::doInput()
     SDL_Event event;
     while(TouchInput::pollEvent(&event,
             (!pInGameMenu && !pInGameMentat && !pWaitingForOtherPlayers) ? screenborder : nullptr,
-            currentCursorMode == CursorMode_Placing)) {
+            currentCursorMode == CursorMode_Placing,
+            currentCursorMode == CursorMode_Normal && canIssueTouchMapAction())) {
         // check for a key press
 
         // first of all update mouse
@@ -1861,9 +1862,7 @@ void Game::doInput()
                             if(currentCursorMode != CursorMode_Normal) {
                                 //cancel special cursor mode
                                 setCursorMode(CursorMode_Normal);
-                            } else if((!selectedList.empty()
-                                            && (((objectManager.getObject(*selectedList.begin()))->getOwner() == pLocalHouse))
-                                            && (((objectManager.getObject(*selectedList.begin()))->isRespondable())) ) )
+                            } else if(canIssueSelectedObjectsAction())
                             {
                                 //if user has a controlable unit selected
 
@@ -4068,6 +4067,25 @@ bool Game::handleSelectedObjectsActionClick(int xPos, int yPos) {
     } else {
         return false;
     }
+}
+
+
+bool Game::canIssueSelectedObjectsAction() {
+    if(selectedList.empty()) return false;
+    ObjectBase* pObject = objectManager.getObject(*selectedList.begin());
+    return pObject != nullptr && pObject->getOwner() == pLocalHouse && pObject->isRespondable();
+}
+
+
+bool Game::canIssueTouchMapAction() {
+    for(Uint32 objectID : selectedList) {
+        ObjectBase* pObject = objectManager.getObject(objectID);
+        if(pObject != nullptr && pObject->isAUnit()
+           && pObject->getOwner() == pLocalHouse && pObject->isRespondable()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 

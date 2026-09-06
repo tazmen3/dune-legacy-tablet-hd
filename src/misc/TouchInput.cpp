@@ -9,6 +9,7 @@
 
 #include <misc/TouchInput.h>
 #include <misc/PinchZoom.h>
+#include <misc/TouchGesture.h>
 
 #ifdef __ANDROID__
 
@@ -24,7 +25,6 @@
 
 namespace {
 
-constexpr float MOVEMENT_THRESHOLD = 12.0f;
 constexpr Uint32 LONG_PRESS_MS = 600;
 constexpr Uint32 REPEAT_MS = 1000;
 
@@ -61,10 +61,11 @@ struct TouchState {
     Uint32 repeatItem = 0;
     Uint32 lastRepeat = 0;
     bool primaryActive = false;
-    bool dragging = false;
-    bool cancelled = false;
+    TouchInput::TouchGestureClassifier gesture;
     bool placementPreviewEnabled = false;
     bool placementGesture = false;
+    bool contextMapTapEnabled = false;
+    bool contextMapTapEligible = false;
     bool lastPointerWasTouch = false;
     bool productionCatalogTargetValid = false;
     TouchInput::ProductionCatalogTarget productionCatalogTarget{};
@@ -123,7 +124,10 @@ void queueEvent(const SDL_Event& event) {
 }
 
 void queueCompletedGesture() {
-    if(state.dragging) {
+    const auto outcome = state.gesture.outcome();
+    if(outcome == TouchInput::TouchGestureOutcome::None) return;
+
+    if(outcome == TouchInput::TouchGestureOutcome::Drag) {
         queueEvent(makeMouseMotion(state.start, { 0, 0 }, state.windowID, 0));
         queueEvent(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.start, state.windowID));
         queueEvent(makeMouseMotion(
@@ -133,17 +137,23 @@ void queueCompletedGesture() {
             SDL_BUTTON_LMASK));
         queueEvent(makeMouseButton(SDL_MOUSEBUTTONUP, state.last, state.windowID));
     } else {
+        const bool endedInsideMap = state.camera
+            && state.camera->isScreenCoordInsideMap(state.last.x, state.last.y);
+        const Uint8 button = TouchInput::shouldUseContextMapTap(
+            outcome, state.contextMapTapEnabled, state.contextMapTapEligible, endedInsideMap)
+            ? SDL_BUTTON_RIGHT
+            : SDL_BUTTON_LEFT;
         queueEvent(makeMouseMotion(state.last, { 0, 0 }, state.windowID, 0));
-        queueEvent(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.last, state.windowID));
-        queueEvent(makeMouseButton(SDL_MOUSEBUTTONUP, state.last, state.windowID));
+        queueEvent(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.last, state.windowID, button));
+        queueEvent(makeMouseButton(SDL_MOUSEBUTTONUP, state.last, state.windowID, button));
     }
 }
 
 void resetGesture() {
     state.primaryActive = false;
-    state.dragging = false;
-    state.cancelled = false;
+    state.gesture.reset();
     state.placementGesture = false;
+    state.contextMapTapEligible = false;
     state.windowID = 0;
     state.longPressFired = false;
     state.repeatProduction = false;
@@ -157,18 +167,18 @@ void resetGesture() {
 }
 
 void queueLongPressIfReady(Uint32 now) {
-    if(!state.camera || !state.primaryActive || state.dragging || state.fingers.size() != 1
+    if(!state.camera || !state.primaryActive || state.gesture.isDragging() || state.fingers.size() != 1
        || state.productionCatalogTouch.isTracking() || state.placementGesture) return;
     if(state.longPressFired) {
         if(!state.repeatProduction || now - state.lastRepeat < REPEAT_MS) return;
-    } else if(state.cancelled || now - state.pressedAt < LONG_PRESS_MS) return;
+    } else if(state.gesture.isCancelled() || now - state.pressedAt < LONG_PRESS_MS) return;
     state.longPressFired = true;
     state.repeatProduction = false; // The production widget must renew permission.
     state.lastRepeat = now; // Never catch up with a burst after a slow frame.
     queueEvent(makeMouseMotion(state.start, {0, 0}, state.windowID, 0));
     queueEvent(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.start, state.windowID, SDL_BUTTON_RIGHT));
     queueEvent(makeMouseButton(SDL_MOUSEBUTTONUP, state.start, state.windowID, SDL_BUTTON_RIGHT));
-    state.cancelled = true; // No left click on release.
+    state.gesture.cancel(); // No second click on release.
     state.panBlocked = true;
 }
 
@@ -211,9 +221,9 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
         state.windowID = finger.windowID;
         state.pressedAt = finger.timestamp;
         state.primaryActive = true;
-        state.dragging = false;
-        state.cancelled = false;
+        state.gesture.begin(point.x, point.y);
         state.panEligible = state.camera && state.camera->isScreenCoordInsideMap(point.x, point.y);
+        state.contextMapTapEligible = state.contextMapTapEnabled && state.panEligible;
         if(state.productionCatalogTargetValid
            && state.productionCatalogTouch.begin(state.productionCatalogTarget, point.x, point.y, finger.timestamp)) {
             state.panEligible = false;
@@ -225,8 +235,9 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
     } else {
         // No mouse event has been emitted yet, so cancellation has no side effect.
         state.repeatProduction = false;
-        state.cancelled = true;
+        state.gesture.cancel();
         state.placementGesture = false;
+        state.contextMapTapEligible = false;
         state.productionCatalogTouch.cancel();
         if(state.fingers.size() == 2 && !state.panBlocked && state.panEligible
            && key.first == state.primaryFinger.first
@@ -253,11 +264,7 @@ void handleFingerMotion(const SDL_TouchFingerEvent& finger) {
     if(state.placementGesture && key == state.primaryFinger && state.fingers.size() == 1) {
         const auto previous = state.last;
         state.last = found->second;
-        const float deltaX = static_cast<float>(state.last.x - state.start.x);
-        const float deltaY = static_cast<float>(state.last.y - state.start.y);
-        if((deltaX * deltaX + deltaY * deltaY) >= MOVEMENT_THRESHOLD * MOVEMENT_THRESHOLD) {
-            state.dragging = true;
-        }
+        state.gesture.move(state.last.x, state.last.y);
         queueEvent(makeMouseMotion(state.last,
                                    { state.last.x - previous.x, state.last.y - previous.y },
                                    state.windowID,
@@ -267,9 +274,9 @@ void handleFingerMotion(const SDL_TouchFingerEvent& finger) {
     if(state.longPressFired) {
         const float dx = static_cast<float>(found->second.x - state.start.x);
         const float dy = static_cast<float>(found->second.y - state.start.y);
-        if(dx*dx + dy*dy >= MOVEMENT_THRESHOLD*MOVEMENT_THRESHOLD) {
+        if(dx*dx + dy*dy >= TouchInput::TOUCH_MOVEMENT_THRESHOLD*TouchInput::TOUCH_MOVEMENT_THRESHOLD) {
             state.repeatProduction = false;
-            state.dragging = true;
+            state.gesture.move(found->second.x, found->second.y);
         }
         return;
     }
@@ -277,7 +284,7 @@ void handleFingerMotion(const SDL_TouchFingerEvent& finger) {
         const auto center = panCenter();
         const float dx = (center.x - state.panStart.x) / 2.0f;
         const float dy = (center.y - state.panStart.y) / 2.0f;
-        if(!state.panning && dx*dx + dy*dy >= MOVEMENT_THRESHOLD*MOVEMENT_THRESHOLD) {
+        if(!state.panning && dx*dx + dy*dy >= TouchInput::TOUCH_MOVEMENT_THRESHOLD*TouchInput::TOUCH_MOVEMENT_THRESHOLD) {
             state.panning = true;
         }
         if(state.panning) {
@@ -300,16 +307,12 @@ void handleFingerMotion(const SDL_TouchFingerEvent& finger) {
         }
         return;
     }
-    if(!state.primaryActive || state.cancelled || key != state.primaryFinger) {
+    if(!state.primaryActive || state.gesture.isCancelled() || key != state.primaryFinger) {
         return;
     }
 
     state.last = toLogicalPoint(finger);
-    const float deltaX = static_cast<float>(state.last.x - state.start.x);
-    const float deltaY = static_cast<float>(state.last.y - state.start.y);
-    if((deltaX * deltaX + deltaY * deltaY) >= MOVEMENT_THRESHOLD * MOVEMENT_THRESHOLD) {
-        state.dragging = true;
-    }
+    state.gesture.move(state.last.x, state.last.y);
 }
 
 void handleFingerUp(const SDL_TouchFingerEvent& finger) {
@@ -324,25 +327,17 @@ void handleFingerUp(const SDL_TouchFingerEvent& finger) {
         if(TouchInput::isProductionCatalogTap(action)) {
             queueCompletedGesture();
         }
-        state.cancelled = true;
-    } else if(state.primaryActive && key == state.primaryFinger && state.placementGesture && !state.cancelled) {
+        state.gesture.cancel();
+    } else if(state.primaryActive && key == state.primaryFinger && state.placementGesture && !state.gesture.isCancelled()) {
         state.last = toLogicalPoint(finger);
-        const float deltaX = static_cast<float>(state.last.x - state.start.x);
-        const float deltaY = static_cast<float>(state.last.y - state.start.y);
-        if((deltaX * deltaX + deltaY * deltaY) >= MOVEMENT_THRESHOLD * MOVEMENT_THRESHOLD) {
-            state.dragging = true;
-        }
+        state.gesture.move(state.last.x, state.last.y);
         // Keep the existing release sequence; Game validates only its final UP.
         queueCompletedGesture();
-    } else if(state.primaryActive && key == state.primaryFinger && !state.cancelled) {
+    } else if(state.primaryActive && key == state.primaryFinger && !state.gesture.isCancelled()) {
         state.last = toLogicalPoint(finger);
-        const float deltaX = static_cast<float>(state.last.x - state.start.x);
-        const float deltaY = static_cast<float>(state.last.y - state.start.y);
-        if((deltaX * deltaX + deltaY * deltaY) >= MOVEMENT_THRESHOLD * MOVEMENT_THRESHOLD) {
-            state.dragging = true;
-        }
+        state.gesture.move(state.last.x, state.last.y);
         queueLongPressIfReady(finger.timestamp);
-        if(!state.cancelled) queueCompletedGesture();
+        if(!state.gesture.isCancelled()) queueCompletedGesture();
     }
 
     state.fingers.erase(key);
@@ -382,7 +377,7 @@ bool isPhysicalMouseEvent(const SDL_Event& event) {
 
 namespace TouchInput {
 
-bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview) {
+bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview, bool contextMapTap) {
     state.touchDispatch = false;
     state.longPressDispatch = false;
     if(event == nullptr) {
@@ -392,7 +387,7 @@ bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview) {
     if(state.camera != camera) {
         state.camera = camera;
         // A gesture cannot cross a menu/game boundary.
-        state.cancelled = true;
+        state.gesture.cancel();
         state.panBlocked = true;
         state.panning = false;
         state.repeatProduction = false;
@@ -400,11 +395,13 @@ bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview) {
         if(state.fingers.empty()) resetGesture();
     }
 
+    state.contextMapTapEnabled = contextMapTap;
+
     if(state.placementPreviewEnabled != placementPreview) {
         state.placementPreviewEnabled = placementPreview;
         if(state.primaryActive) {
             state.placementGesture = false;
-            state.cancelled = true;
+            state.gesture.cancel();
         }
     }
 
@@ -460,7 +457,7 @@ bool allowProductionRepeat(Uint32 builder, Uint32 item) {
     state.repeatBuilder = builder;
     state.repeatItem = item;
     state.repeatProduction = state.longPressFired && state.primaryActive
-        && state.fingers.size() == 1 && !state.dragging;
+        && state.fingers.size() == 1 && !state.gesture.isDragging();
     return true;
 }
 
@@ -468,7 +465,7 @@ void setProductionCatalogTarget(const ProductionCatalogTarget& target) {
     if(state.productionCatalogTouch.isTracking()
        && !state.productionCatalogTouch.target().sameRegion(target)) {
         state.productionCatalogTouch.cancel();
-        state.cancelled = true;
+        state.gesture.cancel();
         state.panBlocked = true;
     }
     state.productionCatalogTarget = target;
@@ -483,7 +480,7 @@ void clearProductionCatalogTarget(Uint32 builderObjectID) {
     if(state.productionCatalogTouch.isTracking()
        && state.productionCatalogTouch.target().builderObjectID == builderObjectID) {
         state.productionCatalogTouch.cancel();
-        state.cancelled = true;
+        state.gesture.cancel();
         state.panBlocked = true;
     }
 }
