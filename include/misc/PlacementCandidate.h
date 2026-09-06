@@ -16,11 +16,6 @@
 
 namespace TouchInput {
 
-enum class PlacementTapAction {
-    Preview,
-    Confirm
-};
-
 /**
     Keeps a touch placement preview anchored to map coordinates.
 
@@ -29,16 +24,11 @@ enum class PlacementTapAction {
 */
 class PlacementCandidate {
 public:
-    PlacementTapAction select(const Coord& mapPosition, std::uint32_t builderObjectID, std::uint32_t itemID) {
-        if(matches(builderObjectID, itemID) && position_ == mapPosition) {
-            return PlacementTapAction::Confirm;
-        }
-
+    void update(const Coord& mapPosition, std::uint32_t builderObjectID, std::uint32_t itemID) {
         position_ = mapPosition;
         builderObjectID_ = builderObjectID;
         itemID_ = itemID;
         valid_ = true;
-        return PlacementTapAction::Preview;
     }
 
     void clear() {

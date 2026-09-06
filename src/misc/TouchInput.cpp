@@ -62,6 +62,8 @@ struct TouchState {
     bool primaryActive = false;
     bool dragging = false;
     bool cancelled = false;
+    bool placementPreviewEnabled = false;
+    bool placementGesture = false;
     bool lastPointerWasTouch = false;
 };
 
@@ -133,6 +135,7 @@ void resetGesture() {
     state.primaryActive = false;
     state.dragging = false;
     state.cancelled = false;
+    state.placementGesture = false;
     state.windowID = 0;
     state.longPressFired = false;
     state.repeatProduction = false;
@@ -145,7 +148,8 @@ void resetGesture() {
 }
 
 void queueLongPressIfReady(Uint32 now) {
-    if(!state.camera || !state.primaryActive || state.dragging || state.fingers.size() != 1) return;
+    if(!state.camera || !state.primaryActive || state.dragging || state.fingers.size() != 1
+       || state.placementGesture) return;
     if(state.longPressFired) {
         if(!state.repeatProduction || now - state.lastRepeat < REPEAT_MS) return;
     } else if(state.cancelled || now - state.pressedAt < LONG_PRESS_MS) return;
@@ -199,10 +203,15 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
         state.dragging = false;
         state.cancelled = false;
         state.panEligible = state.camera && state.camera->isScreenCoordInsideMap(point.x, point.y);
+        if(state.placementPreviewEnabled && state.panEligible) {
+            state.placementGesture = true;
+            state.pendingEvents.push_back(makeMouseMotion(state.last, { 0, 0 }, state.windowID, 0));
+        }
     } else {
         // No mouse event has been emitted yet, so cancellation has no side effect.
         state.repeatProduction = false;
         state.cancelled = true;
+        state.placementGesture = false;
         if(state.fingers.size() == 2 && !state.panBlocked && state.panEligible
            && key.first == state.primaryFinger.first
            && state.camera && state.camera->isScreenCoordInsideMap(point.x, point.y)) {
@@ -221,6 +230,21 @@ void handleFingerMotion(const SDL_TouchFingerEvent& finger) {
     const auto found = state.fingers.find(key);
     if(found == state.fingers.end()) return;
     found->second = toLogicalPoint(finger);
+    if(state.placementGesture && key == state.primaryFinger && state.fingers.size() == 1) {
+        const auto previous = state.last;
+        state.last = found->second;
+        const float deltaX = static_cast<float>(state.last.x - state.start.x);
+        const float deltaY = static_cast<float>(state.last.y - state.start.y);
+        if((deltaX * deltaX + deltaY * deltaY) >= MOVEMENT_THRESHOLD * MOVEMENT_THRESHOLD) {
+            state.dragging = true;
+        }
+        state.pendingEvents.push_back(makeMouseMotion(
+            state.last,
+            { state.last.x - previous.x, state.last.y - previous.y },
+            state.windowID,
+            SDL_BUTTON_LMASK));
+        return;
+    }
     if(state.longPressFired) {
         const float dx = static_cast<float>(found->second.x - state.start.x);
         const float dy = static_cast<float>(found->second.y - state.start.y);
@@ -275,7 +299,16 @@ void handleFingerUp(const SDL_TouchFingerEvent& finger) {
     const FingerKey key{ finger.touchId, finger.fingerId };
     if(state.fingers.find(key) == state.fingers.end()) return;
 
-    if(state.primaryActive && key == state.primaryFinger && !state.cancelled) {
+    if(state.primaryActive && key == state.primaryFinger && state.placementGesture && !state.cancelled) {
+        state.last = toLogicalPoint(finger);
+        const float deltaX = static_cast<float>(state.last.x - state.start.x);
+        const float deltaY = static_cast<float>(state.last.y - state.start.y);
+        if((deltaX * deltaX + deltaY * deltaY) >= MOVEMENT_THRESHOLD * MOVEMENT_THRESHOLD) {
+            state.dragging = true;
+        }
+        // Keep the existing release sequence; Game validates only its final UP.
+        queueCompletedGesture();
+    } else if(state.primaryActive && key == state.primaryFinger && !state.cancelled) {
         state.last = toLogicalPoint(finger);
         const float deltaX = static_cast<float>(state.last.x - state.start.x);
         const float deltaY = static_cast<float>(state.last.y - state.start.y);
@@ -323,7 +356,7 @@ bool isPhysicalMouseEvent(const SDL_Event& event) {
 
 namespace TouchInput {
 
-bool pollEvent(SDL_Event* event, ScreenBorder* camera) {
+bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview) {
     state.longPressDispatch = false;
     if(event == nullptr) {
         return false;
@@ -338,6 +371,14 @@ bool pollEvent(SDL_Event* event, ScreenBorder* camera) {
         state.repeatProduction = false;
         state.pendingEvents.clear();
         if(state.fingers.empty()) resetGesture();
+    }
+
+    if(state.placementPreviewEnabled != placementPreview) {
+        state.placementPreviewEnabled = placementPreview;
+        if(state.primaryActive) {
+            state.placementGesture = false;
+            state.cancelled = true;
+        }
     }
 
     if(deliverPending(event)) return true;

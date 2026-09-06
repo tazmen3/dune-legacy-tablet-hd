@@ -89,11 +89,11 @@ namespace {
 struct PlacementEvaluation {
     Coord size;
     bool canPlace = false;
-    std::vector<bool> affectedTiles;
+    std::vector<bool> validTiles;
 
-    bool affects(int offsetX, int offsetY) const {
+    bool isTileValid(int offsetX, int offsetY) const {
         const auto index = static_cast<std::size_t>(offsetY * size.x + offsetX);
-        return index < affectedTiles.size() && affectedTiles[index];
+        return index < validTiles.size() && validTiles[index];
     }
 };
 
@@ -101,7 +101,7 @@ PlacementEvaluation evaluatePlacement(const Map& map, const BuilderBase& builder
                                       const Coord& origin) {
     PlacementEvaluation result;
     result.size = getStructureSize(itemID);
-    result.affectedTiles.assign(static_cast<std::size_t>(result.size.x * result.size.y), false);
+    result.validTiles.assign(static_cast<std::size_t>(result.size.x * result.size.y), false);
 
     if(itemID == Structure_Slab1) {
         result.canPlace = map.okayToPlaceStructure(origin.x, origin.y, 1, 1, false, builder.getOwner());
@@ -109,38 +109,60 @@ PlacementEvaluation evaluatePlacement(const Map& map, const BuilderBase& builder
             const Tile* tile = map.getTile(origin);
             result.canPlace = tile && !tile->isConcrete();
         }
-        result.affectedTiles[0] = result.canPlace;
+        result.validTiles[0] = result.canPlace;
         return result;
     }
 
     if(itemID == Structure_Slab4) {
         bool withinBuildRange = false;
         bool affectsAtLeastOneTile = false;
+        bool allTilesValid = true;
 
         for(int offsetY = 0; offsetY < result.size.y; ++offsetY) {
             for(int offsetX = 0; offsetX < result.size.x; ++offsetX) {
                 const int x = origin.x + offsetX;
                 const int y = origin.y + offsetY;
-                if(!map.tileExists(x, y)) continue;
+                const auto index = static_cast<std::size_t>(offsetY * result.size.x + offsetX);
+                if(!map.tileExists(x, y)) {
+                    allTilesValid = false;
+                    continue;
+                }
                 const Tile* tile = map.getTile(x, y);
 
                 withinBuildRange = withinBuildRange || map.isWithinBuildRange(x, y, builder.getOwner());
-                const bool affected = tile->isRock() && !tile->isMountain()
-                    && !tile->hasAGroundObject() && !tile->isConcrete();
-                result.affectedTiles[static_cast<std::size_t>(offsetY * result.size.x + offsetX)] = affected;
-                affectsAtLeastOneTile = affectsAtLeastOneTile || affected;
+                const bool tileValid = tile->isRock() && !tile->isMountain() && !tile->hasAGroundObject();
+                result.validTiles[index] = tileValid;
+                allTilesValid = allTilesValid && tileValid;
+                affectsAtLeastOneTile = affectsAtLeastOneTile || (tileValid && !tile->isConcrete());
             }
         }
 
-        // Slab4 historically lays every usable tile in its 2x2 footprint and may
-        // overlap existing concrete. It is useful only if at least one tile changes.
-        result.canPlace = withinBuildRange && affectsAtLeastOneTile;
+        // Existing concrete can be part of the footprint, but every tile must be
+        // safe and in-map. At least one tile must still be changed by the slab.
+        result.canPlace = withinBuildRange && allTilesValid && affectsAtLeastOneTile;
+        if(!withinBuildRange || !affectsAtLeastOneTile) {
+            std::fill(result.validTiles.begin(), result.validTiles.end(), false);
+        }
         return result;
     }
 
     result.canPlace = map.okayToPlaceStructure(origin.x, origin.y, result.size.x, result.size.y,
                                                 false, builder.getOwner());
-    std::fill(result.affectedTiles.begin(), result.affectedTiles.end(), result.canPlace);
+    bool withinBuildRange = false;
+    for(int offsetY = 0; offsetY < result.size.y; ++offsetY) {
+        for(int offsetX = 0; offsetX < result.size.x; ++offsetX) {
+            const int x = origin.x + offsetX;
+            const int y = origin.y + offsetY;
+            const auto index = static_cast<std::size_t>(offsetY * result.size.x + offsetX);
+            if(!map.tileExists(x, y)) continue;
+            const Tile* tile = map.getTile(x, y);
+            result.validTiles[index] = tile->isRock() && !tile->isBlocked();
+            withinBuildRange = withinBuildRange || map.isWithinBuildRange(x, y, builder.getOwner());
+        }
+    }
+    if(!withinBuildRange) {
+        std::fill(result.validTiles.begin(), result.validTiles.end(), false);
+    }
     return result;
 }
 
@@ -1545,8 +1567,7 @@ void Game::drawScreen()
 
                 for(int offsetX = 0; offsetX < evaluation.size.x; ++offsetX) {
                     for(int offsetY = 0; offsetY < evaluation.size.y; ++offsetY) {
-                        const bool tileWillBeUsed = evaluation.canPlace && evaluation.affects(offsetX, offsetY);
-                        SDL_Texture* image = tileWillBeUsed ? validPlace : invalidPlace;
+                        SDL_Texture* image = evaluation.isTileValid(offsetX, offsetY) ? validPlace : invalidPlace;
                         const int mapX = origin.x + offsetX;
                         const int mapY = origin.y + offsetY;
                         SDL_Rect drawLocation = calcDrawingRect(image,
@@ -1660,7 +1681,8 @@ void Game::doInput()
 {
     SDL_Event event;
     while(TouchInput::pollEvent(&event,
-            (!pInGameMenu && !pInGameMentat && !pWaitingForOtherPlayers) ? screenborder : nullptr)) {
+            (!pInGameMenu && !pInGameMentat && !pWaitingForOtherPlayers) ? screenborder : nullptr,
+            currentCursorMode == CursorMode_Placing)) {
         // check for a key press
 
         // first of all update mouse
@@ -1668,9 +1690,19 @@ void Game::doInput()
             SDL_MouseMotionEvent* mouse = &event.motion;
             drawnMouseX = std::max(0, std::min(mouse->x, settings.video.width-1));
             drawnMouseY = std::max(0, std::min(mouse->y, settings.video.height-1));
-            if(currentCursorMode == CursorMode_Placing && mouse->which != SDL_TOUCH_MOUSEID) {
-                // A physical mouse keeps the historical hover-driven placement.
-                touchPlacementCandidate.clear();
+            if(currentCursorMode == CursorMode_Placing) {
+                if(mouse->which != SDL_TOUCH_MOUSEID) {
+                    // A physical mouse keeps the historical hover-driven placement.
+                    touchPlacementCandidate.clear();
+                } else if(screenborder->isScreenCoordInsideMap(mouse->x, mouse->y)
+                          && selectedList.size() == 1) {
+                    auto* builder = dynamic_cast<BuilderBase*>(objectManager.getObject(*selectedList.begin()));
+                    if(builder) {
+                        touchPlacementCandidate.update(
+                            Coord(screenborder->screen2MapX(mouse->x), screenborder->screen2MapY(mouse->y)),
+                            builder->getObjectID(), builder->getCurrentProducedItem());
+                    }
+                }
             }
 
             static Uint32 lastCursorLog = 0;
@@ -1872,11 +1904,9 @@ void Game::doInput()
                        && selectedList.size() == 1) {
                         auto* builder = dynamic_cast<BuilderBase*>(objectManager.getObject(*selectedList.begin()));
                         if(builder) {
-                            const Coord mapPosition(screenborder->screen2MapX(mouse->x),
-                                                    screenborder->screen2MapY(mouse->y));
-                            const auto action = touchPlacementCandidate.select(mapPosition,
-                                builder->getObjectID(), builder->getCurrentProducedItem());
-                            if(action == TouchInput::PlacementTapAction::Confirm) {
+                            if(touchPlacementCandidate.matches(builder->getObjectID(),
+                                                               builder->getCurrentProducedItem())) {
+                                const Coord mapPosition = touchPlacementCandidate.position();
                                 handlePlacementClick(mapPosition.x, mapPosition.y);
                             }
                         }

@@ -29,11 +29,12 @@ inline bool allowProductionRepeat(Uint32, Uint32) { return true; }
  * Polls the next application input event. On Android, raw single-touch
  * gestures are normalized into the existing left-mouse input path.
  * Passing the active map camera enables two-finger pan and pinch. Menus omit it.
+ * placementPreview emits live touch motion only for a one-finger placement gesture.
  */
 #ifdef __ANDROID__
-bool pollEvent(SDL_Event* event, ScreenBorder* camera = nullptr);
+bool pollEvent(SDL_Event* event, ScreenBorder* camera = nullptr, bool placementPreview = false);
 #else
-inline bool pollEvent(SDL_Event* event, ScreenBorder* = nullptr) {
+inline bool pollEvent(SDL_Event* event, ScreenBorder* = nullptr, bool = false) {
     return event != nullptr && SDL_PollEvent(event) != 0;
 }
 #endif
