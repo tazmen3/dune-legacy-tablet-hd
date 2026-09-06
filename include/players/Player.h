@@ -156,7 +156,7 @@ protected:
         \param  pBuilder        the structure to build in
         \param  itemID          the item to produce
     */
-    void doProduceItem(const BuilderBase* pBuilder, Uint32 itemID) const;
+    int doProduceItem(const BuilderBase* pBuilder, Uint32 itemID) const;
 
     /**
         Cancel production of the specified item in pBuilder.

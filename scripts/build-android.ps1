@@ -22,6 +22,9 @@ $env:ANDROID_SDK_ROOT = $AndroidSdk
 $env:ANDROID_NDK_HOME = Join-Path $AndroidSdk "ndk\28.2.13676358"
 $env:VCPKG_ROOT = $VcpkgRoot
 $env:VCPKG_INSTALLED_DIR = $VcpkgInstalledDir
+if ([string]::IsNullOrWhiteSpace($env:ANDROID_USER_HOME)) {
+    $env:ANDROID_USER_HOME = Join-Path $repoRoot "android\.gradle-user-home\android-user-home"
+}
 if ([string]::IsNullOrWhiteSpace($env:GRADLE_USER_HOME)) {
     $env:GRADLE_USER_HOME = Join-Path $repoRoot "android\.gradle-user-home"
 }

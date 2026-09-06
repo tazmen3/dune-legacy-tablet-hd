@@ -511,21 +511,26 @@ void SmartBot::build() {
                                && getHouse()->getNumItems(Unit_MCV)
                                + buildQueue[Unit_MCV] < 1) {
 
-                                doProduceItem(pBuilder, Unit_MCV);
-                                money = money - choam.getPrice(Unit_MCV);
+                                if(doProduceItem(pBuilder, Unit_MCV) > 0) {
+                                    money = money - choam.getPrice(Unit_MCV);
+                                }
                             }
 
                             while (money > choam.getPrice(Unit_Harvester)
                                    && choam.getNumAvailable(Unit_Harvester) > 0
                                    && getHouse()->getNumItems(Unit_Harvester) + buildQueue[Unit_Harvester] < harvesterLimit) {
-                                doProduceItem(pBuilder, Unit_Harvester);
+                                if(doProduceItem(pBuilder, Unit_Harvester) == 0) {
+                                    break;
+                                }
                                 buildQueue[Unit_Harvester]++;
                                 money = money - choam.getPrice(Unit_Harvester);
                             }
 
                             while (money > choam.getPrice(Unit_Carryall) && choam.getNumAvailable(Unit_Carryall) > 0
                                    && (getHouse()->getNumItems(Unit_Carryall) + buildQueue[Unit_Carryall] < 2)) {
-                                doProduceItem(pBuilder, Unit_Carryall);
+                                if(doProduceItem(pBuilder, Unit_Carryall) == 0) {
+                                    break;
+                                }
                                 buildQueue[Unit_Carryall]++;
                                 money = money - choam.getPrice(Unit_Carryall);
                             }
@@ -540,27 +545,37 @@ void SmartBot::build() {
                                 */
 
                                 while (money > choam.getPrice(Unit_SiegeTank) && choam.getNumAvailable(Unit_SiegeTank) > 0 && choam.isCheap(Unit_SiegeTank)) {
-                                    doProduceItem(pBuilder, Unit_SiegeTank);
+                                    if(doProduceItem(pBuilder, Unit_SiegeTank) == 0) {
+                                        break;
+                                    }
                                     money = money - choam.getPrice(Unit_SiegeTank);
                                 }
 
                                 while (money > choam.getPrice(Unit_Launcher) && choam.getNumAvailable(Unit_Launcher) > 0 && choam.isCheap(Unit_Launcher)) {
-                                    doProduceItem(pBuilder, Unit_Launcher);
+                                    if(doProduceItem(pBuilder, Unit_Launcher) == 0) {
+                                        break;
+                                    }
                                     money = money - choam.getPrice(Unit_Launcher);
                                 }
 
                                 while (money > choam.getPrice(Unit_Tank) && choam.getNumAvailable(Unit_Tank) > 0 && choam.isCheap(Unit_Tank)) {
-                                    doProduceItem(pBuilder, Unit_Tank);
+                                    if(doProduceItem(pBuilder, Unit_Tank) == 0) {
+                                        break;
+                                    }
                                     money = money - choam.getPrice(Unit_Tank);
                                 }
 
                                 while (money > choam.getPrice(Unit_Quad) && choam.getNumAvailable(Unit_Quad) > 0 && choam.isCheap(Unit_Quad)) {
-                                    doProduceItem(pBuilder, Unit_Quad);
+                                    if(doProduceItem(pBuilder, Unit_Quad) == 0) {
+                                        break;
+                                    }
                                     money = money - choam.getPrice(Unit_Quad);
                                 }
 
                                 while (money > choam.getPrice(Unit_Trike) && choam.getNumAvailable(Unit_Trike) > 0 && choam.isCheap(Unit_Trike)) {
-                                    doProduceItem(pBuilder, Unit_Trike);
+                                    if(doProduceItem(pBuilder, Unit_Trike) == 0) {
+                                        break;
+                                    }
                                     money = money - choam.getPrice(Unit_Trike);
                                 }
                             }
@@ -713,25 +728,29 @@ void SmartBot::build() {
                                                     && pBuilder->isAvailableToBuild(Structure_Slab4)
                                                     && (abs(i - location.x) < 2) && (abs(j - location.y) < 2)) {
                                                     if( (i == location.x) && (j == location.y) && pTile->getType() != Terrain_Slab) {
-                                                        placeLocations.emplace_back(i,j);
-                                                        doProduceItem(pBuilder, Structure_Slab4);
+                                                        if(doProduceItem(pBuilder, Structure_Slab4) > 0) {
+                                                            placeLocations.emplace_back(i,j);
+                                                        }
                                                     }
                                                 } else if(pTile->getType() != Terrain_Slab) {
-                                                    placeLocations.emplace_back(i,j);
-                                                    doProduceItem(pBuilder, Structure_Slab1);
+                                                    if(doProduceItem(pBuilder, Structure_Slab1) > 0) {
+                                                        placeLocations.emplace_back(i,j);
+                                                    }
                                                 }
                                             }
                                         }
                                     }
 
-                                    placeLocations.push_back(placeLocation);
-                                    doProduceItem(pBuilder, itemID);
+                                    if(doProduceItem(pBuilder, itemID) > 0) {
+                                        placeLocations.push_back(placeLocation);
+                                    }
                                 } else {
                                     // we havn't found a placing location => build some random slabs
                                     location = findPlaceLocation(Structure_Slab1);
                                     if(location.isValid() && getMap().isWithinBuildRange(location.x, location.y, getHouse())) {
-                                        placeLocations.push_back(location);
-                                        doProduceItem(pBuilder, Structure_Slab1);
+                                        if(doProduceItem(pBuilder, Structure_Slab1) > 0) {
+                                            placeLocations.push_back(location);
+                                        }
                                     }
                                 }
                             }

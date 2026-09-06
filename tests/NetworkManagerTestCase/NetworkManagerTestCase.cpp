@@ -10,6 +10,10 @@
 #include <Network/ENetHelper.h>
 #include <Network/ENetPacketOStream.h>
 #include <Network/ENetPacketIStream.h>
+#include <Network/NetworkManager.h>
+
+#include <Command.h>
+#include <structures/BuilderBase.h>
 
 #include <enet/enet.h>
 
@@ -18,7 +22,7 @@
 #define TEST_NETWORKPACKET_SENDGAMEINFO         1
 #define TEST_NETWORKPACKET_CLIENTSTATS          13
 #define TEST_NETWORKPACKET_KEEPALIVE            19
-#define TEST_NETWORK_PROTOCOL_VERSION           3
+#define TEST_NETWORK_PROTOCOL_VERSION           4
 
 // ENet initialization fixture
 struct ENetFixture {
@@ -152,4 +156,45 @@ TEST_CASE_METHOD(ENetFixture, "NetworkManager: Packet stream various int sizes",
     REQUIRE(istream.readUint16() == 0xABCD);
     REQUIRE(istream.readUint32() == 0x12345678);
     REQUIRE(istream.readUint64() == 0xDEADBEEFCAFEBABE);
+}
+
+TEST_CASE("Production commands: new IDs are appended without renumbering history", "[production][network]") {
+    REQUIRE(CMD_BUILDER_PRODUCEITEM == 16);
+    REQUIRE(CMD_TEST_SYNC == 26);
+    REQUIRE(CMD_BUILDER_CANCELQUEUEENTRY == 27);
+    REQUIRE(CMD_BUILDER_CANCELALL == 28);
+    REQUIRE(NETWORK_PROTOCOL_VERSION == TEST_NETWORK_PROTOCOL_VERSION);
+}
+
+TEST_CASE_METHOD(ENetFixture, "Production queue entry: economic fields survive serialization", "[production][save]") {
+    const ProductionQueueItem original(42, Unit_Tank, 700, FixPoint(615), true);
+
+    ENetPacketOStream ostream(ENET_PACKET_FLAG_RELIABLE);
+    original.save(ostream);
+
+    ProductionQueueItem restored;
+    ENetPacketIStream istream(ostream.getPacket());
+    restored.load(istream);
+
+    REQUIRE(restored.queueEntryId == 42);
+    REQUIRE(restored.itemID == Unit_Tank);
+    REQUIRE(restored.price == 700);
+    REQUIRE(restored.paidAmount == 615);
+    REQUIRE(restored.legacyPaymentPending);
+}
+
+TEST_CASE_METHOD(ENetFixture, "Production queue entry: legacy format remains readable", "[production][save][migration]") {
+    ENetPacketOStream ostream(ENET_PACKET_FLAG_RELIABLE);
+    ostream.writeUint32(Unit_Tank);
+    ostream.writeUint32(700);
+
+    ProductionQueueItem restored;
+    ENetPacketIStream istream(ostream.getPacket());
+    restored.loadLegacy(istream);
+
+    REQUIRE(restored.queueEntryId == 0);
+    REQUIRE(restored.itemID == Unit_Tank);
+    REQUIRE(restored.price == 700);
+    REQUIRE(restored.paidAmount == 0);
+    REQUIRE_FALSE(restored.legacyPaymentPending);
 }

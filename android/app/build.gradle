@@ -2,9 +2,11 @@ plugins {
     id "com.android.application"
 }
 
-def androidVersionName = "0.99.5-android7"
+def androidVersionName = "0.99.5-android9"
 def bundledAssetRoot = "dunelegacy-data"
 def generatedAssetsDir = layout.buildDirectory.dir("generated/duneLegacyAssets/main")
+def assetVersionFile = "asset-version.txt"
+def assetManifestFile = "asset-manifest.txt"
 def proprietaryDuneDataFiles = [
     "DUNE.PAK", "SCENARIO.PAK", "MENTAT.PAK", "VOC.PAK", "MERC.PAK",
     "FINALE.PAK", "INTRO.PAK", "INTROVOC.PAK", "SOUND.PAK",
@@ -36,8 +38,19 @@ def prepareDuneLegacyAssets = tasks.register("prepareDuneLegacyAssets", Sync) {
         into "${bundledAssetRoot}/config"
     }
     doLast {
-        def marker = new File(generatedAssetsDir.get().asFile, "${bundledAssetRoot}/asset-version.txt")
+        def assetRoot = new File(generatedAssetsDir.get().asFile, bundledAssetRoot)
+        def marker = new File(assetRoot, assetVersionFile)
         marker.text = "${androidVersionName}\n"
+
+        def manifest = new File(assetRoot, assetManifestFile)
+        def managedPaths = fileTree(assetRoot).files.findAll { candidate ->
+            candidate != manifest
+        }.collect { candidate ->
+            assetRoot.toPath().relativize(candidate.toPath()).toString().replace('\\', '/')
+        }
+        managedPaths.add(assetManifestFile)
+        managedPaths.sort()
+        manifest.text = managedPaths.join('\n') + '\n'
     }
 }
 
@@ -64,7 +77,7 @@ android {
         applicationId "org.dunelegacy.tablethd"
         minSdk 28
         targetSdk 35
-        versionCode 7
+        versionCode 9
         versionName androidVersionName
 
         ndk {
@@ -106,6 +119,10 @@ android {
             assets.srcDir generatedAssetsDir
         }
     }
+}
+
+dependencies {
+    testImplementation "junit:junit:4.13.2"
 }
 
 tasks.named("preBuild").configure {

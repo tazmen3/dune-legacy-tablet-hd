@@ -1720,7 +1720,7 @@ void QuantBot::build(int militaryValue) {
 						std::string itemName = getItemNameByID(itemID);
 						logDebug("Queuing %s (ID:%d)", itemName.c_str(), itemID);
 					}
-					doProduceItem(pBuilder, itemID);
+					return doProduceItem(pBuilder, itemID);
 				};
 				
 				switch (pStructure->getItemID()) {
@@ -1751,8 +1751,9 @@ void QuantBot::build(int militaryValue) {
 						}
 
 						if (itemID != NONE_ID) {
-							produceItemWithLogging(itemID);
-							itemCount[itemID]++;
+							if(produceItemWithLogging(itemID) > 0) {
+								itemCount[itemID]++;
+							}
 						}
 					}
 				}
@@ -1776,8 +1777,9 @@ void QuantBot::build(int militaryValue) {
 						&& (pBuilder->getProductionQueueSize() < 1)
 						&& money > 1000
 						&& !getHouse()->isAirUnitLimitReached()) {
-						produceItemWithLogging(Unit_Carryall);
-						itemCount[Unit_Carryall]++;
+						if(produceItemWithLogging(Unit_Carryall) > 0) {
+							itemCount[Unit_Carryall]++;
+						}
 					}
 					else if ((money > 500) && (pBuilder->isUpgrading() == false) && (pBuilder->getCurrentUpgradeLevel() < pBuilder->getMaxUpgradeLevel())) {
 						if (pBuilder->getHealth() >= pBuilder->getMaxHealth()) {
@@ -1794,10 +1796,11 @@ void QuantBot::build(int militaryValue) {
 						&& money > 1200) {
 						// Current value and what percentage of military we want used to determine
 						// whether to build an additional unit.
-						produceItemWithLogging(Unit_Ornithopter);
-						itemCount[Unit_Ornithopter]++;
-						money -= data[Unit_Ornithopter][houseID].price;
-						militaryValue += data[Unit_Ornithopter][houseID].price;
+						if(produceItemWithLogging(Unit_Ornithopter) > 0) {
+							itemCount[Unit_Ornithopter]++;
+							money -= data[Unit_Ornithopter][houseID].price;
+							militaryValue += data[Unit_Ornithopter][houseID].price;
+						}
 					}
 				} break;
 
@@ -1809,8 +1812,9 @@ void QuantBot::build(int militaryValue) {
 							&& itemCount[Unit_MCV] + itemCount[Structure_ConstructionYard] + itemCount[Structure_StarPort] < 1
 							&& pBuilder->isAvailableToBuild(Unit_MCV)
 							&& !getHouse()->isGroundUnitLimitReached()) {
-							produceItemWithLogging(Unit_MCV);
-							itemCount[Unit_MCV]++;
+							if(produceItemWithLogging(Unit_MCV) > 0) {
+								itemCount[Unit_MCV]++;
+							}
 						}
 						else if ((money > 10000) && (pBuilder->isUpgrading() == false) && (pBuilder->getCurrentUpgradeLevel() < pBuilder->getMaxUpgradeLevel())) {
 							if (pBuilder->getHealth() >= pBuilder->getMaxHealth()) {
@@ -1825,8 +1829,9 @@ void QuantBot::build(int militaryValue) {
 							&& itemCount[Structure_ConstructionYard] + itemCount[Unit_MCV] < 4
 							&& !getHouse()->isGroundUnitLimitReached()) {
 							// If we are really rich, like in all against Atriedes
-							produceItemWithLogging(Unit_MCV);
-							itemCount[Unit_MCV]++;
+							if(produceItemWithLogging(Unit_MCV) > 0) {
+								itemCount[Unit_MCV]++;
+							}
 						}
 						else if (gameMode == GameMode::Custom
 							&& pBuilder->isAvailableToBuild(Unit_Harvester)
@@ -1834,8 +1839,9 @@ void QuantBot::build(int militaryValue) {
 							&& itemCount[Unit_Harvester] < militaryValue / 1000
 							&& itemCount[Unit_Harvester] < harvesterLimit) {
 							// In case we get given lots of money, it will eventually run out so we need to be prepared
-							produceItemWithLogging(Unit_Harvester);
-							itemCount[Unit_Harvester]++;
+							if(produceItemWithLogging(Unit_Harvester) > 0) {
+								itemCount[Unit_Harvester]++;
+							}
 						}
 						else if (itemCount[Unit_Harvester] < harvesterLimit
 							&& pBuilder->isAvailableToBuild(Unit_Harvester)
@@ -1843,8 +1849,9 @@ void QuantBot::build(int militaryValue) {
 							&& (money < 2000 || gameMode == GameMode::Campaign)) {
 							//logDebug("*Building a Harvester.",
 							//itemCount[Unit_Harvester], harvesterLimit, money);
-							produceItemWithLogging(Unit_Harvester);
-							itemCount[Unit_Harvester]++;
+							if(produceItemWithLogging(Unit_Harvester) > 0) {
+								itemCount[Unit_Harvester]++;
+							}
 						}
 						else if ((money > 500) && (pBuilder->isUpgrading() == false) && (pBuilder->getCurrentUpgradeLevel() < pBuilder->getMaxUpgradeLevel())) {
 							if (pBuilder->getHealth() >= pBuilder->getMaxHealth()) {
@@ -1869,41 +1876,47 @@ void QuantBot::build(int militaryValue) {
 							/// Use current value and what percentage of military we want to determine
 							/// whether to build an additional unit.
 							if (pBuilder->isAvailableToBuild(Unit_Launcher) && (militaryValue * launcherPercent > launcherValue)) {
-								produceItemWithLogging(Unit_Launcher);
-								itemCount[Unit_Launcher]++;
-								money -= data[Unit_Launcher][houseID].price;
-								militaryValue += data[Unit_Launcher][houseID].price;
+								if(produceItemWithLogging(Unit_Launcher) > 0) {
+									itemCount[Unit_Launcher]++;
+									money -= data[Unit_Launcher][houseID].price;
+									militaryValue += data[Unit_Launcher][houseID].price;
+								}
 							}
 							else if (pBuilder->isAvailableToBuild(Unit_Devastator) && (militaryValue * specialPercent > specialValue)) {
-								produceItemWithLogging(Unit_Devastator);
-								itemCount[Unit_Devastator]++;
-								money -= data[Unit_Devastator][houseID].price;
-								militaryValue += data[Unit_Devastator][houseID].price;
+								if(produceItemWithLogging(Unit_Devastator) > 0) {
+									itemCount[Unit_Devastator]++;
+									money -= data[Unit_Devastator][houseID].price;
+									militaryValue += data[Unit_Devastator][houseID].price;
+								}
 							}
 							else if (pBuilder->isAvailableToBuild(Unit_SonicTank) && (militaryValue * specialPercent > specialValue)) {
-								produceItemWithLogging(Unit_SonicTank);
-								itemCount[Unit_SonicTank]++;
-								money -= data[Unit_SonicTank][houseID].price;
-								militaryValue += data[Unit_SonicTank][houseID].price;
+								if(produceItemWithLogging(Unit_SonicTank) > 0) {
+									itemCount[Unit_SonicTank]++;
+									money -= data[Unit_SonicTank][houseID].price;
+									militaryValue += data[Unit_SonicTank][houseID].price;
+								}
 							}
 							else if (pBuilder->isAvailableToBuild(Unit_Deviator) && (militaryValue * specialPercent > specialValue)) {
-								produceItemWithLogging(Unit_Deviator);
-								itemCount[Unit_Deviator]++;
-								money -= data[Unit_Deviator][houseID].price;
-								militaryValue += data[Unit_Deviator][houseID].price;
+								if(produceItemWithLogging(Unit_Deviator) > 0) {
+									itemCount[Unit_Deviator]++;
+									money -= data[Unit_Deviator][houseID].price;
+									militaryValue += data[Unit_Deviator][houseID].price;
+								}
 							}
 							else if (pBuilder->isAvailableToBuild(Unit_SiegeTank) && (militaryValue * siegePercent > siegeValue)) {
-								produceItemWithLogging(Unit_SiegeTank);
-								itemCount[Unit_SiegeTank]++;
-								money -= data[Unit_Tank][houseID].price;
-								militaryValue += data[Unit_SiegeTank][houseID].price;
+								if(produceItemWithLogging(Unit_SiegeTank) > 0) {
+									itemCount[Unit_SiegeTank]++;
+									money -= data[Unit_Tank][houseID].price;
+									militaryValue += data[Unit_SiegeTank][houseID].price;
+								}
 							}
 							else if (pBuilder->isAvailableToBuild(Unit_Tank)) {
 								// Tanks for all else
-								produceItemWithLogging(Unit_Tank);
-								itemCount[Unit_Tank]++;
-								money -= data[Unit_Tank][houseID].price;
-								militaryValue += data[Unit_Tank][houseID].price;
+								if(produceItemWithLogging(Unit_Tank) > 0) {
+									itemCount[Unit_Tank]++;
+									money -= data[Unit_Tank][houseID].price;
+									militaryValue += data[Unit_Tank][houseID].price;
+								}
 							}
 						}
 					}
@@ -1920,20 +1933,24 @@ void QuantBot::build(int militaryValue) {
 							&& pStarPort->isAvailableToBuild(Unit_MCV)
 							&& choam.getNumAvailable(Unit_MCV) > 0
 							&& itemCount[Structure_ConstructionYard] + itemCount[Unit_MCV] < 1) {
-							produceItemWithLogging(Unit_MCV);
-							itemCount[Unit_MCV]++;
-							money = money - choam.getPrice(Unit_MCV);
+							if(produceItemWithLogging(Unit_MCV) > 0) {
+								itemCount[Unit_MCV]++;
+								money = money - choam.getPrice(Unit_MCV);
+							}
 						}
 
 						if (money > choam.getPrice(Unit_Carryall) && choam.getNumAvailable(Unit_Carryall) > 0 && itemCount[Unit_Carryall] == 0) {
 							// Get at least one Carryall
-							produceItemWithLogging(Unit_Carryall);
-							itemCount[Unit_Carryall]++;
-							money = money - choam.getPrice(Unit_Carryall);
+							if(produceItemWithLogging(Unit_Carryall) > 0) {
+								itemCount[Unit_Carryall]++;
+								money = money - choam.getPrice(Unit_Carryall);
+							}
 						}
 
 						while (money > choam.getPrice(Unit_Harvester) && choam.getNumAvailable(Unit_Harvester) > 0 && itemCount[Unit_Harvester] < harvesterLimit) {
-							produceItemWithLogging(Unit_Harvester);
+							if(produceItemWithLogging(Unit_Harvester) == 0) {
+								break;
+							}
 							itemCount[Unit_Harvester]++;
 							money = money - choam.getPrice(Unit_Harvester);
 						}
@@ -1941,14 +1958,18 @@ void QuantBot::build(int militaryValue) {
 						int itemCountUnits = itemCount[Unit_Tank] + itemCount[Unit_SiegeTank] + itemCount[Unit_Launcher] + itemCount[Unit_Harvester];
 
 						while (money > choam.getPrice(Unit_Carryall) && choam.getNumAvailable(Unit_Carryall) > 0 && itemCount[Unit_Carryall] < itemCountUnits / 7) {
-							produceItemWithLogging(Unit_Carryall);
+							if(produceItemWithLogging(Unit_Carryall) == 0) {
+								break;
+							}
 							itemCount[Unit_Carryall]++;
 							money = money - choam.getPrice(Unit_Carryall);
 						}
 
 						while (militaryValue < militaryValueLimit && money > choam.getPrice(Unit_SiegeTank) && choam.getNumAvailable(Unit_SiegeTank) > 0
 							&& choam.isCheap(Unit_SiegeTank) && militaryValue < militaryValueLimit && money > 2000) {
-							produceItemWithLogging(Unit_SiegeTank);
+							if(produceItemWithLogging(Unit_SiegeTank) == 0) {
+								break;
+							}
 							itemCount[Unit_SiegeTank]++;
 							money = money - choam.getPrice(Unit_SiegeTank);
 							militaryValue += data[Unit_SiegeTank][houseID].price;
@@ -1956,7 +1977,9 @@ void QuantBot::build(int militaryValue) {
 
 						while (militaryValue < militaryValueLimit && money > choam.getPrice(Unit_Launcher) && choam.getNumAvailable(Unit_Launcher) > 0
 							&& choam.isCheap(Unit_Launcher) && militaryValue < militaryValueLimit && money > 2000) {
-							produceItemWithLogging(Unit_Launcher);
+							if(produceItemWithLogging(Unit_Launcher) == 0) {
+								break;
+							}
 							itemCount[Unit_Launcher]++;
 							money = money - choam.getPrice(Unit_Launcher);
 							militaryValue += data[Unit_Launcher][houseID].price;
@@ -1964,7 +1987,9 @@ void QuantBot::build(int militaryValue) {
 
 						while (militaryValue < militaryValueLimit && money > choam.getPrice(Unit_Tank) && choam.getNumAvailable(Unit_Tank) > 0
 							&& choam.isCheap(Unit_Tank) && militaryValue < militaryValueLimit && money > 2000) {
-							produceItemWithLogging(Unit_Tank);
+							if(produceItemWithLogging(Unit_Tank) == 0) {
+								break;
+							}
 							itemCount[Unit_Tank]++;
 							money = money - choam.getPrice(Unit_Tank);
 							militaryValue += data[Unit_Tank][houseID].price;
@@ -1974,7 +1999,9 @@ void QuantBot::build(int militaryValue) {
 
 						while (militaryValue < militaryValueLimit && money > choam.getPrice(Unit_Ornithopter) && choam.getNumAvailable(Unit_Ornithopter) > 0
 							&& choam.isCheap(Unit_Ornithopter) && militaryValue < militaryValueLimit && money > 2000) {
-							produceItemWithLogging(Unit_Ornithopter);
+							if(produceItemWithLogging(Unit_Ornithopter) == 0) {
+								break;
+							}
 							itemCount[Unit_Ornithopter]++;
 							money = money - choam.getPrice(Unit_Ornithopter);
 							militaryValue += data[Unit_Ornithopter][houseID].price;
@@ -2030,8 +2057,9 @@ void QuantBot::build(int militaryValue) {
 								&& pBuilder->getProductionQueueSize() < 1) {
 
 								logDebug("***CampAI Build itemID: %o structure count: %o, initial count: %o", i, itemCount[i], initialItemCount[i]);
-								produceItemWithLogging(i);
-								itemCount[i]++;  // Increment immediately to prevent multiple CYs from building same item
+								if(produceItemWithLogging(i) > 0) {
+									itemCount[i]++;  // Increment immediately to prevent multiple CYs from building same item
+								}
 							}
 						}
 
@@ -2056,20 +2084,20 @@ void QuantBot::build(int militaryValue) {
 								&& findPlaceLocation(Structure_WindTrap).isValid()
 								&& pBuilder->getProductionQueueSize() == 0) {
 
-								produceItemWithLogging(Structure_WindTrap);
-								itemCount[Structure_WindTrap]++;
-
-								logDebug("***CampAI Build windtrap: power %d/%d", getHouse()->getProducedPower(), getHouse()->getPowerRequirement());
+								if(produceItemWithLogging(Structure_WindTrap) > 0) {
+									itemCount[Structure_WindTrap]++;
+									logDebug("***CampAI Build windtrap: power %d/%d", getHouse()->getProducedPower(), getHouse()->getPowerRequirement());
+								}
 							}
 							else if ((getHouse()->getStoredCredits() > getHouse()->getCapacity() * 0.90_fix)  // Only build when 90% full
 								&& pBuilder->isAvailableToBuild(Structure_Silo)
 								&& findPlaceLocation(Structure_Silo).isValid()
 								&& pBuilder->getProductionQueueSize() == 0) {
 
-								produceItemWithLogging(Structure_Silo);
-								itemCount[Structure_Silo]++;
-
-								logDebug("***CampAI Build A new Silo increasing count to: %d (credits: %d/%d)", itemCount[Structure_Silo], getHouse()->getStoredCredits().lround(), getHouse()->getCapacity());
+								if(produceItemWithLogging(Structure_Silo) > 0) {
+									itemCount[Structure_Silo]++;
+									logDebug("***CampAI Build A new Silo increasing count to: %d (credits: %d/%d)", itemCount[Structure_Silo], getHouse()->getStoredCredits().lround(), getHouse()->getCapacity());
+								}
 							}
 							else if (money > 3000
 								&& pBuilder->isAvailableToBuild(Structure_RocketTurret)
@@ -2078,10 +2106,10 @@ void QuantBot::build(int militaryValue) {
 								&& (itemCount[Structure_RocketTurret] <
 									(itemCount[Structure_Silo] + itemCount[Structure_Refinery]) * 2)) {
 
-								produceItemWithLogging(Structure_RocketTurret);
-								itemCount[Structure_RocketTurret]++;
-
-								logDebug("***CampAI Build A new Rocket turret increasing count to: %d", itemCount[Structure_RocketTurret]);
+								if(produceItemWithLogging(Structure_RocketTurret) > 0) {
+									itemCount[Structure_RocketTurret]++;
+									logDebug("***CampAI Build A new Rocket turret increasing count to: %d", itemCount[Structure_RocketTurret]);
+								}
 							}
 
 							// MULTIPLAYER FIX: Use deterministic timer instead of random
@@ -2473,8 +2501,10 @@ void QuantBot::build(int militaryValue) {
 							&& (itemCount[Structure_StarPort] > 0 || itemCount[Structure_HeavyFactory] > 0)
 							&& pBuilder->getCurrentUpgradeLevel() >= 2));
 				
+				Coord plannedLocation = Coord::Invalid();
 				if (needsConcrete) {
 					Coord location = findPlaceLocation(itemID);
+					plannedLocation = location;
 					Coord structureSize = getStructureSize(itemID);
 					
 					// Determine starting corner based on build range (like AIPlayer)
@@ -2502,27 +2532,31 @@ void QuantBot::build(int militaryValue) {
 								&& abs(i - location.x) < 2 && abs(j - location.y) < 2) {
 								// Only queue Slab4 at the origin corner (covers 2x2)
 								if (i == location.x && j == location.y && pTile->getType() != Terrain_Slab) {
-									placeLocations.emplace_back(i, j);
-									doProduceItem(pBuilder, Structure_Slab4);
-									logDebug("CONCRETE: Queuing Slab4 at (%d,%d) for %s", i, j, getItemNameByID(itemID).c_str());
+									if(doProduceItem(pBuilder, Structure_Slab4) > 0) {
+										placeLocations.emplace_back(i, j);
+										logDebug("CONCRETE: Queuing Slab4 at (%d,%d) for %s", i, j, getItemNameByID(itemID).c_str());
+									}
 								}
 							} else if (pTile->getType() != Terrain_Slab) {
 								// Use Slab1 for remaining tiles or if Slab4 not available
 								if (pBuilder->isAvailableToBuild(Structure_Slab1)) {
-									placeLocations.emplace_back(i, j);
-									doProduceItem(pBuilder, Structure_Slab1);
-									logDebug("CONCRETE: Queuing Slab1 at (%d,%d) for %s", i, j, getItemNameByID(itemID).c_str());
+									if(doProduceItem(pBuilder, Structure_Slab1) > 0) {
+										placeLocations.emplace_back(i, j);
+										logDebug("CONCRETE: Queuing Slab1 at (%d,%d) for %s", i, j, getItemNameByID(itemID).c_str());
+									}
 								}
 							}
 						}
 					}
 					
-					// Store building location and queue the building
-					placeLocations.push_back(location);
 				}
 				
-				produceItemWithLogging(itemID);
-				itemCount[itemID]++;
+				if(produceItemWithLogging(itemID) > 0) {
+					if(plannedLocation.isValid()) {
+						placeLocations.push_back(plannedLocation);
+					}
+					itemCount[itemID]++;
+				}
 			}
 			else if (itemID != NONE_ID && pBuilder->isAvailableToBuild(itemID) && !findPlaceLocation(itemID).isValid()) {
 				// Only build concrete slabs to expand buildable area for structures that need it:

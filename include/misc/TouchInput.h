@@ -11,6 +11,7 @@
 #define TOUCHINPUT_H
 
 #include <SDL.h>
+#include <misc/ProductionControls.h>
 
 class ScreenBorder;
 
@@ -19,10 +20,16 @@ namespace TouchInput {
 // True only while dispatching a right-button event from a long press.
 #ifdef __ANDROID__
 bool isLongPressDispatch();
+bool isTouchDispatch();
 bool allowProductionRepeat(Uint32 builder, Uint32 item);
+void setProductionCatalogTarget(const ProductionCatalogTarget& target);
+void clearProductionCatalogTarget(Uint32 builderObjectID);
 #else
 inline bool isLongPressDispatch() { return false; }
+inline bool isTouchDispatch() { return false; }
 inline bool allowProductionRepeat(Uint32, Uint32) { return true; }
+inline void setProductionCatalogTarget(const ProductionCatalogTarget&) {}
+inline void clearProductionCatalogTarget(Uint32) {}
 #endif
 
 /**

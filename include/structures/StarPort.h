@@ -41,7 +41,7 @@ public:
         \param  itemID          the item to produce
         \param  multipleMode    false = 1 item, true = 5 items
     */
-    void doProduceItem(Uint32 itemID, bool multipleMode = false) override;
+    int doProduceItem(Uint32 itemID, bool multipleMode = false) override;
 
     /**
         Cancel ordering of the specified item.
@@ -49,6 +49,10 @@ public:
         \param  multipleMode    false = 1 item, true = 5 items
     */
     void doCancelItem(Uint32 itemID, bool multipleMode = false) override;
+
+    bool doCancelQueueEntry(Uint32 queueEntryId) override;
+
+    void doCancelAllProduction() override;
 
     /**
         Send order and wait for delivery.

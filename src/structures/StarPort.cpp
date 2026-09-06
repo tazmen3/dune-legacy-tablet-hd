@@ -50,6 +50,11 @@ StarPort::StarPort(House* newOwner) : BuilderBase(newOwner) {
 StarPort::StarPort(InputStream& stream) : BuilderBase(stream) {
     StarPort::init();
 
+    if(currentGame && currentGame->getLoadedSavegameVersion() < 9807) {
+        // Legacy Starport queues were already paid in full when the order was created.
+        migrateLegacyStarportQueue();
+    }
+
     arrivalTimer = stream.readSint32();
     if(stream.readBool() == true) {
         startDeploying();
@@ -123,8 +128,9 @@ void StarPort::handleCancelOrderClick() {
     currentGame->getCommandManager().addCommand(Command(pLocalPlayer->getPlayerID(), CMD_STARPORT_CANCELORDER, objectID));
 }
 
-void StarPort::doProduceItem(Uint32 itemID, bool multipleMode) {
+int StarPort::doProduceItem(Uint32 itemID, bool multipleMode) {
     Choam& choam = owner->getChoam();
+    int addedCount = 0;
 
     for(BuildItem& buildItem : buildList) {
         if(buildItem.itemID == itemID) {
@@ -135,54 +141,63 @@ void StarPort::doProduceItem(Uint32 itemID, bool multipleMode) {
                     break;
                 }
 
-                if((owner->getCredits() >= (int) buildItem.price)) {
-                    buildItem.num++;
-                    currentProductionQueue.emplace_back(itemID,buildItem.price );
-                    owner->takeCredits(buildItem.price);
-
-                    if(choam.setNumAvailable(itemID, numAvailable - 1) == false) {
-                        // sold out
-                        break;
-                    }
+                const FixPoint committedCost = buildItem.price;
+                if(!owner->tryTakeCredits(committedCost)) {
+                    break;
                 }
+
+                // Choam::setNumAvailable() returns false when the resulting stock is zero,
+                // even though the stock update succeeded. Reaching zero is a valid sale.
+                choam.setNumAvailable(itemID, numAvailable - 1);
+
+                buildItem.num++;
+                currentProductionQueue.emplace_back(allocateQueueEntryId(), itemID, buildItem.price, committedCost);
+                addedCount++;
             }
+            break;
+        }
+    }
+    return addedCount;
+}
+
+void StarPort::doCancelItem(Uint32 itemID, bool multipleMode) {
+    for(int i = 0; i < (multipleMode ? 5 : 1); i++) {
+        auto iterMostExpensiveItem = currentProductionQueue.end();
+        Uint32 mostExpensiveItemPrice = 0;
+        for(auto iter = currentProductionQueue.begin(); iter != currentProductionQueue.end(); ++iter) {
+            if(iter->itemID == itemID && (iterMostExpensiveItem == currentProductionQueue.end() || iter->price > mostExpensiveItemPrice)) {
+                iterMostExpensiveItem = iter;
+                mostExpensiveItemPrice = iter->price;
+            }
+        }
+
+        if(iterMostExpensiveItem == currentProductionQueue.end() || !doCancelQueueEntry(iterMostExpensiveItem->queueEntryId)) {
             break;
         }
     }
 }
 
-void StarPort::doCancelItem(Uint32 itemID, bool multipleMode) {
-    Choam& choam = owner->getChoam();
-
-    for(BuildItem& buildItem : buildList) {
-        if(buildItem.itemID == itemID) {
-            for(int i = 0; i < (multipleMode ? 5 : 1); i++) {
-                if(buildItem.num > 0) {
-                    buildItem.num--;
-                    choam.setNumAvailable(itemID, choam.getNumAvailable(itemID) + 1);
-
-                    // find the most expensive item to cancel
-                    auto iterMostExpensiveItem = currentProductionQueue.end();
-                    Uint32 mostExpensiveItemPrice = 0;
-                    for(auto iter = currentProductionQueue.begin(); iter != currentProductionQueue.end(); ++iter) {
-                        if(iter->itemID == itemID) {
-                            if(iter->price > mostExpensiveItemPrice) {
-                                iterMostExpensiveItem = iter;
-                                mostExpensiveItemPrice = iter->price;
-                            }
-                        }
-                    }
-
-                    // Cancel the best found item if any was found
-                    if(iterMostExpensiveItem != currentProductionQueue.end()) {
-                        owner->returnCredits(iterMostExpensiveItem->price);
-                        currentProductionQueue.erase(iterMostExpensiveItem);
-                    }
-                }
-            }
-            break;
-        }
+bool StarPort::doCancelQueueEntry(Uint32 queueEntryId) {
+    if(arrivalTimer != STARPORT_NO_ARRIVAL_AWAITED) {
+        return false;
     }
+
+    auto queueItemIter = std::find_if(currentProductionQueue.begin(), currentProductionQueue.end(),
+                                      [queueEntryId](const ProductionQueueItem& queueItem) {
+                                          return queueItem.queueEntryId == queueEntryId;
+                                      });
+    if(queueItemIter == currentProductionQueue.end()) {
+        return false;
+    }
+
+    Choam& choam = owner->getChoam();
+    choam.setNumAvailable(queueItemIter->itemID, choam.getNumAvailable(queueItemIter->itemID) + 1);
+    removeQueueEntry(queueItemIter, QueueRefundPolicy::PaidAmount);
+    return true;
+}
+
+void StarPort::doCancelAllProduction() {
+    doCancelOrder();
 }
 
 void StarPort::doPlaceOrder() {
@@ -324,16 +339,7 @@ void StarPort::updateStructureSpecificStuff() {
                     }
                 }
 
-                auto currentProducedBuildItem = std::find_if(   buildList.begin(),
-                                                                buildList.end(),
-                                                                [&](BuildItem& buildItem) {
-                                                                    return (buildItem.itemID == currentProductionQueue.front().itemID);
-                                                                });
-                if(currentProducedBuildItem != buildList.end()) {
-                    currentProducedBuildItem->num--;
-                }
-
-                currentProductionQueue.pop_front();
+                removeQueueEntry(currentProductionQueue.begin(), QueueRefundPolicy::None);
 
                 if(currentProductionQueue.empty() == true) {
                     arrivalTimer = STARPORT_NO_ARRIVAL_AWAITED;
@@ -353,7 +359,9 @@ void StarPort::updateStructureSpecificStuff() {
 }
 
 void StarPort::informFrigateDestroyed() {
-    currentProductionQueue.clear();
+    while(!currentProductionQueue.empty()) {
+        removeQueueEntry(currentProductionQueue.begin(), QueueRefundPolicy::None);
+    }
     arrivalTimer = STARPORT_NO_ARRIVAL_AWAITED;
     deployTimer = 0;
     deploying = false;

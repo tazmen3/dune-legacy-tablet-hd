@@ -10,6 +10,9 @@ target_sources(dunelegacy_tests
     PRIVATE
         PinchZoomTest.cpp
         PlacementCandidateTest.cpp
+        ProductionEconomyTest.cpp
+        ProductionControlsTest.cpp
+        LocalizationTest.cpp
         PathBudgetTestCase/PathBudgetTestCase.cpp
         NetworkManagerTestCase/NetworkManagerTestCase.cpp
         # ENet library sources (needed for NetworkManager tests)
@@ -24,6 +27,8 @@ target_sources(dunelegacy_tests
         $<$<PLATFORM_ID:Windows>:${CMAKE_SOURCE_DIR}/src/enet/win32.c>
         # fmt library (needed for THROW macro in ENet headers)
         ${CMAKE_SOURCE_DIR}/src/misc/format.cpp
+        ${CMAKE_SOURCE_DIR}/src/misc/string_util.cpp
+        ${CMAKE_SOURCE_DIR}/src/FileClasses/POFile.cpp
 )
 
 # Include directories

@@ -52,6 +52,8 @@ typedef enum {
     CMD_PLAYER_PAUSE,                   ///< CMD_PLAYER_PAUSE() - notify other players this player paused
     CMD_PLAYER_RESUME,                  ///< CMD_PLAYER_RESUME() - notify other players this player resumed
     CMD_TEST_SYNC,                      ///< TEST_SYNC(SEED)
+    CMD_BUILDER_CANCELQUEUEENTRY,       ///< BUILDER_CANCELQUEUEENTRY(OBJECT_ID,QUEUE_ENTRY_ID)
+    CMD_BUILDER_CANCELALL,              ///< BUILDER_CANCELALL(OBJECT_ID)
     CMD_MAX
 } CMDTYPE;
 

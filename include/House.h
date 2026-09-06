@@ -168,6 +168,7 @@ public:
     void addCredits(FixPoint newCredits, bool wasRefined = false);
     void returnCredits(FixPoint newCredits);
     FixPoint takeCredits(FixPoint amount);
+    bool tryTakeCredits(FixPoint amount);
 
     void printStat() const;
 

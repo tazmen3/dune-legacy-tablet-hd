@@ -313,6 +313,36 @@ void Command::executeCommand() const {
             pBuilder->doSetOnHold((bool) parameter[1]);
         } break;
 
+        case CMD_BUILDER_CANCELQUEUEENTRY: {
+            if(parameter.size() != 2) {
+                THROW(std::invalid_argument, "Command::executeCommand(): CMD_BUILDER_CANCELQUEUEENTRY needs 2 Parameters!");
+            }
+            BuilderBase* pBuilder = dynamic_cast<BuilderBase*>(currentGame->getObjectManager().getObject(parameter[0]));
+            if(pBuilder == nullptr) {
+                return;
+            }
+            Player* pIssuingPlayer = currentGame->getPlayerByID(playerID);
+            if(pIssuingPlayer == nullptr || pBuilder->getOwner() != pIssuingPlayer->getHouse()) {
+                return;
+            }
+            pBuilder->doCancelQueueEntry(parameter[1]);
+        } break;
+
+        case CMD_BUILDER_CANCELALL: {
+            if(parameter.size() != 1) {
+                THROW(std::invalid_argument, "Command::executeCommand(): CMD_BUILDER_CANCELALL needs 1 Parameter!");
+            }
+            BuilderBase* pBuilder = dynamic_cast<BuilderBase*>(currentGame->getObjectManager().getObject(parameter[0]));
+            if(pBuilder == nullptr) {
+                return;
+            }
+            Player* pIssuingPlayer = currentGame->getPlayerByID(playerID);
+            if(pIssuingPlayer == nullptr || pBuilder->getOwner() != pIssuingPlayer->getHouse()) {
+                return;
+            }
+            pBuilder->doCancelAllProduction();
+        } break;
+
         case CMD_PALACE_SPECIALWEAPON: {
             if(parameter.size() != 1) {
                 THROW(std::invalid_argument, "Command::executeCommand(): CMD_PALACE_SPECIALWEAPON needs 1 Parameter!");

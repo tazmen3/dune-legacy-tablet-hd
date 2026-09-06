@@ -1376,6 +1376,14 @@ msgid "Order"
 msgstr ""
 
 #: src/GUI/dune/BuilderList.cpp:67
+msgid "Pause"
+msgstr ""
+
+#: src/GUI/dune/BuilderList.cpp:262
+msgid "Resume"
+msgstr ""
+
+#: src/GUI/dune/BuilderList.cpp:67
 msgid "SOLD OUT"
 msgstr ""
 
@@ -1555,10 +1563,15 @@ msgstr ""
 
 #: src/GUI/dune/InGameSettingsMenu.cpp:91 src/GUI/dune/LoadSaveWindow.cpp:97
 #: src/MapEditor/ChoamWindow.cpp:119 src/MapEditor/LoadMapWindow.cpp:117
+#: src/GUI/dune/BuilderList.cpp:74
 #: src/MapEditor/MapSettingsWindow.cpp:267 src/MapEditor/NewMapWindow.cpp:203
 #: src/MapEditor/PlayerSettingsWindow.cpp:172
 #: src/MapEditor/ReinforcementsWindow.cpp:176 src/MapEditor/TeamsWindow.cpp:169
 msgid "Cancel"
+msgstr ""
+
+#: src/GUI/dune/BuilderList.cpp:81
+msgid "Cancel All"
 msgstr ""
 
 #: src/GUI/dune/LoadSaveWindow.cpp:89

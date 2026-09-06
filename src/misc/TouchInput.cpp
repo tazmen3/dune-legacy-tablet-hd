@@ -52,6 +52,7 @@ struct TouchState {
     LogicalPoint last;
     Uint32 windowID = 0;
     Uint32 pressedAt = 0;
+    bool touchDispatch = false;
     bool longPressDispatch = false;
     bool longPressFired = false;
     bool repeatProduction = false;
@@ -65,6 +66,9 @@ struct TouchState {
     bool placementPreviewEnabled = false;
     bool placementGesture = false;
     bool lastPointerWasTouch = false;
+    bool productionCatalogTargetValid = false;
+    TouchInput::ProductionCatalogTarget productionCatalogTarget{};
+    TouchInput::ProductionCatalogTouchGuard productionCatalogTouch;
 };
 
 TouchState state;
@@ -114,20 +118,24 @@ SDL_Event makeMouseButton(Uint32 type, LogicalPoint point, Uint32 windowID, Uint
     return event;
 }
 
+void queueEvent(const SDL_Event& event) {
+    state.pendingEvents.push_back(event);
+}
+
 void queueCompletedGesture() {
     if(state.dragging) {
-        state.pendingEvents.push_back(makeMouseMotion(state.start, { 0, 0 }, state.windowID, 0));
-        state.pendingEvents.push_back(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.start, state.windowID));
-        state.pendingEvents.push_back(makeMouseMotion(
+        queueEvent(makeMouseMotion(state.start, { 0, 0 }, state.windowID, 0));
+        queueEvent(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.start, state.windowID));
+        queueEvent(makeMouseMotion(
             state.last,
             { state.last.x - state.start.x, state.last.y - state.start.y },
             state.windowID,
             SDL_BUTTON_LMASK));
-        state.pendingEvents.push_back(makeMouseButton(SDL_MOUSEBUTTONUP, state.last, state.windowID));
+        queueEvent(makeMouseButton(SDL_MOUSEBUTTONUP, state.last, state.windowID));
     } else {
-        state.pendingEvents.push_back(makeMouseMotion(state.last, { 0, 0 }, state.windowID, 0));
-        state.pendingEvents.push_back(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.last, state.windowID));
-        state.pendingEvents.push_back(makeMouseButton(SDL_MOUSEBUTTONUP, state.last, state.windowID));
+        queueEvent(makeMouseMotion(state.last, { 0, 0 }, state.windowID, 0));
+        queueEvent(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.last, state.windowID));
+        queueEvent(makeMouseButton(SDL_MOUSEBUTTONUP, state.last, state.windowID));
     }
 }
 
@@ -145,28 +153,31 @@ void resetGesture() {
     state.panBlocked = false;
     state.remainderX = state.remainderY = 0;
     state.pinch.reset(0);
+    state.productionCatalogTouch.cancel();
 }
 
 void queueLongPressIfReady(Uint32 now) {
     if(!state.camera || !state.primaryActive || state.dragging || state.fingers.size() != 1
-       || state.placementGesture) return;
+       || state.productionCatalogTouch.isTracking() || state.placementGesture) return;
     if(state.longPressFired) {
         if(!state.repeatProduction || now - state.lastRepeat < REPEAT_MS) return;
     } else if(state.cancelled || now - state.pressedAt < LONG_PRESS_MS) return;
     state.longPressFired = true;
     state.repeatProduction = false; // The production widget must renew permission.
     state.lastRepeat = now; // Never catch up with a burst after a slow frame.
-    state.pendingEvents.push_back(makeMouseMotion(state.start, {0, 0}, state.windowID, 0));
-    state.pendingEvents.push_back(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.start, state.windowID, SDL_BUTTON_RIGHT));
-    state.pendingEvents.push_back(makeMouseButton(SDL_MOUSEBUTTONUP, state.start, state.windowID, SDL_BUTTON_RIGHT));
+    queueEvent(makeMouseMotion(state.start, {0, 0}, state.windowID, 0));
+    queueEvent(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.start, state.windowID, SDL_BUTTON_RIGHT));
+    queueEvent(makeMouseButton(SDL_MOUSEBUTTONUP, state.start, state.windowID, SDL_BUTTON_RIGHT));
     state.cancelled = true; // No left click on release.
     state.panBlocked = true;
 }
 
 bool deliverPending(SDL_Event* event) {
     if(state.pendingEvents.empty()) return false;
-    *event = state.pendingEvents.front();
+    const auto pending = state.pendingEvents.front();
     state.pendingEvents.pop_front();
+    *event = pending;
+    state.touchDispatch = true;
     state.longPressDispatch = (event->type == SDL_MOUSEBUTTONDOWN || event->type == SDL_MOUSEBUTTONUP)
         && event->button.button == SDL_BUTTON_RIGHT;
     return true;
@@ -203,15 +214,20 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
         state.dragging = false;
         state.cancelled = false;
         state.panEligible = state.camera && state.camera->isScreenCoordInsideMap(point.x, point.y);
-        if(state.placementPreviewEnabled && state.panEligible) {
+        if(state.productionCatalogTargetValid
+           && state.productionCatalogTouch.begin(state.productionCatalogTarget, point.x, point.y, finger.timestamp)) {
+            state.panEligible = false;
+            state.panBlocked = true;
+        } else if(state.placementPreviewEnabled && state.panEligible) {
             state.placementGesture = true;
-            state.pendingEvents.push_back(makeMouseMotion(state.last, { 0, 0 }, state.windowID, 0));
+            queueEvent(makeMouseMotion(state.last, { 0, 0 }, state.windowID, 0));
         }
     } else {
         // No mouse event has been emitted yet, so cancellation has no side effect.
         state.repeatProduction = false;
         state.cancelled = true;
         state.placementGesture = false;
+        state.productionCatalogTouch.cancel();
         if(state.fingers.size() == 2 && !state.panBlocked && state.panEligible
            && key.first == state.primaryFinger.first
            && state.camera && state.camera->isScreenCoordInsideMap(point.x, point.y)) {
@@ -230,6 +246,10 @@ void handleFingerMotion(const SDL_TouchFingerEvent& finger) {
     const auto found = state.fingers.find(key);
     if(found == state.fingers.end()) return;
     found->second = toLogicalPoint(finger);
+    if(state.productionCatalogTouch.isTracking() && key == state.primaryFinger) {
+        state.productionCatalogTouch.move(found->second.x, found->second.y);
+        return;
+    }
     if(state.placementGesture && key == state.primaryFinger && state.fingers.size() == 1) {
         const auto previous = state.last;
         state.last = found->second;
@@ -238,11 +258,10 @@ void handleFingerMotion(const SDL_TouchFingerEvent& finger) {
         if((deltaX * deltaX + deltaY * deltaY) >= MOVEMENT_THRESHOLD * MOVEMENT_THRESHOLD) {
             state.dragging = true;
         }
-        state.pendingEvents.push_back(makeMouseMotion(
-            state.last,
-            { state.last.x - previous.x, state.last.y - previous.y },
-            state.windowID,
-            SDL_BUTTON_LMASK));
+        queueEvent(makeMouseMotion(state.last,
+                                   { state.last.x - previous.x, state.last.y - previous.y },
+                                   state.windowID,
+                                   SDL_BUTTON_LMASK));
         return;
     }
     if(state.longPressFired) {
@@ -299,7 +318,14 @@ void handleFingerUp(const SDL_TouchFingerEvent& finger) {
     const FingerKey key{ finger.touchId, finger.fingerId };
     if(state.fingers.find(key) == state.fingers.end()) return;
 
-    if(state.primaryActive && key == state.primaryFinger && state.placementGesture && !state.cancelled) {
+    if(state.primaryActive && key == state.primaryFinger && state.productionCatalogTouch.isTracking()) {
+        state.last = toLogicalPoint(finger);
+        const auto action = state.productionCatalogTouch.release(state.last.x, state.last.y, finger.timestamp);
+        if(TouchInput::isProductionCatalogTap(action)) {
+            queueCompletedGesture();
+        }
+        state.cancelled = true;
+    } else if(state.primaryActive && key == state.primaryFinger && state.placementGesture && !state.cancelled) {
         state.last = toLogicalPoint(finger);
         const float deltaX = static_cast<float>(state.last.x - state.start.x);
         const float deltaY = static_cast<float>(state.last.y - state.start.y);
@@ -357,6 +383,7 @@ bool isPhysicalMouseEvent(const SDL_Event& event) {
 namespace TouchInput {
 
 bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview) {
+    state.touchDispatch = false;
     state.longPressDispatch = false;
     if(event == nullptr) {
         return false;
@@ -424,6 +451,8 @@ bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview) {
 
 bool isLongPressDispatch() { return state.longPressDispatch; }
 
+bool isTouchDispatch() { return state.touchDispatch; }
+
 bool allowProductionRepeat(Uint32 builder, Uint32 item) {
     if(!state.longPressDispatch) return true;
     if(state.repeatTargetSet && (state.repeatBuilder != builder || state.repeatItem != item)) return false;
@@ -433,6 +462,30 @@ bool allowProductionRepeat(Uint32 builder, Uint32 item) {
     state.repeatProduction = state.longPressFired && state.primaryActive
         && state.fingers.size() == 1 && !state.dragging;
     return true;
+}
+
+void setProductionCatalogTarget(const ProductionCatalogTarget& target) {
+    if(state.productionCatalogTouch.isTracking()
+       && !state.productionCatalogTouch.target().sameRegion(target)) {
+        state.productionCatalogTouch.cancel();
+        state.cancelled = true;
+        state.panBlocked = true;
+    }
+    state.productionCatalogTarget = target;
+    state.productionCatalogTargetValid = target.builderObjectID != 0
+        && target.width > 0 && target.height > 0;
+}
+
+void clearProductionCatalogTarget(Uint32 builderObjectID) {
+    if(state.productionCatalogTargetValid && state.productionCatalogTarget.builderObjectID == builderObjectID) {
+        state.productionCatalogTargetValid = false;
+    }
+    if(state.productionCatalogTouch.isTracking()
+       && state.productionCatalogTouch.target().builderObjectID == builderObjectID) {
+        state.productionCatalogTouch.cancel();
+        state.cancelled = true;
+        state.panBlocked = true;
+    }
 }
 
 bool allowsMouseEdgeScrolling() {

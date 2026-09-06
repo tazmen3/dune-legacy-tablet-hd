@@ -26,6 +26,10 @@ missing
 aclocal.m4
 install-sh
 dunelegacy
+!/android/app/src/main/java/org/dunelegacy/
+!/android/app/src/main/java/org/dunelegacy/**
+!/android/app/src/test/java/org/dunelegacy/
+!/android/app/src/test/java/org/dunelegacy/**
 clean
 valgrind.supp
 UserInterfaceState.xcuserstate

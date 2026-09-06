@@ -143,11 +143,12 @@ bool Player::doUpgrade(const BuilderBase* pBuilder) const {
     }
 }
 
-void Player::doProduceItem(const BuilderBase* pBuilder, Uint32 itemID) const {
+int Player::doProduceItem(const BuilderBase* pBuilder, Uint32 itemID) const {
     if(pBuilder->getOwner() == getHouse() && pBuilder->isActive()) {
-        const_cast<BuilderBase*>(pBuilder)->doProduceItem(itemID);
+        return const_cast<BuilderBase*>(pBuilder)->doProduceItem(itemID);
     } else {
         logWarn("The player '%s' tries to build some item in a structure he doesn't own or that is inactive!\n", playername.c_str());
+        return 0;
     }
 }
 

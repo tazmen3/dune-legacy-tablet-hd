@@ -66,7 +66,7 @@
 // Network protocol version - increment when packet formats change
 // Version 2: Added simMsAvg to NETWORKPACKET_CLIENTSTATS (5 fields instead of 4)
 // Version 3: Added mod transfer packets (MOD_INFO, MOD_REQUEST, MOD_CHUNK, MOD_COMPLETE)
-#define NETWORK_PROTOCOL_VERSION            3
+#define NETWORK_PROTOCOL_VERSION            4
 
 // Mod transfer limits
 #define MAX_MOD_TRANSFER_SIZE   (10 * 1024 * 1024)  // 10MB max mod size

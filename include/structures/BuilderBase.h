@@ -59,27 +59,41 @@ public:
 class ProductionQueueItem {
 public:
     ProductionQueueItem()
-     : itemID(0), price(0) {
+     : queueEntryId(0), itemID(ItemID_Invalid), price(0), paidAmount(0), legacyPaymentPending(false) {
 
     }
 
-    ProductionQueueItem(Uint32 _ItemID, Uint32 _price)
-     : itemID(_ItemID), price(_price) {
+    ProductionQueueItem(Uint32 _queueEntryId, Uint32 _itemID, Uint32 _price, FixPoint _paidAmount, bool _legacyPaymentPending = false)
+     : queueEntryId(_queueEntryId), itemID(_itemID), price(_price), paidAmount(_paidAmount), legacyPaymentPending(_legacyPaymentPending) {
 
     }
 
     void save(OutputStream& stream) const {
+        stream.writeUint32(queueEntryId);
         stream.writeUint32(itemID);
         stream.writeUint32(price);
+        stream.writeFixPoint(paidAmount);
+        stream.writeBool(legacyPaymentPending);
     }
 
     void load(InputStream& stream) {
+        queueEntryId = stream.readUint32();
+        itemID = stream.readUint32();
+        price = stream.readUint32();
+        paidAmount = stream.readFixPoint();
+        legacyPaymentPending = stream.readBool();
+    }
+
+    void loadLegacy(InputStream& stream) {
         itemID = stream.readUint32();
         price = stream.readUint32();
     }
 
+    Uint32 queueEntryId;
     Uint32 itemID;
-    Uint32 price;
+    Uint32 price;                 ///< Cost committed when this queue entry was admitted
+    FixPoint paidAmount;          ///< Exact amount actually paid and therefore refundable
+    bool legacyPaymentPending;    ///< Old-save entry that still follows progressive payment
 };
 
 
@@ -136,6 +150,8 @@ public:
     virtual void handleUpgradeClick();
     virtual void handleProduceItemClick(Uint32 itemID, bool multipleMode = false);
     virtual void handleCancelItemClick(Uint32 itemID, bool multipleMode = false);
+    virtual void handleCancelQueueEntryClick(Uint32 queueEntryId);
+    virtual void handleCancelAllProductionClick();
     virtual void handleSetOnHoldClick(bool OnHold);
 
 
@@ -151,7 +167,7 @@ public:
         \param  itemID          the item to produce
         \param  multipleMode    false = 1 item, true = 5 items
     */
-    virtual void doProduceItem(Uint32 itemID, bool multipleMode = false);
+    virtual int doProduceItem(Uint32 itemID, bool multipleMode = false);
 
     /**
         Cancel production of the specified item.
@@ -159,6 +175,12 @@ public:
         \param  multipleMode    false = 1 item, true = 5 items
     */
     virtual void doCancelItem(Uint32 itemID, bool multipleMode = false);
+
+    /** Cancel one exact queue occurrence by its stable identifier. */
+    virtual bool doCancelQueueEntry(Uint32 queueEntryId);
+
+    /** Cancel and refund every production queue entry. */
+    virtual void doCancelAllProduction();
 
     /**
         Sets the currently produced item on hold or continues production.
@@ -192,6 +214,10 @@ public:
     bool isUnitLimitReached(Uint32 itemID) const;
     inline FixPoint getProductionProgress() const { return productionProgress; }
     inline const std::list<BuildItem>& getBuildList() const { return buildList; }
+    inline const std::list<ProductionQueueItem>& getProductionQueue() const { return currentProductionQueue; }
+    inline Uint32 getCurrentQueueEntryId() const {
+        return currentProductionQueue.empty() ? 0 : currentProductionQueue.front().queueEntryId;
+    }
 
     virtual inline bool isAvailableToBuild(Uint32 itemID) const {
         return (getBuildItem(itemID) != nullptr);
@@ -204,9 +230,22 @@ public:
     FixPoint getBuildSpeedLimit() const { return buildSpeedLimit; }
 
 protected:
+    enum class QueueRefundPolicy {
+        None,
+        PaidAmount
+    };
+
+    using ProductionQueueIterator = std::list<ProductionQueueItem>::iterator;
+
     virtual void updateProductionProgress();
 
     void removeBuiltItemFromProductionQueue();
+
+    ProductionQueueIterator removeQueueEntry(ProductionQueueIterator iter, QueueRefundPolicy refundPolicy);
+
+    Uint32 allocateQueueEntryId();
+
+    void migrateLegacyStarportQueue();
 
     virtual void insertItem(std::list<BuildItem>& buildItemList, std::list<BuildItem>::iterator& iter, Uint32 itemID, int price=-1);
 
@@ -249,6 +288,7 @@ protected:
 
     std::list<ProductionQueueItem>  currentProductionQueue;     ///< This list is the production queue (It contains the item IDs of the units/structures to produce)
     std::list<BuildItem>            buildList;                  ///< This list contains all the things that can be produced by this builder
+    Uint32                          nextQueueEntryId;            ///< Next deterministic stable queue-entry identifier
 };
 
 #endif //BUILDERBASE_H

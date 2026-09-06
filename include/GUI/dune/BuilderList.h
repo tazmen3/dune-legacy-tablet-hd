@@ -28,7 +28,9 @@
 #define BUILDERBTN_HEIGHT 55
 #define BUILDERBTN_WIDTH 91
 #define BUILDERBTN_SPACING 5
-#define ORDERBTN_HEIGHT 16
+#define ACTIONBTN_HEIGHT 24
+#define ACTIONBTN_SPACING 3
+#define ACTION_PANEL_HEIGHT (3*ACTIONBTN_HEIGHT + 2*ACTIONBTN_SPACING)
 
 #define WIDGET_WIDTH (BUILDERBTN_SPACING + BUILDERBTN_WIDTH + BUILDERBTN_SPACING)
 
@@ -119,7 +121,7 @@ public:
     Point getMinimumSize() const override
     {
         return Point(   WIDGET_WIDTH,
-                        BUILDERBTN_HEIGHT*3 + (ARROWBTN_HEIGHT+BUILDERBTN_SPACING)*2 + BUILDERBTN_SPACING*4 + ORDERBTN_HEIGHT + BUILDERBTN_SPACING);
+                        BUILDERBTN_HEIGHT*3 + (ARROWBTN_HEIGHT+BUILDERBTN_SPACING)*2 + BUILDERBTN_SPACING*4 + ACTION_PANEL_HEIGHT + BUILDERBTN_SPACING);
     };
 
 
@@ -146,7 +148,9 @@ private:
     void onUp();
     void onDown();
     void onOrder();
-    void onCancel();
+    void onPauseToggle();
+    void onCancelCurrent();
+    void onCancelAll();
 
     int currentListPos;
     PictureButton   upButton;
@@ -154,6 +158,9 @@ private:
     Uint32          builderObjectID;
 
     TextButton  orderButton;
+    TextButton  pauseButton;
+    TextButton  cancelButton;
+    TextButton  cancelAllButton;
 
     int mouseLeftButton;
     int mouseRightButton;

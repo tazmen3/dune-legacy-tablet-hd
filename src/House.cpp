@@ -45,6 +45,7 @@
 
 #include <misc/exceptions.h>
 #include <misc/format.h>
+#include <misc/CreditTransaction.h>
 
 #include <algorithm>
 
@@ -298,6 +299,10 @@ FixPoint House::takeCredits(FixPoint amount) {
     }
 
     return taken;   //the amount that was actually withdrawn
+}
+
+bool House::tryTakeCredits(FixPoint amount) {
+    return CreditTransaction::tryTakeExact(storedCredits, startingCredits, amount);
 }
 
 

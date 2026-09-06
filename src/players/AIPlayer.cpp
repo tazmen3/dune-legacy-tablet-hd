@@ -598,25 +598,29 @@ void AIPlayer::build() {
                                                             && pBuilder->isAvailableToBuild(Structure_Slab4)
                                                             && (abs(i - location.x) < 2) && (abs(j - location.y) < 2)) {
                                                             if( (i == location.x) && (j == location.y) && pTile->getType() != Terrain_Slab) {
-                                                                placeLocations.emplace_back(i,j);
-                                                                doProduceItem(pBuilder, Structure_Slab4);
+                                                                if(doProduceItem(pBuilder, Structure_Slab4) > 0) {
+                                                                    placeLocations.emplace_back(i,j);
+                                                                }
                                                             }
                                                         } else if(pTile->getType() != Terrain_Slab) {
-                                                            placeLocations.emplace_back(i,j);
-                                                            doProduceItem(pBuilder, Structure_Slab1);
+                                                            if(doProduceItem(pBuilder, Structure_Slab1) > 0) {
+                                                                placeLocations.emplace_back(i,j);
+                                                            }
                                                         }
                                                     }
                                                 }
                                             }
 
-                                            placeLocations.push_back(placeLocation);
-                                            doProduceItem(pBuilder, itemID);
+                                            if(doProduceItem(pBuilder, itemID) > 0) {
+                                                placeLocations.push_back(placeLocation);
+                                            }
                                         } else {
                                             // we havn't found a placing location => build some random slabs
                                             location = findPlaceLocation(Structure_Slab1);
                                             if(location.isValid() && getMap().isWithinBuildRange(location.x, location.y, getHouse())) {
-                                                placeLocations.push_back(location);
-                                                doProduceItem(pBuilder, Structure_Slab1);
+                                                if(doProduceItem(pBuilder, Structure_Slab1) > 0) {
+                                                    placeLocations.push_back(location);
+                                                }
                                             }
                                         }
                                     }

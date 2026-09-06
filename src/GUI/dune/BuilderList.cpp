@@ -56,9 +56,31 @@ BuilderList::BuilderList(Uint32 builderObjectID) {
 
     addWidget(&orderButton,
                 Point(0,(ARROWBTN_HEIGHT + BUILDERBTN_SPACING) + BUILDERBTN_SPACING),
-                Point(WIDGET_WIDTH,ORDERBTN_HEIGHT));
+                Point(WIDGET_WIDTH,ACTIONBTN_HEIGHT));
     orderButton.setOnClick(std::bind(&BuilderList::onOrder, this));
     orderButton.setText(_("Order"));
+
+    addWidget(&pauseButton,
+                Point(0,(ARROWBTN_HEIGHT + BUILDERBTN_SPACING) + BUILDERBTN_SPACING),
+                Point(WIDGET_WIDTH,ACTIONBTN_HEIGHT));
+    pauseButton.setOnClick(std::bind(&BuilderList::onPauseToggle, this));
+    pauseButton.setText(_("Pause"));
+    pauseButton.setVisible(false);
+
+    addWidget(&cancelButton,
+                Point(0,(ARROWBTN_HEIGHT + BUILDERBTN_SPACING) + BUILDERBTN_SPACING),
+                Point(WIDGET_WIDTH,ACTIONBTN_HEIGHT));
+    cancelButton.setOnClick(std::bind(&BuilderList::onCancelCurrent, this));
+    cancelButton.setText(_("Cancel"));
+    cancelButton.setVisible(false);
+
+    addWidget(&cancelAllButton,
+                Point(0,(ARROWBTN_HEIGHT + BUILDERBTN_SPACING) + BUILDERBTN_SPACING),
+                Point(WIDGET_WIDTH,ACTIONBTN_HEIGHT));
+    cancelAllButton.setOnClick(std::bind(&BuilderList::onCancelAll, this));
+    cancelAllButton.setText(_("Cancel All"));
+    cancelAllButton.setTextColor(COLOR_LIGHTYELLOW);
+    cancelAllButton.setVisible(false);
 
     currentListPos = 0;
 
@@ -79,7 +101,9 @@ BuilderList::BuilderList(Uint32 builderObjectID) {
     resize(BuilderList::getMinimumSize().x, BuilderList::getMinimumSize().y);
 }
 
-BuilderList::~BuilderList() = default;
+BuilderList::~BuilderList() {
+    TouchInput::clearProductionCatalogTarget(builderObjectID);
+}
 
 void BuilderList::handleMouseMovement(Sint32 x, Sint32 y, bool insideOverlay) {
     StaticContainer::handleMouseMovement(x,y,insideOverlay);
@@ -120,7 +144,10 @@ bool BuilderList::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
                 } else {
                     currentGame->setCursorMode(Game::CursorMode_Placing);
                 }
-            } else if((getItemIDFromIndex(mouseLeftButton) == static_cast<int>(pBuilder->getCurrentProducedItem())) && (pBuilder->isOnHold() == true)) {
+            } else if(TouchInput::shouldUseLegacyMouseResume(
+                          TouchInput::isTouchDispatch(),
+                          getItemIDFromIndex(mouseLeftButton) == static_cast<int>(pBuilder->getCurrentProducedItem()),
+                          pBuilder->isOnHold())) {
                 soundPlayer->playSound(Sound_ButtonClick);
                 pBuilder->handleSetOnHoldClick(false);
             } else {
@@ -205,18 +232,43 @@ bool BuilderList::handleKeyPress(SDL_KeyboardEvent& key) {
 
 void BuilderList::draw(Point position) {
     SDL_Rect blackRectDest = {  position.x, position.y + ARROWBTN_HEIGHT + BUILDERBTN_SPACING,
-                                getSize().x, getRealHeight(getSize().y) - 2*(ARROWBTN_HEIGHT + BUILDERBTN_SPACING) - BUILDERBTN_SPACING - ORDERBTN_HEIGHT };
+                                getSize().x, getRealHeight(getSize().y) - 2*(ARROWBTN_HEIGHT + BUILDERBTN_SPACING) - BUILDERBTN_SPACING - ACTION_PANEL_HEIGHT };
     renderFillRect(renderer, &blackRectDest, COLOR_BLACK);
 
     BuilderBase* pBuilder = dynamic_cast<BuilderBase*>(currentGame->getObjectManager().getObject(builderObjectID));
+    orderButton.setVisible(false);
+    pauseButton.setVisible(false);
+    cancelButton.setVisible(false);
+    cancelAllButton.setVisible(false);
     if(pBuilder != nullptr) {
         StarPort* pStarport = dynamic_cast<StarPort*>(pBuilder);
+
+        const bool hasQueue = !pBuilder->getProductionQueue().empty();
+        const auto controls = TouchInput::productionControlVisibility(
+            hasQueue,
+            pBuilder->isWaitingToPlace(),
+            pStarport != nullptr,
+            pStarport != nullptr && pStarport->okToOrder());
+        cancelButton.setVisible(controls.cancel);
+        cancelButton.setEnabled(controls.cancel);
+        cancelAllButton.setVisible(controls.cancelAll);
+        cancelAllButton.setEnabled(controls.cancelAll);
 
         if(pStarport != nullptr) {
             orderButton.setVisible(true);
             orderButton.setEnabled(pStarport->okToOrder());
+            pauseButton.setVisible(false);
         } else {
             orderButton.setVisible(false);
+            pauseButton.setVisible(controls.pause);
+            pauseButton.setEnabled(controls.pause);
+            if(controls.pause) {
+                const std::string buttonText = pBuilder->isOnHold() ? _("Resume") : _("Pause");
+                if(pauseButton.getText() != buttonText) {
+                    pauseButton.setText(buttonText);
+                    pauseButton.resize(WIDGET_WIDTH, ACTIONBTN_HEIGHT);
+                }
+            }
         }
 
         if(getNumButtons(getSize().y) < static_cast<int>(pBuilder->getBuildList().size())) {
@@ -314,11 +366,35 @@ void BuilderList::draw(Point position) {
                     SDL_Rect drawLocationNumber = calcDrawingRect(pNumberTexture.get(), dest.x + BUILDERBTN_WIDTH - 3, dest.y + BUILDERBTN_HEIGHT + 2, HAlign::Right, VAlign::Bottom);
                     SDL_RenderCopy(renderer, pNumberTexture.get(), nullptr, &drawLocationNumber);
                 }
+
             }
 
             i++;
         }
     }
+
+#ifdef __ANDROID__
+    if(pBuilder != nullptr) {
+        const int visibleButtons = std::min(
+            getNumButtons(getSize().y),
+            std::max(0, static_cast<int>(pBuilder->getBuildList().size()) - currentListPos));
+        if(visibleButtons > 0) {
+            const Point first = getButtonPosition(0);
+            const Point last = getButtonPosition(visibleButtons - 1);
+            TouchInput::setProductionCatalogTarget({
+                builderObjectID,
+                position.x + first.x,
+                position.y + first.y,
+                BUILDERBTN_WIDTH,
+                last.y - first.y + BUILDERBTN_HEIGHT
+            });
+        } else {
+            TouchInput::clearProductionCatalogTarget(builderObjectID);
+        }
+    } else {
+        TouchInput::clearProductionCatalogTarget(builderObjectID);
+    }
+#endif
 
     SDL_Texture* pBuilderListUpperCap = pGFXManager->getUIGraphic(UI_BuilderListUpperCap);
     SDL_Rect builderListUpperCapDest = calcDrawingRect(pBuilderListUpperCap, blackRectDest.x - 3, blackRectDest.y - 13 + 4);
@@ -370,12 +446,21 @@ void BuilderList::drawOverlay(Point position) {
 void BuilderList::resize(Uint32 width, Uint32 height) {
     setWidgetGeometry(  &upButton,Point( (WIDGET_WIDTH - ARROWBTN_WIDTH)/2,-2),upButton.getSize());
     setWidgetGeometry(  &downButton,
-                        Point( (WIDGET_WIDTH - ARROWBTN_WIDTH)/2, getRealHeight(height) - ARROWBTN_HEIGHT - ORDERBTN_HEIGHT - BUILDERBTN_SPACING + 2),
+                        Point( (WIDGET_WIDTH - ARROWBTN_WIDTH)/2, getRealHeight(height) - ARROWBTN_HEIGHT - ACTION_PANEL_HEIGHT - BUILDERBTN_SPACING + 2),
                         downButton.getSize());
 
     setWidgetGeometry(  &orderButton,
-                        Point( 0, getRealHeight(height) - ORDERBTN_HEIGHT + 2),
-                        Point(WIDGET_WIDTH,ORDERBTN_HEIGHT));
+                        Point(0, getRealHeight(height) - ACTION_PANEL_HEIGHT + 2),
+                        Point(WIDGET_WIDTH,ACTIONBTN_HEIGHT));
+    setWidgetGeometry(  &pauseButton,
+                        Point(0, getRealHeight(height) - ACTION_PANEL_HEIGHT + 2),
+                        Point(WIDGET_WIDTH,ACTIONBTN_HEIGHT));
+    setWidgetGeometry(  &cancelButton,
+                        Point(0, getRealHeight(height) - ACTION_PANEL_HEIGHT + ACTIONBTN_HEIGHT + ACTIONBTN_SPACING + 2),
+                        Point(WIDGET_WIDTH,ACTIONBTN_HEIGHT));
+    setWidgetGeometry(  &cancelAllButton,
+                        Point(0, getRealHeight(height) - ACTIONBTN_HEIGHT + 2),
+                        Point(WIDGET_WIDTH,ACTIONBTN_HEIGHT));
 
     StaticContainer::resize(width,height);
 
@@ -403,11 +488,11 @@ int BuilderList::getRealHeight(int height) {
     int tmp = height;
     tmp -= (ARROWBTN_HEIGHT + BUILDERBTN_SPACING)*2;
     tmp -= BUILDERBTN_SPACING;
-    tmp -= ORDERBTN_HEIGHT;
+    tmp -= ACTION_PANEL_HEIGHT;
     tmp -= BUILDERBTN_SPACING;
     int numButtons = tmp / (BUILDERBTN_HEIGHT + BUILDERBTN_SPACING);
 
-    return numButtons * (BUILDERBTN_HEIGHT + BUILDERBTN_SPACING) + 3*BUILDERBTN_SPACING + 2*ARROWBTN_HEIGHT + ORDERBTN_HEIGHT + BUILDERBTN_SPACING;
+    return numButtons * (BUILDERBTN_HEIGHT + BUILDERBTN_SPACING) + 3*BUILDERBTN_SPACING + 2*ARROWBTN_HEIGHT + ACTION_PANEL_HEIGHT + BUILDERBTN_SPACING;
 }
 
 void BuilderList::onUp() {
@@ -431,11 +516,45 @@ void BuilderList::onOrder() {
     }
 }
 
+void BuilderList::onPauseToggle() {
+    BuilderBase* pBuilder = dynamic_cast<BuilderBase*>(currentGame->getObjectManager().getObject(builderObjectID));
+    if(pBuilder && !dynamic_cast<StarPort*>(pBuilder)
+       && !pBuilder->getProductionQueue().empty() && !pBuilder->isWaitingToPlace()) {
+        soundPlayer->playSound(Sound_ButtonClick);
+        pBuilder->handleSetOnHoldClick(TouchInput::nextProductionOnHoldState(pBuilder->isOnHold()));
+    }
+}
+
+void BuilderList::onCancelCurrent() {
+    BuilderBase* pBuilder = dynamic_cast<BuilderBase*>(currentGame->getObjectManager().getObject(builderObjectID));
+    StarPort* pStarport = dynamic_cast<StarPort*>(pBuilder);
+    if(!pBuilder || pBuilder->getProductionQueue().empty()
+       || (pStarport && !pStarport->okToOrder())) {
+        return;
+    }
+
+    if(TouchInput::requestCancelCurrentProduction(*pBuilder)) {
+        soundPlayer->playSound(Sound_ButtonClick);
+    }
+}
+
+void BuilderList::onCancelAll() {
+    BuilderBase* pBuilder = dynamic_cast<BuilderBase*>(currentGame->getObjectManager().getObject(builderObjectID));
+    StarPort* pStarport = dynamic_cast<StarPort*>(pBuilder);
+    if(!pBuilder || pBuilder->getProductionQueue().empty()
+       || (pStarport && !pStarport->okToOrder())) {
+        return;
+    }
+
+    soundPlayer->playSound(Sound_ButtonClick);
+    TouchInput::requestCancelAllProduction(*pBuilder);
+}
+
 int BuilderList::getNumButtons(int height) {
     int tmp = height;
     tmp -= (ARROWBTN_HEIGHT + BUILDERBTN_SPACING)*2;
     tmp -= BUILDERBTN_SPACING;
-    tmp -= ORDERBTN_HEIGHT;
+    tmp -= ACTION_PANEL_HEIGHT;
     tmp -= BUILDERBTN_SPACING;
     return tmp / (BUILDERBTN_HEIGHT + BUILDERBTN_SPACING);
 }

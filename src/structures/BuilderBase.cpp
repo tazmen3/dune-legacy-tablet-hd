@@ -24,11 +24,14 @@
 #include <SoundPlayer.h>
 #include <Map.h>
 #include <House.h>
+#include <Game.h>
 #include <units/UnitBase.h>
 
 #include <players/HumanPlayer.h>
 
 #include <GUI/ObjectInterfaces/BuilderInterface.h>
+
+#include <limits>
 
 const int BuilderBase::itemOrder[] = {    Structure_Slab4, Structure_Slab1, Structure_IX, Structure_StarPort,
                                            Structure_HighTechFactory, Structure_HeavyFactory, Structure_RocketTurret,
@@ -55,6 +58,7 @@ BuilderBase::BuilderBase(House* newOwner) : StructureBase(newOwner) {
     deployTimer = 0;
 
     buildSpeedLimit = 1.0_fix;
+    nextQueueEntryId = 1;
 }
 
 BuilderBase::BuilderBase(InputStream& stream) : StructureBase(stream) {
@@ -71,11 +75,31 @@ BuilderBase::BuilderBase(InputStream& stream) : StructureBase(stream) {
 
     buildSpeedLimit = stream.readFixPoint();
 
+    const bool hasEconomicQueueFormat = currentGame && (currentGame->getLoadedSavegameVersion() >= 9807);
     int numProductionQueueItem = stream.readUint32();
     for(int i=0;i<numProductionQueueItem;i++) {
         ProductionQueueItem tmp;
-        tmp.load(stream);
+        if(hasEconomicQueueFormat) {
+            tmp.load(stream);
+        } else {
+            tmp.loadLegacy(stream);
+            tmp.queueEntryId = static_cast<Uint32>(i + 1);
+            if(i == 0) {
+                tmp.paidAmount = std::min(productionProgress, FixPoint(tmp.price));
+            }
+            tmp.legacyPaymentPending = (tmp.paidAmount < tmp.price);
+        }
         currentProductionQueue.push_back(tmp);
+    }
+
+    nextQueueEntryId = hasEconomicQueueFormat ? stream.readUint32() : static_cast<Uint32>(numProductionQueueItem + 1);
+    if(nextQueueEntryId == 0) {
+        nextQueueEntryId = 1;
+    }
+    for(const ProductionQueueItem& queueItem : currentProductionQueue) {
+        if(queueItem.queueEntryId >= nextQueueEntryId && queueItem.queueEntryId != std::numeric_limits<Uint32>::max()) {
+            nextQueueEntryId = queueItem.queueEntryId + 1;
+        }
     }
 
     int numBuildItem = stream.readUint32();
@@ -111,6 +135,7 @@ void BuilderBase::save(OutputStream& stream) const {
     for(const ProductionQueueItem& queueItem : currentProductionQueue) {
         queueItem.save(stream);
     }
+    stream.writeUint32(nextQueueEntryId);
 
     stream.writeUint32(buildList.size());
     for(const BuildItem& buildItem : buildList) {
@@ -147,30 +172,20 @@ void BuilderBase::insertItem(std::list<BuildItem>& buildItemList, std::list<Buil
 void BuilderBase::removeItem(std::list<BuildItem>& buildItemList, std::list<BuildItem>::iterator& iter, Uint32 itemID) {
     if(iter != buildItemList.end()) {
         if(iter->itemID == itemID) {
-            std::list<BuildItem>::iterator iter2 = iter;
-            ++iter;
-            buildItemList.erase(iter2);
-
-            // is this item currently produced?
-            if(currentProducedItem == itemID) {
-                owner->returnCredits(productionProgress);
-                productionProgress = 0;
-                currentProducedItem = ItemID_Invalid;
-            }
-
-            // remove from production list
-            std::list<ProductionQueueItem>::iterator iter3 = currentProductionQueue.begin();
-            while(iter3 != currentProductionQueue.end()) {
-                if(iter3->itemID == itemID) {
-                    std::list<ProductionQueueItem>::iterator iter4 = iter3;
-                    ++iter3;
-                    currentProductionQueue.erase(iter4);
+            // Removing an item from the catalogue also cancels every queued occurrence.
+            // Refund before erasing the BuildItem so the aggregate counter stays coherent.
+            auto queueItemIter = currentProductionQueue.begin();
+            while(queueItemIter != currentProductionQueue.end()) {
+                if(queueItemIter->itemID == itemID) {
+                    queueItemIter = removeQueueEntry(queueItemIter, QueueRefundPolicy::PaidAmount);
                 } else {
-                    ++iter3;
+                    ++queueItemIter;
                 }
             }
 
-            produceNextAvailableItem();
+            std::list<BuildItem>::iterator iter2 = iter;
+            ++iter;
+            buildItemList.erase(iter2);
         }
     }
 }
@@ -185,11 +200,10 @@ bool BuilderBase::isWaitingToPlace() const {
         return false;
     }
 
-    const BuildItem* tmp = getBuildItem(currentProducedItem);
-    if(tmp == nullptr) {
+    if(currentProductionQueue.empty()) {
         return false;
     } else {
-        return (productionProgress >= tmp->price);
+        return (productionProgress >= currentProductionQueue.front().price);
     }
 }
 
@@ -214,45 +228,47 @@ bool BuilderBase::isUnitLimitReached(Uint32 itemID) const {
 
 
 void BuilderBase::updateProductionProgress() {
-    if(currentProducedItem != ItemID_Invalid) {
-        BuildItem* tmp = getBuildItem(currentProducedItem);
+    if(currentProducedItem == ItemID_Invalid || currentProductionQueue.empty()) {
+        return;
+    }
 
-        if((productionProgress < tmp->price) && (isOnHold() == false) && (isUnitLimitReached(currentProducedItem) == false) && (owner->getCredits() > 0)) {
+    ProductionQueueItem& queueItem = currentProductionQueue.front();
+    const FixPoint committedCost = queueItem.price;
+    if((productionProgress >= committedCost) || isOnHold() || isUnitLimitReached(currentProducedItem)) {
+        return;
+    }
 
-            FixPoint oldProgress = productionProgress;
+    FixPoint requestedProgress;
+    if(currentGame->getGameInitSettings().getGameOptions().instantBuild == true) {
+        requestedProgress = committedCost - productionProgress;
+    } else {
+        const FixPoint buildSpeed = std::min(getHealth() / getMaxHealth(), buildSpeedLimit);
+        const FixPoint totalBuildGameTicks = currentGame->objectData.data[currentProducedItem][originalHouseID].buildtime * 15;
+        requestedProgress = (committedCost / totalBuildGameTicks) * buildSpeed;
+        requestedProgress = std::min(requestedProgress, committedCost - productionProgress);
+    }
 
-            if(currentGame->getGameInitSettings().getGameOptions().instantBuild == true) {
-                FixPoint totalBuildCosts = currentGame->objectData.data[currentProducedItem][originalHouseID].price;
-                FixPoint buildCosts = totalBuildCosts - productionProgress;
-
-                productionProgress += owner->takeCredits(buildCosts);
-            } else {
-
-                FixPoint buildSpeed = std::min( getHealth() / getMaxHealth(), buildSpeedLimit);
-                FixPoint totalBuildCosts = currentGame->objectData.data[currentProducedItem][originalHouseID].price;
-                FixPoint totalBuildGameTicks = currentGame->objectData.data[currentProducedItem][originalHouseID].buildtime*15;
-                FixPoint buildCosts = totalBuildCosts / totalBuildGameTicks;
-
-                productionProgress += owner->takeCredits(buildCosts*buildSpeed);
-
-                /* That was wrong. Build speed does not depend on power production
-                if (getOwner()->hasPower() || (((currentGame->gameType == GameType::Campaign) || (currentGame->gameType == GameType::Skirmish)) && getOwner()->isAI())) {
-                    //if not enough power, production is halved
-                    ProductionProgress += owner->takeCredits(0.25_fix);
-                } else {
-                    ProductionProgress += owner->takeCredits(0.125_fix);
-                }*/
-
-            }
-
-            if ((oldProgress == productionProgress) && (owner == pLocalHouse)) {
-                currentGame->addToNewsTicker(_("Not enough money"));
-            }
-
-            if(productionProgress >= tmp->price) {
-                setWaitingToPlace();
-            }
+    const FixPoint oldProgress = productionProgress;
+    if(queueItem.legacyPaymentPending) {
+        const FixPoint paymentLeft = committedCost - queueItem.paidAmount;
+        const FixPoint paidNow = owner->takeCredits(std::min(requestedProgress, paymentLeft));
+        queueItem.paidAmount += paidNow;
+        productionProgress += paidNow;
+        if(queueItem.paidAmount >= committedCost) {
+            queueItem.paidAmount = committedCost;
+            queueItem.legacyPaymentPending = false;
         }
+    } else {
+        productionProgress += requestedProgress;
+    }
+
+    if((oldProgress == productionProgress) && queueItem.legacyPaymentPending && (owner == pLocalHouse)) {
+        currentGame->addToNewsTicker(_("Not enough money"));
+    }
+
+    if(productionProgress >= committedCost) {
+        productionProgress = committedCost;
+        setWaitingToPlace();
     }
 }
 
@@ -363,7 +379,8 @@ bool BuilderBase::update() {
         return false;
     }
 
-    if(isUnit(currentProducedItem) && (productionProgress >= getBuildItem(currentProducedItem)->price)) {
+    if(isUnit(currentProducedItem) && !currentProductionQueue.empty()
+       && (productionProgress >= currentProductionQueue.front().price)) {
         deployTimer--;
         if(deployTimer == 0) {
             int finishedItemID = currentProducedItem;
@@ -448,21 +465,71 @@ bool BuilderBase::update() {
 }
 
 void BuilderBase::removeBuiltItemFromProductionQueue() {
-    productionProgress = 0;
+    if(!currentProductionQueue.empty()) {
+        removeQueueEntry(currentProductionQueue.begin(), QueueRefundPolicy::None);
+    }
+}
 
-    auto currentBuildItemIter = std::find_if(   buildList.begin(),
-                                                buildList.end(),
-                                                [&](BuildItem& buildItem) {
-                                                    return ((buildItem.itemID == currentProducedItem) && (buildItem.num > 0));
-                                                });
+BuilderBase::ProductionQueueIterator BuilderBase::removeQueueEntry(ProductionQueueIterator iter, QueueRefundPolicy refundPolicy) {
+    if(iter == currentProductionQueue.end()) {
+        return iter;
+    }
 
-    if(currentBuildItemIter != buildList.end()) {
+    const bool removesCurrentItem = (iter == currentProductionQueue.begin()) && (currentProducedItem != ItemID_Invalid);
+    const Uint32 removedItemID = iter->itemID;
+    const FixPoint refund = (refundPolicy == QueueRefundPolicy::PaidAmount) ? iter->paidAmount : FixPoint(0);
+
+    auto currentBuildItemIter = std::find_if(buildList.begin(), buildList.end(),
+                                              [removedItemID](const BuildItem& buildItem) {
+                                                  return buildItem.itemID == removedItemID;
+                                              });
+    if(currentBuildItemIter != buildList.end() && currentBuildItemIter->num > 0) {
         currentBuildItemIter->num--;
     }
 
-    deployTimer = 0;
-    currentProductionQueue.pop_front();
-    produceNextAvailableItem();
+    ProductionQueueIterator next = currentProductionQueue.erase(iter);
+    if(refund > 0) {
+        owner->returnCredits(refund);
+    }
+
+    if(removesCurrentItem) {
+        deployTimer = 0;
+        produceNextAvailableItem();
+    } else if(currentProductionQueue.empty()) {
+        currentProducedItem = ItemID_Invalid;
+        productionProgress = 0;
+        bCurrentItemOnHold = false;
+        deployTimer = 0;
+    }
+
+    return next;
+}
+
+Uint32 BuilderBase::allocateQueueEntryId() {
+    if(nextQueueEntryId == 0) {
+        nextQueueEntryId = 1;
+    }
+
+    while(std::any_of(currentProductionQueue.begin(), currentProductionQueue.end(),
+                      [&](const ProductionQueueItem& queueItem) { return queueItem.queueEntryId == nextQueueEntryId; })) {
+        ++nextQueueEntryId;
+        if(nextQueueEntryId == 0) {
+            nextQueueEntryId = 1;
+        }
+    }
+
+    const Uint32 allocatedId = nextQueueEntryId++;
+    if(nextQueueEntryId == 0) {
+        nextQueueEntryId = 1;
+    }
+    return allocatedId;
+}
+
+void BuilderBase::migrateLegacyStarportQueue() {
+    for(ProductionQueueItem& queueItem : currentProductionQueue) {
+        queueItem.paidAmount = queueItem.price;
+        queueItem.legacyPaymentPending = false;
+    }
 }
 
 void BuilderBase::handleUpgradeClick() {
@@ -489,6 +556,14 @@ void BuilderBase::handleCancelItemClick(Uint32 itemID, bool multipleMode) {
     currentGame->getCommandManager().addCommand(Command(pLocalPlayer->getPlayerID(), CMD_BUILDER_CANCELITEM, objectID, itemID, (Uint32) multipleMode));
 }
 
+void BuilderBase::handleCancelQueueEntryClick(Uint32 queueEntryId) {
+    currentGame->getCommandManager().addCommand(Command(pLocalPlayer->getPlayerID(), CMD_BUILDER_CANCELQUEUEENTRY, objectID, queueEntryId));
+}
+
+void BuilderBase::handleCancelAllProductionClick() {
+    currentGame->getCommandManager().addCommand(Command(pLocalPlayer->getPlayerID(), CMD_BUILDER_CANCELALL, objectID));
+}
+
 void BuilderBase::handleSetOnHoldClick(bool OnHold) {
     currentGame->getCommandManager().addCommand(Command(pLocalPlayer->getPlayerID(), CMD_BUILDER_SETONHOLD, objectID, (Uint32) OnHold));
 }
@@ -506,7 +581,8 @@ bool BuilderBase::doUpgrade() {
     }
 }
 
-void BuilderBase::doProduceItem(Uint32 itemID, bool multipleMode) {
+int BuilderBase::doProduceItem(Uint32 itemID, bool multipleMode) {
+    int addedCount = 0;
     for(BuildItem& buildItem : buildList) {
         if(buildItem.itemID == itemID) {
             for(int i = 0; i < (multipleMode ? 5 : 1); i++) {
@@ -514,11 +590,17 @@ void BuilderBase::doProduceItem(Uint32 itemID, bool multipleMode) {
                     && (itemID == Structure_Palace)
                     && ((buildItem.num > 0) || (owner->getNumItems(Structure_Palace) > 0))) {
                     // only one palace allowed
-                    return;
+                    break;
+                }
+
+                const FixPoint committedCost = buildItem.price;
+                if(!owner->tryTakeCredits(committedCost)) {
+                    break;
                 }
 
                 buildItem.num++;
-                currentProductionQueue.emplace_back(itemID, buildItem.price );
+                currentProductionQueue.emplace_back(allocateQueueEntryId(), itemID, buildItem.price, committedCost);
+                addedCount++;
                 if(currentProducedItem == ItemID_Invalid) {
                     productionProgress = 0;
                     currentProducedItem = itemID;
@@ -531,39 +613,38 @@ void BuilderBase::doProduceItem(Uint32 itemID, bool multipleMode) {
             break;
         }
     }
+    return addedCount;
 }
 
 void BuilderBase::doCancelItem(Uint32 itemID, bool multipleMode) {
-    for(BuildItem& buildItem : buildList) {
-        if(buildItem.itemID == itemID) {
-            for(int i = 0; i < (multipleMode ? 5 : 1); i++) {
-                if(buildItem.num > 0) {
-                    buildItem.num--;
-
-                    bool bCancelCurrentItem = (itemID == currentProducedItem);
-
-                    auto queueItemIter = std::find_if(  currentProductionQueue.rbegin(),
-                                                        currentProductionQueue.rend(),
-                                                        [&](ProductionQueueItem& queueItem) {
-                                                            return (queueItem.itemID == itemID);
-                                                        });
-
-                    if(queueItemIter != currentProductionQueue.rend()) {
-                        if(buildItem.num == 0 && bCancelCurrentItem) {
-                            owner->returnCredits(productionProgress);
-                        } else {
-                            bCancelCurrentItem = false;
-                        }
-                        currentProductionQueue.erase(std::next(queueItemIter).base());
-                    }
-
-                    if(bCancelCurrentItem) {
-                        deployTimer = 0;
-                        produceNextAvailableItem();
-                    }
-                }
-            }
+    for(int i = 0; i < (multipleMode ? 5 : 1); i++) {
+        auto queueItemIter = std::find_if(currentProductionQueue.rbegin(), currentProductionQueue.rend(),
+                                          [itemID](const ProductionQueueItem& queueItem) {
+                                              return queueItem.itemID == itemID;
+                                          });
+        if(queueItemIter == currentProductionQueue.rend()) {
             break;
         }
+
+        removeQueueEntry(std::next(queueItemIter).base(), QueueRefundPolicy::PaidAmount);
+    }
+}
+
+bool BuilderBase::doCancelQueueEntry(Uint32 queueEntryId) {
+    auto queueItemIter = std::find_if(currentProductionQueue.begin(), currentProductionQueue.end(),
+                                      [queueEntryId](const ProductionQueueItem& queueItem) {
+                                          return queueItem.queueEntryId == queueEntryId;
+                                      });
+    if(queueItemIter == currentProductionQueue.end()) {
+        return false;
+    }
+
+    removeQueueEntry(queueItemIter, QueueRefundPolicy::PaidAmount);
+    return true;
+}
+
+void BuilderBase::doCancelAllProduction() {
+    while(!currentProductionQueue.empty()) {
+        removeQueueEntry(currentProductionQueue.begin(), QueueRefundPolicy::PaidAmount);
     }
 }
