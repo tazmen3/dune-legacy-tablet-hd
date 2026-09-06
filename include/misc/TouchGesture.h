@@ -20,6 +20,20 @@ enum class TouchGestureOutcome {
     Drag
 };
 
+enum class TouchMapTapAction {
+    LeftClick,
+    ContextAction,
+    DeselectSelectedUnit
+};
+
+struct TouchMapTapContext {
+    bool touchInput = false;
+    bool startedInsideMap = false;
+    bool endedInsideMap = false;
+    bool contextActionsEnabled = false;
+    bool targetIsSelectedUnit = false;
+};
+
 /**
  * Small deterministic part of the Android gesture arbitration. It deliberately
  * knows nothing about gameplay: callers cancel it when multi-touch or another
@@ -71,14 +85,18 @@ private:
     bool dragging_ = false;
 };
 
-constexpr bool shouldUseContextMapTap(TouchGestureOutcome outcome,
-                                      bool contextActionsEnabled,
-                                      bool startedInsideMap,
-                                      bool endedInsideMap) {
-    return outcome == TouchGestureOutcome::Tap
-        && contextActionsEnabled
-        && startedInsideMap
-        && endedInsideMap;
+constexpr TouchMapTapAction chooseTouchMapTapAction(TouchGestureOutcome outcome,
+                                                    const TouchMapTapContext& context) {
+    if(!context.touchInput || outcome != TouchGestureOutcome::Tap
+       || !context.startedInsideMap || !context.endedInsideMap) {
+        return TouchMapTapAction::LeftClick;
+    }
+    if(context.targetIsSelectedUnit) {
+        return TouchMapTapAction::DeselectSelectedUnit;
+    }
+    return context.contextActionsEnabled
+        ? TouchMapTapAction::ContextAction
+        : TouchMapTapAction::LeftClick;
 }
 
 } // namespace TouchInput

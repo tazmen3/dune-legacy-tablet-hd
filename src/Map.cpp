@@ -552,6 +552,24 @@ void Map::removeObjectFromMap(Uint32 objectID) {
         tile.unassignObject(objectID);
 }
 
+ObjectBase* Map::getObjectAt(const House* pHouse, int mapX, int mapY, int realX, int realY) const {
+    const auto tile = getTile_internal(mapX, mapY);
+    if(!tile || (!tile->isExploredByTeam(pHouse->getTeamID()) && !debug)) {
+        return nullptr;
+    }
+    return tile->getObjectAt(realX, realY);
+}
+
+bool Map::deselectObject(ObjectBase* pObject) {
+    if(pObject == nullptr || !pObject->isSelected()) return false;
+
+    pObject->setSelected(false);
+    currentGame->getSelectedList().erase(pObject->getObjectID());
+    currentGame->selectionChanged();
+    lastSinglySelectedObject = nullptr;
+    return true;
+}
+
 void Map::selectObjects(const House* pHouse, int x1, int y1, int x2, int y2, int realX, int realY, bool objectARGMode) {
 
     ObjectBase *lastCheckedObject = nullptr;
@@ -565,16 +583,7 @@ void Map::selectObjects(const House* pHouse, int x1, int y1, int x2, int y2, int
     }
 
     if((x1 == x2) && (y1 == y2)) {
-        const auto tile_center = getTile_internal(x1, y1);
-
-        if (!tile_center)
-            return;
-
-        if(tile_center->isExploredByTeam(pHouse->getTeamID()) || debug) {
-            lastCheckedObject = tile_center->getObjectAt(realX, realY);
-        } else {
-            lastCheckedObject = nullptr;
-        }
+        lastCheckedObject = getObjectAt(pHouse, x1, y1, realX, realY);
 
         if((lastCheckedObject != nullptr) && (lastCheckedObject->getOwner() == pHouse)) {
             if((lastCheckedObject == lastSinglySelectedObject) && ( !lastCheckedObject->isAStructure())) {

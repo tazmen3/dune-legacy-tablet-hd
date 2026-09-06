@@ -35,6 +35,12 @@ struct LogicalPoint {
     Sint32 y = 0;
 };
 
+struct PendingEvent {
+    SDL_Event event{};
+    bool tap = false;
+    bool startedInsideMap = false;
+};
+
 struct TouchState {
     std::map<FingerKey, LogicalPoint> fingers;
     ScreenBorder* camera = nullptr;
@@ -46,13 +52,15 @@ struct TouchState {
     float remainderX = 0;
     float remainderY = 0;
     TouchInput::PinchZoom pinch;
-    std::deque<SDL_Event> pendingEvents;
+    std::deque<PendingEvent> pendingEvents;
     FingerKey primaryFinger{};
     LogicalPoint start;
     LogicalPoint last;
     Uint32 windowID = 0;
     Uint32 pressedAt = 0;
     bool touchDispatch = false;
+    bool tapDispatch = false;
+    bool tapStartedInsideMap = false;
     bool longPressDispatch = false;
     bool longPressFired = false;
     bool repeatProduction = false;
@@ -64,8 +72,7 @@ struct TouchState {
     TouchInput::TouchGestureClassifier gesture;
     bool placementPreviewEnabled = false;
     bool placementGesture = false;
-    bool contextMapTapEnabled = false;
-    bool contextMapTapEligible = false;
+    bool mapTapEligible = false;
     bool lastPointerWasTouch = false;
     bool productionCatalogTargetValid = false;
     TouchInput::ProductionCatalogTarget productionCatalogTarget{};
@@ -119,8 +126,8 @@ SDL_Event makeMouseButton(Uint32 type, LogicalPoint point, Uint32 windowID, Uint
     return event;
 }
 
-void queueEvent(const SDL_Event& event) {
-    state.pendingEvents.push_back(event);
+void queueEvent(const SDL_Event& event, bool tap = false, bool startedInsideMap = false) {
+    state.pendingEvents.push_back({ event, tap, startedInsideMap });
 }
 
 void queueCompletedGesture() {
@@ -137,15 +144,9 @@ void queueCompletedGesture() {
             SDL_BUTTON_LMASK));
         queueEvent(makeMouseButton(SDL_MOUSEBUTTONUP, state.last, state.windowID));
     } else {
-        const bool endedInsideMap = state.camera
-            && state.camera->isScreenCoordInsideMap(state.last.x, state.last.y);
-        const Uint8 button = TouchInput::shouldUseContextMapTap(
-            outcome, state.contextMapTapEnabled, state.contextMapTapEligible, endedInsideMap)
-            ? SDL_BUTTON_RIGHT
-            : SDL_BUTTON_LEFT;
-        queueEvent(makeMouseMotion(state.last, { 0, 0 }, state.windowID, 0));
-        queueEvent(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.last, state.windowID, button));
-        queueEvent(makeMouseButton(SDL_MOUSEBUTTONUP, state.last, state.windowID, button));
+        queueEvent(makeMouseMotion(state.last, { 0, 0 }, state.windowID, 0), true, state.mapTapEligible);
+        queueEvent(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.last, state.windowID), true, state.mapTapEligible);
+        queueEvent(makeMouseButton(SDL_MOUSEBUTTONUP, state.last, state.windowID), true, state.mapTapEligible);
     }
 }
 
@@ -153,7 +154,7 @@ void resetGesture() {
     state.primaryActive = false;
     state.gesture.reset();
     state.placementGesture = false;
-    state.contextMapTapEligible = false;
+    state.mapTapEligible = false;
     state.windowID = 0;
     state.longPressFired = false;
     state.repeatProduction = false;
@@ -186,8 +187,10 @@ bool deliverPending(SDL_Event* event) {
     if(state.pendingEvents.empty()) return false;
     const auto pending = state.pendingEvents.front();
     state.pendingEvents.pop_front();
-    *event = pending;
+    *event = pending.event;
     state.touchDispatch = true;
+    state.tapDispatch = pending.tap;
+    state.tapStartedInsideMap = pending.startedInsideMap;
     state.longPressDispatch = (event->type == SDL_MOUSEBUTTONDOWN || event->type == SDL_MOUSEBUTTONUP)
         && event->button.button == SDL_BUTTON_RIGHT;
     return true;
@@ -223,10 +226,11 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
         state.primaryActive = true;
         state.gesture.begin(point.x, point.y);
         state.panEligible = state.camera && state.camera->isScreenCoordInsideMap(point.x, point.y);
-        state.contextMapTapEligible = state.contextMapTapEnabled && state.panEligible;
+        state.mapTapEligible = state.panEligible;
         if(state.productionCatalogTargetValid
            && state.productionCatalogTouch.begin(state.productionCatalogTarget, point.x, point.y, finger.timestamp)) {
             state.panEligible = false;
+            state.mapTapEligible = false;
             state.panBlocked = true;
         } else if(state.placementPreviewEnabled && state.panEligible) {
             state.placementGesture = true;
@@ -237,7 +241,7 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
         state.repeatProduction = false;
         state.gesture.cancel();
         state.placementGesture = false;
-        state.contextMapTapEligible = false;
+        state.mapTapEligible = false;
         state.productionCatalogTouch.cancel();
         if(state.fingers.size() == 2 && !state.panBlocked && state.panEligible
            && key.first == state.primaryFinger.first
@@ -377,8 +381,10 @@ bool isPhysicalMouseEvent(const SDL_Event& event) {
 
 namespace TouchInput {
 
-bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview, bool contextMapTap) {
+bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview) {
     state.touchDispatch = false;
+    state.tapDispatch = false;
+    state.tapStartedInsideMap = false;
     state.longPressDispatch = false;
     if(event == nullptr) {
         return false;
@@ -394,8 +400,6 @@ bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview, bo
         state.pendingEvents.clear();
         if(state.fingers.empty()) resetGesture();
     }
-
-    state.contextMapTapEnabled = contextMapTap;
 
     if(state.placementPreviewEnabled != placementPreview) {
         state.placementPreviewEnabled = placementPreview;
@@ -449,6 +453,10 @@ bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview, bo
 bool isLongPressDispatch() { return state.longPressDispatch; }
 
 bool isTouchDispatch() { return state.touchDispatch; }
+
+bool isTapDispatch() { return state.tapDispatch; }
+
+bool tapStartedInsideMap() { return state.tapStartedInsideMap; }
 
 bool allowProductionRepeat(Uint32 builder, Uint32 item) {
     if(!state.longPressDispatch) return true;

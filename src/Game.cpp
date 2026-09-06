@@ -48,6 +48,7 @@ std::mutex Game::performanceLogMutex;
 #include <misc/SDL2pp.h>
 #include <misc/DiscordManager.h>
 #include <misc/TouchInput.h>
+#include <misc/TouchGesture.h>
 
 #include <players/HumanPlayer.h>
 
@@ -1682,8 +1683,7 @@ void Game::doInput()
     SDL_Event event;
     while(TouchInput::pollEvent(&event,
             (!pInGameMenu && !pInGameMentat && !pWaitingForOtherPlayers) ? screenborder : nullptr,
-            currentCursorMode == CursorMode_Placing,
-            currentCursorMode == CursorMode_Normal && canIssueTouchMapAction())) {
+            currentCursorMode == CursorMode_Placing)) {
         // check for a key press
 
         // first of all update mouse
@@ -1782,6 +1782,34 @@ void Game::doInput()
                         touchPlacementCandidate.clear();
                     }
 
+                    ObjectBase* touchTapTarget = nullptr;
+                    if(TouchInput::isTapDispatch()) {
+                        touchTapUsesRightButton = false;
+                        touchTapDeselects = false;
+                    }
+                    if(mouse->button == SDL_BUTTON_LEFT && TouchInput::isTapDispatch()
+                       && currentCursorMode == CursorMode_Normal) {
+                        const bool endedInsideMap = screenborder->isScreenCoordInsideMap(mouse->x, mouse->y);
+                        if(endedInsideMap) {
+                            touchTapTarget = currentGameMap->getObjectAt(
+                                pLocalHouse,
+                                screenborder->screen2MapX(mouse->x),
+                                screenborder->screen2MapY(mouse->y),
+                                screenborder->screen2worldX(mouse->x),
+                                screenborder->screen2worldY(mouse->y));
+                        }
+                        const bool targetIsSelectedUnit = touchTapTarget != nullptr
+                            && touchTapTarget->isAUnit() && touchTapTarget->isSelected()
+                            && selectedList.count(touchTapTarget->getObjectID()) != 0;
+                        const auto tapAction = TouchInput::chooseTouchMapTapAction(
+                            TouchInput::TouchGestureOutcome::Tap,
+                            { true, TouchInput::tapStartedInsideMap(), endedInsideMap,
+                              canIssueTouchMapAction(), targetIsSelectedUnit });
+                        touchTapUsesRightButton = tapAction != TouchInput::TouchMapTapAction::LeftClick;
+                        touchTapDeselects = tapAction == TouchInput::TouchMapTapAction::DeselectSelectedUnit;
+                        if(touchTapUsesRightButton) mouse->button = SDL_BUTTON_RIGHT;
+                    }
+
                     switch(mouse->button) {
                         case SDL_BUTTON_LEFT: {
                             pInterface->handleMouseLeft(mouse->x, mouse->y, true);
@@ -1859,7 +1887,9 @@ void Game::doInput()
                         case SDL_BUTTON_RIGHT: {
                             //if the right mouse button is pressed
 
-                            if(currentCursorMode != CursorMode_Normal) {
+                            if(TouchInput::isTapDispatch() && touchTapDeselects) {
+                                currentGameMap->deselectObject(touchTapTarget);
+                            } else if(currentCursorMode != CursorMode_Normal) {
                                 //cancel special cursor mode
                                 setCursorMode(CursorMode_Normal);
                             } else if(canIssueSelectedObjectsAction())
@@ -1886,6 +1916,11 @@ void Game::doInput()
 
                 case SDL_MOUSEBUTTONUP: {
                     SDL_MouseButtonEvent* mouse = &event.button;
+
+                    if(mouse->button == SDL_BUTTON_LEFT && TouchInput::isTapDispatch()
+                       && touchTapUsesRightButton) {
+                        mouse->button = SDL_BUTTON_RIGHT;
+                    }
 
                     switch(mouse->button) {
                         case SDL_BUTTON_LEFT: {
@@ -1980,6 +2015,10 @@ void Game::doInput()
                     }
 
                     selectionMode = false;
+                    if(TouchInput::isTapDispatch()) {
+                        touchTapUsesRightButton = false;
+                        touchTapDeselects = false;
+                    }
 
                 } break;
 

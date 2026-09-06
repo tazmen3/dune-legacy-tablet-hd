@@ -10,14 +10,7 @@ namespace {
 
 using TouchInput::TouchGestureClassifier;
 using TouchInput::TouchGestureOutcome;
-
-bool dispatchesContextAction(const TouchGestureClassifier& gesture,
-                             bool enabled = true,
-                             bool startInsideMap = true,
-                             bool endInsideMap = true) {
-    return TouchInput::shouldUseContextMapTap(
-        gesture.outcome(), enabled, startInsideMap, endInsideMap);
-}
+using TouchInput::TouchMapTapAction;
 
 TouchGestureClassifier startedGesture() {
     TouchGestureClassifier gesture;
@@ -25,46 +18,85 @@ TouchGestureClassifier startedGesture() {
     return gesture;
 }
 
+TouchMapTapAction route(const TouchGestureClassifier& gesture,
+                        bool contextActionsEnabled = true,
+                        bool targetIsSelectedUnit = false,
+                        bool touchInput = true,
+                        bool startedInsideMap = true,
+                        bool endedInsideMap = true) {
+    return TouchInput::chooseTouchMapTapAction(
+        gesture.outcome(),
+        { touchInput, startedInsideMap, endedInsideMap,
+          contextActionsEnabled, targetIsSelectedUnit });
+}
+
 } // namespace
 
-TEST_CASE("Unit touch: a map tap dispatches exactly one contextual action", "[touch][unit-command]") {
+TEST_CASE("Unit touch: no selection keeps a unit tap on normal selection", "[touch][unit-command]") {
     auto gesture = startedGesture();
-    gesture.move(100, 100);
-    REQUIRE(gesture.outcome() == TouchGestureOutcome::Tap);
-    REQUIRE(dispatchesContextAction(gesture));
+    REQUIRE(route(gesture, false) == TouchMapTapAction::LeftClick);
 }
 
-TEST_CASE("Unit touch: natural finger jitter remains a tap", "[touch][unit-command]") {
+TEST_CASE("Unit touch: selected unit plus terrain keeps the contextual order", "[touch][unit-command]") {
     auto gesture = startedGesture();
-    gesture.move(107, 107);
-    REQUIRE(gesture.outcome() == TouchGestureOutcome::Tap);
-    REQUIRE(dispatchesContextAction(gesture));
+    REQUIRE(route(gesture) == TouchMapTapAction::ContextAction);
 }
 
-TEST_CASE("Unit touch: selection drag never dispatches a contextual action", "[touch][unit-command]") {
+TEST_CASE("Unit touch: tapping the sole selected unit requests deselection", "[touch][unit-command]") {
+    auto gesture = startedGesture();
+    REQUIRE(route(gesture, true, true) == TouchMapTapAction::DeselectSelectedUnit);
+}
+
+TEST_CASE("Unit touch: tapping one unit in a multi-selection removes that unit", "[touch][unit-command]") {
+    auto gesture = startedGesture();
+    const int selectedUnitCount = 3;
+    REQUIRE(selectedUnitCount > 1);
+    REQUIRE(route(gesture, true, true) == TouchMapTapAction::DeselectSelectedUnit);
+}
+
+TEST_CASE("Unit touch: an enemy target remains contextual", "[touch][unit-command]") {
+    auto gesture = startedGesture();
+    REQUIRE(route(gesture, true, false) == TouchMapTapAction::ContextAction);
+}
+
+TEST_CASE("Unit touch: an unselected ally remains on the desktop contextual path", "[touch][unit-command]") {
+    auto gesture = startedGesture();
+    REQUIRE(route(gesture, true, false) == TouchMapTapAction::ContextAction);
+}
+
+TEST_CASE("Unit touch: selection drag never routes a tap action", "[touch][unit-command]") {
     auto gesture = startedGesture();
     gesture.move(112, 100);
     REQUIRE(gesture.outcome() == TouchGestureOutcome::Drag);
-    REQUIRE_FALSE(dispatchesContextAction(gesture));
+    REQUIRE(route(gesture) == TouchMapTapAction::LeftClick);
 }
 
-TEST_CASE("Unit touch: adding a second finger cancels the pending tap", "[touch][unit-command]") {
+TEST_CASE("Unit touch: natural jitter below 12 logical pixels stays contextual", "[touch][unit-command]") {
+    auto gesture = startedGesture();
+    gesture.move(107, 107);
+    REQUIRE(gesture.outcome() == TouchGestureOutcome::Tap);
+    REQUIRE(route(gesture) == TouchMapTapAction::ContextAction);
+}
+
+TEST_CASE("Unit touch: a second finger cancels the pending tap", "[touch][unit-command]") {
     auto gesture = startedGesture();
     gesture.cancel();
     REQUIRE(gesture.outcome() == TouchGestureOutcome::None);
-    REQUIRE_FALSE(dispatchesContextAction(gesture));
+    REQUIRE(route(gesture, true, true) == TouchMapTapAction::LeftClick);
 }
 
-TEST_CASE("Unit touch: two-finger pan and pinch remain command-free", "[touch][unit-command]") {
-    auto pan = startedGesture();
-    pan.cancel();
-    pan.move(160, 130);
-    REQUIRE_FALSE(dispatchesContextAction(pan));
+TEST_CASE("Unit touch: two-finger pan cannot deselect", "[touch][unit-command]") {
+    auto gesture = startedGesture();
+    gesture.cancel();
+    gesture.move(160, 130);
+    REQUIRE(route(gesture, true, true) == TouchMapTapAction::LeftClick);
+}
 
-    auto pinch = startedGesture();
-    pinch.cancel();
-    pinch.move(80, 100);
-    REQUIRE_FALSE(dispatchesContextAction(pinch));
+TEST_CASE("Unit touch: pinch cannot deselect", "[touch][unit-command]") {
+    auto gesture = startedGesture();
+    gesture.cancel();
+    gesture.move(80, 100);
+    REQUIRE(route(gesture, true, true) == TouchMapTapAction::LeftClick);
 }
 
 TEST_CASE("Unit touch: returning from two fingers to one stays cancelled", "[touch][unit-command]") {
@@ -72,53 +104,32 @@ TEST_CASE("Unit touch: returning from two fingers to one stays cancelled", "[tou
     gesture.cancel();
     gesture.move(101, 101);
     REQUIRE(gesture.outcome() == TouchGestureOutcome::None);
-    REQUIRE_FALSE(dispatchesContextAction(gesture));
+    REQUIRE(route(gesture) == TouchMapTapAction::LeftClick);
 }
 
 TEST_CASE("Unit touch: a third finger keeps gameplay input cancelled", "[touch][unit-command]") {
     auto gesture = startedGesture();
     gesture.cancel();
     gesture.cancel();
-    REQUIRE(gesture.outcome() == TouchGestureOutcome::None);
-    REQUIRE_FALSE(dispatchesContextAction(gesture));
+    REQUIRE(route(gesture, true, true) == TouchMapTapAction::LeftClick);
 }
 
-TEST_CASE("Unit touch: UI and out-of-map taps cannot become commands", "[touch][unit-command]") {
+TEST_CASE("Unit touch: UI sidebar minimap and boundary crossings stay left click", "[touch][unit-command]") {
     auto gesture = startedGesture();
-    REQUIRE_FALSE(dispatchesContextAction(gesture, true, false, false));
-    REQUIRE_FALSE(dispatchesContextAction(gesture, true, false, true));
-    REQUIRE_FALSE(dispatchesContextAction(gesture, true, true, false));
+    REQUIRE(route(gesture, true, true, true, false, false) == TouchMapTapAction::LeftClick);
+    REQUIRE(route(gesture, true, true, true, false, true) == TouchMapTapAction::LeftClick);
+    REQUIRE(route(gesture, true, true, true, true, false) == TouchMapTapAction::LeftClick);
 }
 
-TEST_CASE("Unit touch: a held gesture cannot repeat on release", "[touch][unit-command]") {
+TEST_CASE("Unit touch: a long press owns the gesture and release cannot repeat", "[touch][unit-command]") {
     auto gesture = startedGesture();
-    REQUIRE(dispatchesContextAction(gesture));
-    gesture.cancel(); // the long-press dispatcher owns the completed action
-    REQUIRE_FALSE(dispatchesContextAction(gesture));
-    REQUIRE_FALSE(dispatchesContextAction(gesture));
+    gesture.cancel();
+    REQUIRE(route(gesture, true, true) == TouchMapTapAction::LeftClick);
+    REQUIRE(route(gesture, true, true) == TouchMapTapAction::LeftClick);
 }
 
-TEST_CASE("Unit touch: contextual routing is opt-in and leaves physical mouse unchanged", "[touch][unit-command]") {
+TEST_CASE("Unit touch: physical mouse is never target-routed", "[touch][unit-command]") {
     auto gesture = startedGesture();
-    REQUIRE_FALSE(dispatchesContextAction(gesture, false));
-    REQUIRE(dispatchesContextAction(gesture, true));
-}
-
-TEST_CASE("Unit touch: target semantics share one desktop contextual route", "[touch][unit-command]") {
-    auto terrain = startedGesture();
-    auto enemy = startedGesture();
-    auto ally = startedGesture();
-    auto building = startedGesture();
-
-    REQUIRE(dispatchesContextAction(terrain));
-    REQUIRE(dispatchesContextAction(enemy));
-    REQUIRE(dispatchesContextAction(ally));
-    REQUIRE(dispatchesContextAction(building));
-}
-
-TEST_CASE("Unit touch: multi-selection still produces one routed gesture", "[touch][unit-command]") {
-    auto gesture = startedGesture();
-    int routedGestures = 0;
-    if(dispatchesContextAction(gesture)) ++routedGestures;
-    REQUIRE(routedGestures == 1);
+    REQUIRE(route(gesture, true, false, false) == TouchMapTapAction::LeftClick);
+    REQUIRE(route(gesture, true, true, false) == TouchMapTapAction::LeftClick);
 }

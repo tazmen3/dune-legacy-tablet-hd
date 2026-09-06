@@ -21,12 +21,16 @@ namespace TouchInput {
 #ifdef __ANDROID__
 bool isLongPressDispatch();
 bool isTouchDispatch();
+bool isTapDispatch();
+bool tapStartedInsideMap();
 bool allowProductionRepeat(Uint32 builder, Uint32 item);
 void setProductionCatalogTarget(const ProductionCatalogTarget& target);
 void clearProductionCatalogTarget(Uint32 builderObjectID);
 #else
 inline bool isLongPressDispatch() { return false; }
 inline bool isTouchDispatch() { return false; }
+inline bool isTapDispatch() { return false; }
+inline bool tapStartedInsideMap() { return false; }
 inline bool allowProductionRepeat(Uint32, Uint32) { return true; }
 inline void setProductionCatalogTarget(const ProductionCatalogTarget&) {}
 inline void clearProductionCatalogTarget(Uint32) {}
@@ -37,14 +41,13 @@ inline void clearProductionCatalogTarget(Uint32) {}
  * gestures are normalized into the existing mouse input path.
  * Passing the active map camera enables two-finger pan and pinch. Menus omit it.
  * placementPreview emits live touch motion only for a one-finger placement gesture.
- * contextMapTap converts a validated map tap to the existing contextual right-click
- * path; drags, UI taps and taps outside the map remain left-button input.
+ * Validated taps stay left-button events and carry touch metadata so Game can
+ * choose selection, deselection or the existing contextual action path by target.
  */
 #ifdef __ANDROID__
-bool pollEvent(SDL_Event* event, ScreenBorder* camera = nullptr, bool placementPreview = false,
-               bool contextMapTap = false);
+bool pollEvent(SDL_Event* event, ScreenBorder* camera = nullptr, bool placementPreview = false);
 #else
-inline bool pollEvent(SDL_Event* event, ScreenBorder* = nullptr, bool = false, bool = false) {
+inline bool pollEvent(SDL_Event* event, ScreenBorder* = nullptr, bool = false) {
     return event != nullptr && SDL_PollEvent(event) != 0;
 }
 #endif

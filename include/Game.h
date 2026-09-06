@@ -766,6 +766,8 @@ private:
 
     bool        selectionMode = false;          ///< currently selection multiple units with a selection rectangle?
     SDL_Rect    selectionRect = {0, 0, 0, 0};   ///< the drawn rectangle while selection multiple units
+    bool        touchTapUsesRightButton = false; ///< Target-aware routing for one synthesized tap sequence
+    bool        touchTapDeselects = false;       ///< The routed tap removes its already-selected unit
 
     int         whatNextParam = GAME_NOTHING;
 
