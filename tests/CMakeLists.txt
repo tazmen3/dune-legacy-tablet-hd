@@ -15,6 +15,7 @@ target_sources(dunelegacy_tests
         PlacementCandidateTest.cpp
         ProductionEconomyTest.cpp
         ProductionControlsTest.cpp
+        SaveGameNameTest.cpp
         LocalizationTest.cpp
         PathBudgetTestCase/PathBudgetTestCase.cpp
         NetworkManagerTestCase/NetworkManagerTestCase.cpp
@@ -30,6 +31,7 @@ target_sources(dunelegacy_tests
         $<$<PLATFORM_ID:Windows>:${CMAKE_SOURCE_DIR}/src/enet/win32.c>
         # fmt library (needed for THROW macro in ENet headers)
         ${CMAKE_SOURCE_DIR}/src/misc/format.cpp
+        ${CMAKE_SOURCE_DIR}/src/misc/SaveGameName.cpp
         ${CMAKE_SOURCE_DIR}/src/misc/string_util.cpp
         ${CMAKE_SOURCE_DIR}/src/FileClasses/POFile.cpp
 )

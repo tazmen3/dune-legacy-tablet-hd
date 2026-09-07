@@ -311,6 +311,7 @@ target_sources(dunelegacy
         misc/md5.cpp
         misc/OFileStream.cpp
         misc/Random.cpp
+        misc/SaveGameName.cpp
         misc/sound_util.cpp
         misc/string_util.cpp
         misc/Scaler.cpp
