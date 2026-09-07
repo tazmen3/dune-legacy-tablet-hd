@@ -110,5 +110,6 @@ private:
 
     ChatManager         chatManager;            ///< Manages chat manages shown overlayed with the main map
     TextButton          ornithopterSelectButton;///< Button that selects all owned ornithopters
+    TextButton          deselectButton;         ///< Clears the complete local selection
 };
     #endif // GAMEINTERFACE_H

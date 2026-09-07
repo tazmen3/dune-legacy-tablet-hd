@@ -51,6 +51,7 @@ public:
     void selectObjects(const House* pHouse, int x1, int y1, int x2, int y2, int realX, int realY, bool objectARGMode);
     ObjectBase* getObjectAt(const House* pHouse, int mapX, int mapY, int realX, int realY) const;
     bool deselectObject(ObjectBase* pObject);
+    void clearLastSinglySelectedObject() noexcept { lastSinglySelectedObject = nullptr; }
 
     void viewMap(int houseID, const Coord& location, const int maxViewRange);
     void viewMap(int houseID, int x, int y, const int maxViewRange) {

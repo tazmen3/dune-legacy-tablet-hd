@@ -49,6 +49,7 @@ std::mutex Game::performanceLogMutex;
 #include <misc/DiscordManager.h>
 #include <misc/TouchInput.h>
 #include <misc/TouchGesture.h>
+#include <misc/SelectionControl.h>
 
 #include <players/HumanPlayer.h>
 
@@ -1829,17 +1830,18 @@ void Game::doInput()
                         if(touchTapUsesRightButton) mouse->button = SDL_BUTTON_RIGHT;
                     }
 
+                    bool interfaceInputConsumed = false;
                     switch(mouse->button) {
                         case SDL_BUTTON_LEFT: {
-                            pInterface->handleMouseLeft(mouse->x, mouse->y, true);
+                            interfaceInputConsumed = pInterface->handleMouseLeft(mouse->x, mouse->y, true);
                         } break;
 
                         case SDL_BUTTON_RIGHT: {
-                            pInterface->handleMouseRight(mouse->x, mouse->y, true);
+                            interfaceInputConsumed = pInterface->handleMouseRight(mouse->x, mouse->y, true);
                         } break;
                     }
 
-                    switch(mouse->button) {
+                    if(!interfaceInputConsumed) switch(mouse->button) {
 
                         case SDL_BUTTON_LEFT: {
 
@@ -1941,17 +1943,18 @@ void Game::doInput()
                         mouse->button = SDL_BUTTON_RIGHT;
                     }
 
+                    bool interfaceInputConsumed = false;
                     switch(mouse->button) {
                         case SDL_BUTTON_LEFT: {
-                            pInterface->handleMouseLeft(mouse->x, mouse->y, false);
+                            interfaceInputConsumed = pInterface->handleMouseLeft(mouse->x, mouse->y, false);
                         } break;
 
                         case SDL_BUTTON_RIGHT: {
-                            pInterface->handleMouseRight(mouse->x, mouse->y, false);
+                            interfaceInputConsumed = pInterface->handleMouseRight(mouse->x, mouse->y, false);
                         } break;
                     }
 
-                    if(mouse->button == SDL_BUTTON_LEFT && mouse->which == SDL_TOUCH_MOUSEID
+                    if(!interfaceInputConsumed && mouse->button == SDL_BUTTON_LEFT && mouse->which == SDL_TOUCH_MOUSEID
                        && currentCursorMode == CursorMode_Placing
                        && screenborder->isScreenCoordInsideMap(mouse->x, mouse->y)
                        && selectedList.size() == 1) {
@@ -1965,7 +1968,7 @@ void Game::doInput()
                         }
                     }
 
-                    if(selectionMode && (mouse->button == SDL_BUTTON_LEFT)) {
+                    if(!interfaceInputConsumed && selectionMode && (mouse->button == SDL_BUTTON_LEFT)) {
                         //this keeps the box on the map, and not over game bar
                         int finalMouseX = mouse->x;
                         int finalMouseY = mouse->y;
@@ -3391,8 +3394,30 @@ void Game::selectAllOrnithopters()
 void Game::unselectAll(const std::set<Uint32>& aList)
 {
     for(Uint32 objectID : aList) {
-        objectManager.getObject(objectID)->setSelected(false);
+        ObjectBase* pObject = objectManager.getObject(objectID);
+        if(pObject != nullptr) {
+            pObject->setSelected(false);
+        }
     }
+}
+
+bool Game::clearSelection()
+{
+    return SelectionControl::clearSelection(
+        selectedList,
+        [this](Uint32 objectID) {
+            ObjectBase* pObject = objectManager.getObject(objectID);
+            if(pObject != nullptr) {
+                pObject->setSelected(false);
+            }
+        },
+        [this]() {
+            if(currentGameMap != nullptr) {
+                currentGameMap->clearLastSinglySelectedObject();
+            }
+            setCursorMode(CursorMode_Normal);
+        },
+        [this]() { selectionChanged(); });
 }
 
 void Game::onReceiveSelectionList(const std::string& name, const std::set<Uint32>& newSelectionList, int groupListIndex)

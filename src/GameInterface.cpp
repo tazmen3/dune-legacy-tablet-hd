@@ -29,6 +29,7 @@
 
 #include <misc/draw_util.h>
 #include <misc/SDL2pp.h>
+#include <misc/SelectionControl.h>
 
 #include <algorithm>
 
@@ -87,14 +88,21 @@ GameInterface::GameInterface() : Window(0,0,0,0) {
     ornithopterSelectButton.setOnClick(std::bind(&Game::selectAllOrnithopters, currentGame));
 
     const int ornithopterButtonWidth = sideBar.getSize().x - 25;
-    const int ornithopterButtonHeight = std::max(ornithopterSelectButton.getMinimumSize().y, 36);
+    const int ornithopterButtonHeight = std::max(ornithopterSelectButton.getMinimumSize().y, SIDEBAR_ACTION_BUTTON_HEIGHT);
     const Point ornithopterButtonSize(ornithopterButtonWidth, ornithopterButtonHeight);
     const Point ornithopterButtonPos(
         getRendererWidth() - sideBar.getSize().x + 24,
-        146
+        SIDEBAR_ACTION_BUTTON_TOP
     );
     ornithopterSelectButton.resize(ornithopterButtonSize.x, ornithopterButtonSize.y);
     windowWidget.addWidget(&ornithopterSelectButton, ornithopterButtonPos, ornithopterButtonSize);
+
+    deselectButton.setText(_("Deselect"));
+    deselectButton.setTooltipText(_("Clear the current selection"));
+    deselectButton.setOnClick(std::bind(&Game::clearSelection, currentGame));
+    deselectButton.resize(ornithopterButtonSize.x, ornithopterButtonSize.y);
+    windowWidget.addWidget(&deselectButton, ornithopterButtonPos, ornithopterButtonSize);
+    deselectButton.setVisible(false);
 
     // add chat manager
     windowWidget.addWidget(&chatManager, Point(20, 60), Point(getRendererWidth() - sideBar.getSize().x, 360));
@@ -180,11 +188,13 @@ void GameInterface::updateObjectInterface() {
 
     if(selection.empty()) {
         ornithopterSelectButton.setVisible(true);
+        deselectButton.setVisible(false);
         removeOldContainer();
         return;
     }
 
     ornithopterSelectButton.setVisible(false);
+    deselectButton.setVisible(SelectionControl::isGlobalDeselectVisible(selection.size()));
 
     if(selection.size() == 1) {
         ObjectBase* pObject = currentGame->getObjectManager().getObject(*selection.begin());
@@ -199,8 +209,8 @@ void GameInterface::updateObjectInterface() {
                 objectID = newObjectID;
 
                 windowWidget.addWidget(pObjectContainer,
-                                        Point(getRendererWidth() - sideBar.getSize().x + 24, 146),
-                                        Point(sideBar.getSize().x - 25,getRendererHeight() - 148));
+                                        Point(getRendererWidth() - sideBar.getSize().x + 24, SIDEBAR_OBJECT_INTERFACE_TOP),
+                                        Point(sideBar.getSize().x - 25,getRendererHeight() - SIDEBAR_OBJECT_INTERFACE_TOP - 2));
 
             }
 
@@ -221,8 +231,8 @@ void GameInterface::updateObjectInterface() {
             pObjectContainer = MultiUnitInterface::create();
 
             windowWidget.addWidget(pObjectContainer,
-                                    Point(getRendererWidth() - sideBar.getSize().x + 24, 146),
-                                    Point(sideBar.getSize().x - 25,getRendererHeight() - 148));
+                                    Point(getRendererWidth() - sideBar.getSize().x + 24, SIDEBAR_OBJECT_INTERFACE_TOP),
+                                    Point(sideBar.getSize().x - 25,getRendererHeight() - SIDEBAR_OBJECT_INTERFACE_TOP - 2));
         } else {
             if(pObjectContainer->update() == false) {
                 removeOldContainer();

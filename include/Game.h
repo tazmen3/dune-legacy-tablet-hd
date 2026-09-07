@@ -306,6 +306,12 @@ public:
     void unselectAll(const std::set<Uint32>& aList);
 
     /**
+        Clears the complete local selection and resets selection-specific UI state.
+        \return true if a selection was cleared
+    */
+    bool clearSelection();
+
+    /**
         Returns a list of all currently selected objects.
         \return list of currently selected units/structures
     */
