@@ -1619,6 +1619,10 @@ msgstr "Alles abbrechen"
 msgid "Save"
 msgstr "Speichern"
 
+#: src/GUI/dune/LoadSaveWindow.cpp:104
+msgid "Delete"
+msgstr "Löschen"
+
 #: src/GUI/dune/LoadSaveWindow.cpp:154 src/MapEditor/LoadMapWindow.cpp:153
 #, c-format
 msgid "Do you really want to delete '%s' ?"

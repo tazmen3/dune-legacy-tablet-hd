@@ -101,6 +101,15 @@ LoadSaveWindow::LoadSaveWindow(bool bSave, const std::string& caption, const std
 
     buttonHBox.addWidget(HSpacer::create(8));
 
+    deleteButton.setText(_("Delete"));
+    deleteButton.setTextColor(color);
+    deleteButton.setEnabled(false);
+    deleteButton.setOnClick(std::bind(&LoadSaveWindow::onDelete, this));
+
+    buttonHBox.addWidget(&deleteButton);
+
+    buttonHBox.addWidget(HSpacer::create(8));
+
     cancelButton.setText(_("Cancel"));
     cancelButton.setTextColor(color);
     cancelButton.setOnClick(std::bind(&LoadSaveWindow::onCancel, this));
@@ -143,6 +152,8 @@ void LoadSaveWindow::updateEntries() {
     if(preselectedFileIndex >= 0) {
         fileList.setSelectedItem(preselectedFileIndex);
     }
+
+    updateDeleteButtonState();
 }
 
 bool LoadSaveWindow::handleKeyPress(SDL_KeyboardEvent& key) {
@@ -156,18 +167,7 @@ bool LoadSaveWindow::handleKeyPress(SDL_KeyboardEvent& key) {
             onOK();
             return true;
         } else if(key.keysym.sym == SDLK_DELETE) {
-            int index = fileList.getSelectedIndex();
-            if(index >= 0) {
-                QstBox* pQstBox = QstBox::create(   fmt::sprintf(_("Do you really want to delete '%s' ?"), fileList.getEntry(index).c_str()),
-                                                    _("Yes"),
-                                                    _("No"),
-                                                    QSTBOX_BUTTON1);
-
-                pQstBox->setTextColor(color);
-
-                openWindow(pQstBox);
-            }
-
+            onDelete();
             return true;
         } else {
             return pWindowWidget->handleKeyPress(key);
@@ -216,6 +216,8 @@ void LoadSaveWindow::onChildWindowClose(Window* pChildWindow) {
             fileList.setSelectedItem(index);
         }
     }
+
+    updateDeleteButtonState();
 }
 
 
@@ -253,6 +255,19 @@ void LoadSaveWindow::onCancel() {
     }
 }
 
+void LoadSaveWindow::onDelete() {
+    const int index = fileList.getSelectedIndex();
+    if(index < 0) return;
+
+    QstBox* pQstBox = QstBox::create(   fmt::sprintf(_("Do you really want to delete '%s' ?"), fileList.getEntry(index).c_str()),
+                                        _("Yes"),
+                                        _("No"),
+                                        QSTBOX_BUTTON1);
+
+    pQstBox->setTextColor(color);
+    openWindow(pQstBox);
+}
+
 void LoadSaveWindow::onDirectoryChange(int i) {
     currentDirectoryIndex = i;
     for(int j = 0; j < (int) directoryButtons.size(); j++) {
@@ -263,11 +278,15 @@ void LoadSaveWindow::onDirectoryChange(int i) {
 }
 
 void LoadSaveWindow::onSelectionChange(bool bInteractive) {
-    if(bSaveWindow != true) return;
+    const int index = fileList.getSelectedIndex();
+    deleteButton.setEnabled(index >= 0);
 
-    int index = fileList.getSelectedIndex();
-    if(index >= 0) {
+    if(bSaveWindow && index >= 0) {
         saveName.setText(fileList.getEntry(index));
     }
+}
+
+void LoadSaveWindow::updateDeleteButtonState() {
+    deleteButton.setEnabled(fileList.getSelectedIndex() >= 0);
 }
 

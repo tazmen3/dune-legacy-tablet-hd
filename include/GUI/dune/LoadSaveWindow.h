@@ -109,10 +109,12 @@ private:
 
     void onOK();
     void onCancel();
+    void onDelete();
 
     void onDirectoryChange(int i);
 
     void onSelectionChange(bool bInteractive);
+    void updateDeleteButtonState();
 
     HBox    mainHBox;
     VBox    mainVBox;
@@ -126,6 +128,7 @@ private:
     Label       titleLabel;
     ListBox     fileList;
     TextButton  okButton;
+    TextButton  deleteButton;
     TextButton  cancelButton;
     TextBox     saveName;
 
