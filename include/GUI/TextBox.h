@@ -30,6 +30,8 @@
 class TextBox : public Widget {
 public:
 
+    using Widget::setActive;
+
     /// default constructor
     TextBox() : Widget() {
         fontSize = 14;
@@ -45,6 +47,9 @@ public:
 
     /// destructor
     virtual ~TextBox() {
+#ifdef __ANDROID__
+        stopTextInput();
+#endif
         invalidateTextures();
     }
 
@@ -246,8 +251,28 @@ public:
         if(pressed == true) {
             setActive();
             lastCarretTime = SDL_GetTicks();
+#ifdef __ANDROID__
+            startTextInput();
+#endif
         }
         return true;
+    }
+
+    /**
+        Sets this text box inactive. On Android, this also hides the virtual keyboard
+        if the field currently owns the focus.
+    */
+    void setInactive() override
+    {
+#ifdef __ANDROID__
+        const bool wasActive = isActive();
+#endif
+        Widget::setInactive();
+#ifdef __ANDROID__
+        if(wasActive) {
+            stopTextInput();
+        }
+#endif
     }
 
     /**
@@ -317,6 +342,24 @@ public:
 
 protected:
     /**
+        This method is called by containers to change the focus. Starting text input
+        here would show Android's keyboard for programmatic focus (for example when a
+        save name is preselected), so only focus loss is handled here.
+    */
+    void setActive(bool bActive) override
+    {
+#ifdef __ANDROID__
+        const bool wasActive = isActive();
+#endif
+        Widget::setActive(bActive);
+#ifdef __ANDROID__
+        if(wasActive && !bActive) {
+            stopTextInput();
+        }
+#endif
+    }
+
+    /**
         This method sets a new text for this text box.
         \param  text            The new text for this text box
         \param  bInteractive    Was this text change initiated by the user?
@@ -340,6 +383,24 @@ protected:
     }
 
 private:
+#ifdef __ANDROID__
+    void startTextInput()
+    {
+        SDL_StartTextInput();
+        androidTextInputStarted = true;
+    }
+
+    void stopTextInput()
+    {
+        if(androidTextInputStarted) {
+            SDL_StopTextInput();
+            androidTextInputStarted = false;
+        }
+    }
+
+    bool androidTextInputStarted = false;
+#endif
+
     int fontSize;                               ///< the size of the font to use
     Uint32 textcolor;                           ///< Text color
     Uint32 textshadowcolor;                     ///< Text shadow color
