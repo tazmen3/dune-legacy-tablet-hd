@@ -20,6 +20,7 @@
 
 #include <queue>
 #include <list>
+#include <functional>
 #include <CutScenes/VideoEvent.h>
 #include <CutScenes/TextEvent.h>
 #include <CutScenes/CutSceneTrigger.h>
@@ -79,7 +80,7 @@ public:
         This method draws the current frame. First the video and then the text is drawn. Afterwards CutSceneTriggers are triggered.
         \return the milliseconds until the next frame shall be drawn.
     */
-    int draw();
+    int draw(const std::function<void()>& overlay = {});
 
 private:
     int currentFrameNumber;                     ///< current frame number in this frame

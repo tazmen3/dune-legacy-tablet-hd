@@ -52,7 +52,7 @@ void Scene::addTrigger(std::unique_ptr<CutSceneTrigger> newTrigger)
     triggerList.insert(iter, std::move(newTrigger));
 }
 
-int Scene::draw()
+int Scene::draw(const std::function<void()>& overlay)
 {
     int nextFrameTime = 0;
 
@@ -73,6 +73,10 @@ int Scene::draw()
 
     for(auto& pTextEvent : textEvents) {
         pTextEvent->draw(currentFrameNumber);
+    }
+
+    if(overlay) {
+        overlay();
     }
 
     // 3.: Render everything

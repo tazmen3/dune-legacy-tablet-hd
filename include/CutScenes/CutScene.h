@@ -24,6 +24,7 @@
 #include <misc/SDL2pp.h>
 
 #include <queue>
+#include <string>
 
 /// A base class for running Dune 2 Cutscenes.
 /**
@@ -78,6 +79,12 @@ public:
 
 protected:
     /**
+     * Shows an optional skip button. It is disabled by default so other
+     * cutscenes retain their existing input and rendering behaviour.
+     */
+    void enableSkipButton(const std::string& label);
+
+    /**
         This method draws the current frame. The drawing is deligated to Scene::draw() of the first scene in the scenes queue.
         If the first scene is finished it is dropped from the queue and the next scene is used. If the scenes queue is empty
         the whole cutscene is finished.
@@ -90,8 +97,17 @@ protected:
     static std::unique_ptr<Wsafile> create_wsafile(const char* name1, const char* name2, const char* name3);
 
 private:
+    void abortCutScene();
+    void drawSkipButton() const;
+    SDL_Rect getSkipButtonVisualRect() const;
+    SDL_Rect getSkipButtonHitRect() const;
+    bool isInsideSkipButton(int x, int y) const;
+
     std::queue<std::unique_ptr<Scene>> scenes;  ///< List of all scenes
     bool quiting;                               ///< Quit the cutscene?
+    bool skipButtonEnabled = false;
+    bool skipButtonPressed = false;
+    sdl2::texture_ptr pSkipButtonText;
 };
 
 #endif // CUTSCENE_H

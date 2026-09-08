@@ -19,11 +19,18 @@
 
 #include <FileClasses/Palfile.h>
 #include <FileClasses/FileManager.h>
+#include <FileClasses/FontManager.h>
 #include <FileClasses/music/MusicPlayer.h>
+#include <CutScenes/TouchSkipButton.h>
+#include <misc/DrawingRectHelper.h>
 #include <misc/SDL2pp.h>
+#include <misc/TouchInput.h>
+#include <misc/draw_util.h>
 
 #include <globals.h>
 #include <sand.h>
+
+#include <algorithm>
 
 CutScene::CutScene()
 {
@@ -48,7 +55,7 @@ void CutScene::run()
 
         const int nextFrameTime = draw();
 
-        while(SDL_PollEvent(&event)) {
+        while(TouchInput::pollEvent(&event)) {
 
             //check the events
             switch (event.type)
@@ -56,13 +63,36 @@ void CutScene::run()
                 case (SDL_KEYDOWN): // Look for a keypress
                 {
                     if((event.key.keysym.sym == SDLK_SPACE) || (event.key.keysym.sym == SDLK_ESCAPE)) {
-                        // Fixes some flickering
-                        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-                        SDL_RenderClear(renderer);
-                        SDL_RenderPresent(renderer);
-                        quiting = true;
+                        abortCutScene();
                     }
-                }
+                } break;
+
+                case SDL_MOUSEBUTTONDOWN:
+                    if(skipButtonEnabled) {
+                        CutScenes::armTouchSkipButton(event.button.button == SDL_BUTTON_LEFT,
+                                                      isInsideSkipButton(event.button.x, event.button.y),
+                                                      skipButtonPressed);
+                    }
+                    break;
+
+                case SDL_MOUSEBUTTONUP:
+                    if(skipButtonEnabled
+                       && CutScenes::releaseTouchSkipButton(event.button.button == SDL_BUTTON_LEFT,
+                                                            isInsideSkipButton(event.button.x, event.button.y),
+                                                            skipButtonPressed)) {
+                        abortCutScene();
+                    }
+                    break;
+
+                case SDL_WINDOWEVENT:
+                    if(event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+                        skipButtonPressed = false;
+                    }
+                    break;
+            }
+
+            if(quiting) {
+                break;
             }
         }
 
@@ -113,7 +143,11 @@ int CutScene::draw()
             scenes.pop();
             continue;
         } else {
-            nextFrameTime = scenes.front()->draw();
+            if(skipButtonEnabled) {
+                nextFrameTime = scenes.front()->draw([this] { drawSkipButton(); });
+            } else {
+                nextFrameTime = scenes.front()->draw();
+            }
             break;
         }
     }
@@ -123,6 +157,79 @@ int CutScene::draw()
     }
 
     return nextFrameTime;
+}
+
+void CutScene::enableSkipButton(const std::string& label)
+{
+    pSkipButtonText = pFontManager->createTextureWithText(label, COLOR_WHITE, 14);
+    SDL_SetTextureBlendMode(pSkipButtonText.get(), SDL_BLENDMODE_BLEND);
+    skipButtonEnabled = true;
+}
+
+void CutScene::abortCutScene()
+{
+    // Fixes some flickering while leaving through the same path as ESC/SPACE.
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+    SDL_RenderPresent(renderer);
+    quit();
+}
+
+SDL_Rect CutScene::getSkipButtonVisualRect() const
+{
+    constexpr int Margin = 18;
+    constexpr int HorizontalPadding = 16;
+    constexpr int VerticalPadding = 10;
+    constexpr int MinimumWidth = 104;
+    constexpr int MinimumHeight = 36;
+
+    int textWidth = 0;
+    int textHeight = 0;
+    SDL_QueryTexture(pSkipButtonText.get(), nullptr, nullptr, &textWidth, &textHeight);
+
+    const int rendererWidth = getRendererWidth();
+    const int rendererHeight = getRendererHeight();
+    const int margin = std::min(Margin, std::min(rendererWidth, rendererHeight) / 8);
+    const int width = std::min(rendererWidth - 2 * margin, std::max(MinimumWidth, textWidth + 2 * HorizontalPadding));
+    const int height = std::min(rendererHeight - 2 * margin, std::max(MinimumHeight, textHeight + 2 * VerticalPadding));
+
+    return { rendererWidth - margin - width, margin, width, height };
+}
+
+SDL_Rect CutScene::getSkipButtonHitRect() const
+{
+    constexpr int MinimumTouchWidth = 144;
+    constexpr int MinimumTouchHeight = 64;
+
+    const SDL_Rect visualRect = getSkipButtonVisualRect();
+    const int width = std::min(visualRect.x + visualRect.w, std::max(MinimumTouchWidth, visualRect.w));
+    const int height = std::min(getRendererHeight() - visualRect.y, std::max(MinimumTouchHeight, visualRect.h));
+
+    return { visualRect.x + visualRect.w - width, visualRect.y, width, height };
+}
+
+bool CutScene::isInsideSkipButton(int x, int y) const
+{
+    const SDL_Rect hitRect = getSkipButtonHitRect();
+    return x >= hitRect.x && x < hitRect.x + hitRect.w && y >= hitRect.y && y < hitRect.y + hitRect.h;
+}
+
+void CutScene::drawSkipButton() const
+{
+    SDL_Rect visualRect = getSkipButtonVisualRect();
+    renderFillRect(renderer, &visualRect, COLOR_RGBA(0, 0, 0, 176));
+    renderDrawRect(renderer, &visualRect, COLOR_WHITE);
+
+    int textWidth = 0;
+    int textHeight = 0;
+    SDL_QueryTexture(pSkipButtonText.get(), nullptr, nullptr, &textWidth, &textHeight);
+    SDL_Rect textRect = {
+        visualRect.x + (visualRect.w - textWidth) / 2,
+        visualRect.y + (visualRect.h - textHeight) / 2,
+        textWidth,
+        textHeight
+    };
+    SDL_RenderCopy(renderer, pSkipButtonText.get(), nullptr, &textRect);
 }
 
 std::unique_ptr<Wsafile> CutScene::create_wsafile(const char* name1)

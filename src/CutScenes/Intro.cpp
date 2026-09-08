@@ -84,6 +84,8 @@ const char* Intro::VoiceFileNames[Voice_NUM_ENTRIES] =   {  "BLDING.VOC",
 
 Intro::Intro() {
 
+    enableSkipButton("Passer");
+
     pDuneText = create_wsafile("INTRO1.WSA");
     pPlanet = create_wsafile("INTRO2.WSA");
     pSandstorm = create_wsafile("INTRO3.WSA");
