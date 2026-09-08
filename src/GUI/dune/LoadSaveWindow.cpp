@@ -29,7 +29,14 @@
 
 #include <misc/format.h>
 
+#include <algorithm>
 #include <stdio.h>
+
+#ifdef __ANDROID__
+namespace {
+constexpr int TextInputTopMargin = 32;
+}
+#endif
 
 LoadSaveWindow::LoadSaveWindow(bool bSave, const std::string& caption, const std::vector<std::string>& directories, const std::vector<std::string>& directoryTitles, const std::string& extension, int preselectedDirectoryIndex, const std::string& preselectedFile, Uint32 color)
  : Window(0,0,0,0), bSaveWindow(bSave), directories(directories), directoryTitles(directoryTitles), extension(extension), currentDirectoryIndex(preselectedDirectoryIndex), preselectedFile(preselectedFile), color(color) {
@@ -168,6 +175,24 @@ bool LoadSaveWindow::handleKeyPress(SDL_KeyboardEvent& key) {
     } else {
         return false;
     }
+}
+
+void LoadSaveWindow::draw(Point position) {
+    updatePositionForTextInput();
+    Window::draw(position);
+}
+
+void LoadSaveWindow::updatePositionForTextInput() {
+#ifdef __ANDROID__
+    const int centeredX = std::max(0, (getRendererWidth() - getSize().x) / 2);
+    const int centeredY = std::max(0, (getRendererHeight() - getSize().y) / 2);
+    const int textInputY = std::min(TextInputTopMargin, std::max(0, getRendererHeight() - getSize().y));
+    const int y = (bSaveWindow && SDL_IsTextInputActive()) ? textInputY : centeredY;
+
+    if((getPosition().x != centeredX) || (getPosition().y != y)) {
+        setCurrentPosition(centeredX, y, getSize().x, getSize().y);
+    }
+#endif
 }
 
 
