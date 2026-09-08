@@ -16,14 +16,15 @@ namespace CutScenes {
  * Tracks a pointer press so a skip action is only emitted on a primary-button
  * release that remains inside the skip target.
  */
-inline void armTouchSkipButton(bool primaryButton, bool insideTarget, bool& pressedInside) {
-    if(primaryButton) {
-        pressedInside = insideTarget;
-    }
+inline void armTouchSkipButton(bool primaryButton, bool validGesture, bool insideTarget, bool& pressedInside) {
+    pressedInside = primaryButton && validGesture && insideTarget;
 }
 
-inline bool releaseTouchSkipButton(bool primaryButton, bool insideTarget, bool& pressedInside) {
-    if(!primaryButton || !pressedInside) {
+inline bool releaseTouchSkipButton(bool primaryButton, bool validGesture, bool insideTarget, bool& pressedInside) {
+    if(!primaryButton || !validGesture || !pressedInside) {
+        if(primaryButton && !validGesture) {
+            pressedInside = false;
+        }
         return false;
     }
 

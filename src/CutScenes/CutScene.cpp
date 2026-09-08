@@ -69,7 +69,8 @@ void CutScene::run()
 
                 case SDL_MOUSEBUTTONDOWN:
                     if(skipButtonEnabled) {
-                        CutScenes::armTouchSkipButton(event.button.button == SDL_BUTTON_LEFT,
+                        const bool validGesture = event.button.which != SDL_TOUCH_MOUSEID || TouchInput::isTapDispatch();
+                        CutScenes::armTouchSkipButton(event.button.button == SDL_BUTTON_LEFT, validGesture,
                                                       isInsideSkipButton(event.button.x, event.button.y),
                                                       skipButtonPressed);
                     }
@@ -78,6 +79,7 @@ void CutScene::run()
                 case SDL_MOUSEBUTTONUP:
                     if(skipButtonEnabled
                        && CutScenes::releaseTouchSkipButton(event.button.button == SDL_BUTTON_LEFT,
+                                                            event.button.which != SDL_TOUCH_MOUSEID || TouchInput::isTapDispatch(),
                                                             isInsideSkipButton(event.button.x, event.button.y),
                                                             skipButtonPressed)) {
                         abortCutScene();
