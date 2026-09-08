@@ -15,6 +15,7 @@ target_sources(dunelegacy_tests
         PlacementCandidateTest.cpp
         ProductionEconomyTest.cpp
         ProductionControlsTest.cpp
+        BuilderListInputRoutingTest.cpp
         SaveGameNameTest.cpp
         LocalizationTest.cpp
         PathBudgetTestCase/PathBudgetTestCase.cpp
