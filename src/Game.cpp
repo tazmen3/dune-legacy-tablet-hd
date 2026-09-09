@@ -88,6 +88,15 @@ std::mutex Game::performanceLogMutex;
 
 namespace {
 
+bool isEligibleTouchRallyStructure(const ObjectBase* object, const House* localHouse) {
+    return object != nullptr
+        && object->isAStructure()
+        && object->isABuilder()
+        && object->getItemID() != Structure_ConstructionYard
+        && object->getOwner() == localHouse
+        && object->isRespondable();
+}
+
 struct PlacementEvaluation {
     Coord size;
     bool canPlace = false;
@@ -1821,6 +1830,10 @@ void Game::doInput()
                         const bool targetIsSelectedUnit = touchTapTarget != nullptr
                             && touchTapTarget->isAUnit() && touchTapTarget->isSelected()
                             && selectedList.count(touchTapTarget->getObjectID()) != 0;
+                        const bool targetIsSelectedRallyStructure = touchTapTarget != nullptr
+                            && touchTapTarget->isSelected()
+                            && selectedList.count(touchTapTarget->getObjectID()) != 0
+                            && isEligibleTouchRallyStructure(touchTapTarget, pLocalHouse);
                         // Keep this aligned with Map::selectObjects(): its normal left-click
                         // selection path selects an object owned by the local house.
                         const bool targetIsSelectableFriendly = touchTapTarget != nullptr
@@ -1829,7 +1842,8 @@ void Game::doInput()
                             TouchInput::TouchGestureOutcome::Tap,
                             { true, TouchInput::tapStartedInsideMap(), endedInsideMap,
                               canIssueTouchMapAction(), targetIsSelectedUnit,
-                              targetIsSelectableFriendly });
+                              targetIsSelectableFriendly,
+                              targetIsSelectedRallyStructure });
                         touchTapUsesRightButton = tapAction != TouchInput::TouchMapTapAction::LeftClick;
                         touchTapDeselects = tapAction == TouchInput::TouchMapTapAction::DeselectSelectedUnit;
                         if(touchTapUsesRightButton) mouse->button = SDL_BUTTON_RIGHT;
@@ -4170,6 +4184,9 @@ bool Game::canIssueTouchMapAction() {
         ObjectBase* pObject = objectManager.getObject(objectID);
         if(pObject != nullptr && pObject->isAUnit()
            && pObject->getOwner() == pLocalHouse && pObject->isRespondable()) {
+            return true;
+        }
+        if(isEligibleTouchRallyStructure(pObject, pLocalHouse)) {
             return true;
         }
     }

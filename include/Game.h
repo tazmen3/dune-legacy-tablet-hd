@@ -530,7 +530,7 @@ private:
     /** Whether the current selection may use the ordinary contextual action path. */
     bool canIssueSelectedObjectsAction();
 
-    /** Whether a map tap should be adapted to a contextual unit action. */
+    /** Whether a map tap should be adapted to a contextual unit or rally-point action. */
     bool canIssueTouchMapAction();
 
     /**

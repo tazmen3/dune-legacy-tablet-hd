@@ -24,11 +24,13 @@ TouchMapTapAction route(const TouchGestureClassifier& gesture,
                         bool targetIsSelectableFriendly = false,
                         bool touchInput = true,
                         bool startedInsideMap = true,
-                        bool endedInsideMap = true) {
+                        bool endedInsideMap = true,
+                        bool targetIsSelectedRallyStructure = false) {
     return TouchInput::chooseTouchMapTapAction(
         gesture.outcome(),
         { touchInput, startedInsideMap, endedInsideMap,
-          contextActionsEnabled, targetIsSelectedUnit, targetIsSelectableFriendly });
+          contextActionsEnabled, targetIsSelectedUnit, targetIsSelectableFriendly,
+          targetIsSelectedRallyStructure });
 }
 
 } // namespace
@@ -191,4 +193,61 @@ TEST_CASE("Unit touch: physical mouse is never target-routed", "[touch][unit-com
     auto gesture = startedGesture();
     REQUIRE(route(gesture, true, false, false, false) == TouchMapTapAction::LeftClick);
     REQUIRE(route(gesture, true, true, false, false) == TouchMapTapAction::LeftClick);
+}
+
+TEST_CASE("Rally point touch: selected producer plus terrain is contextual", "[touch][rally-point]") {
+    auto gesture = startedGesture();
+    REQUIRE(route(gesture) == TouchMapTapAction::ContextAction);
+}
+
+TEST_CASE("Rally point touch: tapping the selected producer is contextual", "[touch][rally-point]") {
+    auto gesture = startedGesture();
+    REQUIRE(route(gesture, true, false, true, true, true, true, true) == TouchMapTapAction::ContextAction);
+}
+
+TEST_CASE("Rally point touch: another allied unit keeps normal selection", "[touch][rally-point]") {
+    auto gesture = startedGesture();
+    REQUIRE(route(gesture, true, false, true) == TouchMapTapAction::LeftClick);
+}
+
+TEST_CASE("Rally point touch: another allied structure keeps normal selection", "[touch][rally-point]") {
+    auto gesture = startedGesture();
+    REQUIRE(route(gesture, true, false, true) == TouchMapTapAction::LeftClick);
+}
+
+TEST_CASE("Rally point touch: Construction Yard selection does not route terrain taps", "[touch][rally-point]") {
+    auto gesture = startedGesture();
+    REQUIRE(route(gesture, false) == TouchMapTapAction::LeftClick);
+}
+
+TEST_CASE("Rally point touch: jitter below the threshold remains contextual", "[touch][rally-point]") {
+    auto gesture = startedGesture();
+    gesture.move(107, 107);
+    REQUIRE(gesture.outcome() == TouchGestureOutcome::Tap);
+    REQUIRE(route(gesture) == TouchMapTapAction::ContextAction);
+}
+
+TEST_CASE("Rally point touch: drag, pan, pinch, and cancellation cannot route an order", "[touch][rally-point]") {
+    auto drag = startedGesture();
+    drag.move(112, 100);
+    REQUIRE(route(drag) == TouchMapTapAction::LeftClick);
+
+    auto pan = startedGesture();
+    pan.cancel();
+    pan.move(160, 130);
+    REQUIRE(route(pan) == TouchMapTapAction::LeftClick);
+
+    auto pinch = startedGesture();
+    pinch.cancel();
+    pinch.move(80, 100);
+    REQUIRE(route(pinch) == TouchMapTapAction::LeftClick);
+
+    auto cancelled = startedGesture();
+    cancelled.cancel();
+    REQUIRE(route(cancelled) == TouchMapTapAction::LeftClick);
+}
+
+TEST_CASE("Rally point touch: physical mouse remains unchanged", "[touch][rally-point]") {
+    auto gesture = startedGesture();
+    REQUIRE(route(gesture, true, false, false, false, true, true, true) == TouchMapTapAction::LeftClick);
 }
