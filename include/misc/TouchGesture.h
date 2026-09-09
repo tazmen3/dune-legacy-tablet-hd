@@ -32,6 +32,7 @@ struct TouchMapTapContext {
     bool endedInsideMap = false;
     bool contextActionsEnabled = false;
     bool targetIsSelectedUnit = false;
+    bool targetIsSelectableFriendly = false;
 };
 
 /**
@@ -103,6 +104,9 @@ constexpr TouchMapTapAction chooseTouchMapTapAction(TouchGestureOutcome outcome,
     }
     if(context.targetIsSelectedUnit) {
         return TouchMapTapAction::DeselectSelectedUnit;
+    }
+    if(context.targetIsSelectableFriendly) {
+        return TouchMapTapAction::LeftClick;
     }
     return context.contextActionsEnabled
         ? TouchMapTapAction::ContextAction

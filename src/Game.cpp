@@ -1821,10 +1821,15 @@ void Game::doInput()
                         const bool targetIsSelectedUnit = touchTapTarget != nullptr
                             && touchTapTarget->isAUnit() && touchTapTarget->isSelected()
                             && selectedList.count(touchTapTarget->getObjectID()) != 0;
+                        // Keep this aligned with Map::selectObjects(): its normal left-click
+                        // selection path selects an object owned by the local house.
+                        const bool targetIsSelectableFriendly = touchTapTarget != nullptr
+                            && touchTapTarget->getOwner() == pLocalHouse;
                         const auto tapAction = TouchInput::chooseTouchMapTapAction(
                             TouchInput::TouchGestureOutcome::Tap,
                             { true, TouchInput::tapStartedInsideMap(), endedInsideMap,
-                              canIssueTouchMapAction(), targetIsSelectedUnit });
+                              canIssueTouchMapAction(), targetIsSelectedUnit,
+                              targetIsSelectableFriendly });
                         touchTapUsesRightButton = tapAction != TouchInput::TouchMapTapAction::LeftClick;
                         touchTapDeselects = tapAction == TouchInput::TouchMapTapAction::DeselectSelectedUnit;
                         if(touchTapUsesRightButton) mouse->button = SDL_BUTTON_RIGHT;
