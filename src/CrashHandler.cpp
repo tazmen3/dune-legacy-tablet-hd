@@ -233,6 +233,12 @@ void installCrashHandlers(const char* logPath) {
         crashLogFile = stderr;
     }
     
+    // Android diagnostic builds must leave fatal signals to debuggerd so
+    // logcat can contain the native PC and backtrace.
+#if defined(__ANDROID__) && defined(DUNELEGACY_ANDROID_DEBUG_DIAGNOSTICS)
+    signal(SIGPIPE, SIG_IGN);        // Ignore broken pipe (POSIX)
+    SDL_Log("Android Debug: native fatal signals left to debuggerd");
+#else
     // Install handlers for common crash signals
     signal(SIGSEGV, signalHandler);  // Segmentation fault
     signal(SIGABRT, signalHandler);  // Abort
@@ -244,6 +250,7 @@ void installCrashHandlers(const char* logPath) {
     signal(SIGPIPE, SIG_IGN);        // Ignore broken pipe (POSIX)
 #else
     signal(SIGTERM, signalHandler);  // Termination request (Windows)
+#endif
 #endif
     
     SDL_Log("Crash handlers installed (log: %s)", logPath);

@@ -35,6 +35,12 @@ else()
     add_executable(dunelegacy)
 endif()
 
+# This is enabled only by the Android Gradle Debug variant.  It deliberately
+# leaves native fatal signals to Android's debuggerd for crash diagnosis.
+if(ANDROID AND DUNELEGACY_ANDROID_DEBUG_DIAGNOSTICS)
+    target_compile_definitions(dunelegacy PRIVATE DUNELEGACY_ANDROID_DEBUG_DIAGNOSTICS=1)
+endif()
+
 # Enable Win32 subsystem on Windows
 if(WIN32)
     if(MSVC)

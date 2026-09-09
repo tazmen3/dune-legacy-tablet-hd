@@ -97,9 +97,25 @@ android {
         }
     }
 
+    signingConfigs {
+        debug {
+            // Reuse the existing local debug certificate so updates preserve
+            // the installed application's private data.
+            storeFile rootProject.file(".gradle-user-home/android-user-home/debug.keystore")
+        }
+    }
+
     buildTypes {
         debug {
             debuggable true
+            signingConfig signingConfigs.debug
+
+            // Keep Android's native fatal-signal handling intact in diagnostic builds.
+            externalNativeBuild {
+                cmake {
+                    arguments "-DDUNELEGACY_ANDROID_DEBUG_DIAGNOSTICS=ON"
+                }
+            }
         }
         release {
             minifyEnabled false
