@@ -64,6 +64,17 @@ if(WIN32)
             imm32
             version
     )
+
+    # Keep the executable runnable when launched directly from the build tree.
+    # TARGET_RUNTIME_DLLS resolves the SDL2 runtime supplied by the configured
+    # package manager without hardcoding a machine-specific DLL path.
+    add_custom_command(TARGET dunelegacy_tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_RUNTIME_DLLS:dunelegacy_tests>
+            $<TARGET_FILE_DIR:dunelegacy_tests>
+        COMMAND_EXPAND_LISTS
+        COMMENT "Copying Windows runtime DLLs for dunelegacy_tests"
+    )
 endif()
 
 # Compiler options
