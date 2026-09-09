@@ -3,6 +3,9 @@ plugins {
 }
 
 def androidVersionName = "0.99.5-android13"
+// Increment whenever the bundled engine-data content changes.  This is kept
+// separate from the application version because APK updates retain filesDir.
+def bundledAssetVersion = "2026.09.09.1"
 def bundledAssetRoot = "dunelegacy-data"
 def generatedAssetsDir = layout.buildDirectory.dir("generated/duneLegacyAssets/main")
 def assetVersionFile = "asset-version.txt"
@@ -29,7 +32,7 @@ def verifyNoProprietaryDuneData = tasks.register("verifyNoProprietaryDuneData") 
 
 def prepareDuneLegacyAssets = tasks.register("prepareDuneLegacyAssets", Sync) {
     dependsOn verifyNoProprietaryDuneData
-    inputs.property("assetVersion", androidVersionName)
+    inputs.property("assetVersion", bundledAssetVersion)
     into generatedAssetsDir
     from(file("../../data")) {
         into bundledAssetRoot
@@ -40,7 +43,7 @@ def prepareDuneLegacyAssets = tasks.register("prepareDuneLegacyAssets", Sync) {
     doLast {
         def assetRoot = new File(generatedAssetsDir.get().asFile, bundledAssetRoot)
         def marker = new File(assetRoot, assetVersionFile)
-        marker.text = "${androidVersionName}\n"
+        marker.text = "${bundledAssetVersion}\n"
 
         def manifest = new File(assetRoot, assetManifestFile)
         def managedPaths = fileTree(assetRoot).files.findAll { candidate ->
