@@ -5,7 +5,7 @@ plugins {
 def androidVersionName = "0.99.5-android13"
 // Increment whenever the bundled engine-data content changes.  This is kept
 // separate from the application version because APK updates retain filesDir.
-def bundledAssetVersion = "2026.09.09.2"
+def bundledAssetVersion = "2026.09.09.3"
 def bundledAssetRoot = "dunelegacy-data"
 def generatedAssetsDir = layout.buildDirectory.dir("generated/duneLegacyAssets/main")
 def assetVersionFile = "asset-version.txt"
