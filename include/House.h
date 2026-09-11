@@ -198,7 +198,8 @@ public:
 
     void freeHarvester(int xPos, int yPos);
     void freeHarvester(const Coord& coord) { freeHarvester(coord.x, coord.y); };
-    StructureBase* placeStructure(Uint32 builderID, int itemID, int xPos, int yPos, bool byScenario = false, bool bForcePlacing = false);
+    StructureBase* placeStructure(Uint32 builderID, int itemID, int xPos, int yPos, bool byScenario = false,
+                                  bool bForcePlacing = false, bool consumeBuilderItem = true);
     UnitBase* createUnit(int itemID, bool byScenario = false);
     UnitBase* placeUnit(int itemID, int xPos, int yPos, bool byScenario = false);
 

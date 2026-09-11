@@ -72,6 +72,7 @@ struct TouchState {
     TouchInput::TouchGestureClassifier gesture;
     bool placementPreviewEnabled = false;
     bool placementGesture = false;
+    bool placementCancellationPending = false;
     bool mapTapEligible = false;
     bool lastPointerWasTouch = false;
     bool productionCatalogTargetValid = false;
@@ -238,6 +239,7 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
         }
     } else {
         // No mouse event has been emitted yet, so cancellation has no side effect.
+        state.placementCancellationPending = state.placementCancellationPending || state.placementGesture;
         state.repeatProduction = false;
         state.gesture.cancel();
         state.placementGesture = false;
@@ -468,6 +470,12 @@ bool getSelectionDragPreview(SDL_Point* start, SDL_Point* current) {
     *start = { state.gesture.startX(), state.gesture.startY() };
     *current = { state.gesture.currentX(), state.gesture.currentY() };
     return true;
+}
+
+bool consumePlacementCancellation() {
+    const bool cancelled = state.placementCancellationPending;
+    state.placementCancellationPending = false;
+    return cancelled;
 }
 
 bool allowProductionRepeat(Uint32 builder, Uint32 item) {

@@ -14,6 +14,7 @@ target_sources(dunelegacy_tests
         SelectionControlTest.cpp
         VisualFeedbackTest.cpp
         PlacementCandidateTest.cpp
+        WallLinePlacementTest.cpp
         ProductionEconomyTest.cpp
         ProductionControlsTest.cpp
         BuilderListInputRoutingTest.cpp

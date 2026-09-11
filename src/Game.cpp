@@ -50,6 +50,7 @@ std::mutex Game::performanceLogMutex;
 #include <misc/TouchInput.h>
 #include <misc/TouchGesture.h>
 #include <misc/SelectionControl.h>
+#include <misc/WallLinePlacement.h>
 
 #include <players/HumanPlayer.h>
 
@@ -97,84 +98,12 @@ bool isEligibleTouchRallyStructure(const ObjectBase* object, const House* localH
         && object->isRespondable();
 }
 
-struct PlacementEvaluation {
-    Coord size;
-    bool canPlace = false;
-    std::vector<bool> validTiles;
-
-    bool isTileValid(int offsetX, int offsetY) const {
-        const auto index = static_cast<std::size_t>(offsetY * size.x + offsetX);
-        return index < validTiles.size() && validTiles[index];
-    }
-};
-
-PlacementEvaluation evaluatePlacement(const Map& map, const BuilderBase& builder, int itemID,
-                                      const Coord& origin) {
-    PlacementEvaluation result;
-    result.size = getStructureSize(itemID);
-    result.validTiles.assign(static_cast<std::size_t>(result.size.x * result.size.y), false);
-
-    if(itemID == Structure_Slab1) {
-        result.canPlace = map.okayToPlaceStructure(origin.x, origin.y, 1, 1, false, builder.getOwner());
-        if(result.canPlace) {
-            const Tile* tile = map.getTile(origin);
-            result.canPlace = tile && !tile->isConcrete();
-        }
-        result.validTiles[0] = result.canPlace;
-        return result;
-    }
-
-    if(itemID == Structure_Slab4) {
-        bool withinBuildRange = false;
-        bool affectsAtLeastOneTile = false;
-        bool allTilesValid = true;
-
-        for(int offsetY = 0; offsetY < result.size.y; ++offsetY) {
-            for(int offsetX = 0; offsetX < result.size.x; ++offsetX) {
-                const int x = origin.x + offsetX;
-                const int y = origin.y + offsetY;
-                const auto index = static_cast<std::size_t>(offsetY * result.size.x + offsetX);
-                if(!map.tileExists(x, y)) {
-                    allTilesValid = false;
-                    continue;
-                }
-                const Tile* tile = map.getTile(x, y);
-
-                withinBuildRange = withinBuildRange || map.isWithinBuildRange(x, y, builder.getOwner());
-                const bool tileValid = tile->isRock() && !tile->isMountain() && !tile->hasAGroundObject();
-                result.validTiles[index] = tileValid;
-                allTilesValid = allTilesValid && tileValid;
-                affectsAtLeastOneTile = affectsAtLeastOneTile || (tileValid && !tile->isConcrete());
-            }
-        }
-
-        // Existing concrete can be part of the footprint, but every tile must be
-        // safe and in-map. At least one tile must still be changed by the slab.
-        result.canPlace = withinBuildRange && allTilesValid && affectsAtLeastOneTile;
-        if(!withinBuildRange || !affectsAtLeastOneTile) {
-            std::fill(result.validTiles.begin(), result.validTiles.end(), false);
-        }
-        return result;
-    }
-
-    result.canPlace = map.okayToPlaceStructure(origin.x, origin.y, result.size.x, result.size.y,
-                                                false, builder.getOwner());
-    bool withinBuildRange = false;
-    for(int offsetY = 0; offsetY < result.size.y; ++offsetY) {
-        for(int offsetX = 0; offsetX < result.size.x; ++offsetX) {
-            const int x = origin.x + offsetX;
-            const int y = origin.y + offsetY;
-            const auto index = static_cast<std::size_t>(offsetY * result.size.x + offsetX);
-            if(!map.tileExists(x, y)) continue;
-            const Tile* tile = map.getTile(x, y);
-            result.validTiles[index] = tile->isRock() && !tile->isBlocked();
-            withinBuildRange = withinBuildRange || map.isWithinBuildRange(x, y, builder.getOwner());
-        }
-    }
-    if(!withinBuildRange) {
-        std::fill(result.validTiles.begin(), result.validTiles.end(), false);
-    }
-    return result;
+bool canUseWallLinePlacement(const BuilderBase* builder) {
+    const auto* constructionYard = dynamic_cast<const ConstructionYard*>(builder);
+    return constructionYard != nullptr
+        && constructionYard->getCurrentProducedItem() == Structure_Wall
+        && constructionYard->isWaitingToPlace()
+        && constructionYard->getCurrentUpgradeLevel() >= 3;
 }
 
 } // namespace
@@ -1556,6 +1485,8 @@ void Game::drawScreen()
                 const Coord origin = hasTouchCandidate
                     ? touchPlacementCandidate.position()
                     : Coord(screenborder->screen2MapX(drawnMouseX), screenborder->screen2MapY(drawnMouseY));
+                const bool drawWallLine = hasTouchCandidate && touchPlacementCandidate.lineActive()
+                    && canUseWallLinePlacement(builder);
                 const auto evaluation = evaluatePlacement(*currentGameMap, *builder, itemID, origin);
 
                 SDL_Texture* validPlace = nullptr;
@@ -1576,15 +1507,33 @@ void Game::drawScreen()
                         break;
                 }
 
-                for(int offsetX = 0; offsetX < evaluation.size.x; ++offsetX) {
-                    for(int offsetY = 0; offsetY < evaluation.size.y; ++offsetY) {
-                        SDL_Texture* image = evaluation.isTileValid(offsetX, offsetY) ? validPlace : invalidPlace;
-                        const int mapX = origin.x + offsetX;
-                        const int mapY = origin.y + offsetY;
+                if(drawWallLine) {
+                    const auto plan = planWallLinePlacement(*currentGameMap, *builder,
+                                                            touchPlacementCandidate.start(), origin);
+                    for(const WallLineSegment& segment : plan.segments) {
+                        SDL_Texture* image = segment.constructible ? validPlace : invalidPlace;
                         SDL_Rect drawLocation = calcDrawingRect(image,
-                            screenborder->world2screenX(mapX * TILESIZE),
-                            screenborder->world2screenY(mapY * TILESIZE));
+                            screenborder->world2screenX(segment.position.x * TILESIZE),
+                            screenborder->world2screenY(segment.position.y * TILESIZE));
                         SDL_RenderCopy(renderer, image, nullptr, &drawLocation);
+                    }
+                    const auto lineText = fmt::sprintf(_("%d / %d segments • coût total %d • %d à payer • %d crédits disponibles"),
+                        plan.constructibleCount, static_cast<int>(plan.segments.size()), lround(plan.nominalCost),
+                        lround(plan.additionalCost), lround(plan.availableCredits));
+                    const auto textTexture = pFontManager->createTextureWithText(lineText, COLOR_WHITE, 14);
+                    const SDL_Rect textLocation = calcDrawingRect(textTexture.get(), 16, topBarPos.y + topBarPos.h + 8);
+                    SDL_RenderCopy(renderer, textTexture.get(), nullptr, &textLocation);
+                } else {
+                    for(int offsetX = 0; offsetX < evaluation.size.x; ++offsetX) {
+                        for(int offsetY = 0; offsetY < evaluation.size.y; ++offsetY) {
+                            SDL_Texture* image = evaluation.isTileValid(offsetX, offsetY) ? validPlace : invalidPlace;
+                            const int mapX = origin.x + offsetX;
+                            const int mapY = origin.y + offsetY;
+                            SDL_Rect drawLocation = calcDrawingRect(image,
+                                screenborder->world2screenX(mapX * TILESIZE),
+                                screenborder->world2screenY(mapY * TILESIZE));
+                            SDL_RenderCopy(renderer, image, nullptr, &drawLocation);
+                        }
                     }
                 }
             }
@@ -1728,9 +1677,16 @@ void Game::doInput()
                           && selectedList.size() == 1) {
                     auto* builder = dynamic_cast<BuilderBase*>(objectManager.getObject(*selectedList.begin()));
                     if(builder) {
-                        touchPlacementCandidate.update(
-                            Coord(screenborder->screen2MapX(mouse->x), screenborder->screen2MapY(mouse->y)),
-                            builder->getObjectID(), builder->getCurrentProducedItem());
+                        const Coord mapPosition(screenborder->screen2MapX(mouse->x), screenborder->screen2MapY(mouse->y));
+                        if(mouse->state == 0) {
+                            // TouchInput emits this once at the beginning of each gesture.
+                            touchPlacementCandidate.begin(mapPosition, builder->getObjectID(), builder->getCurrentProducedItem());
+                        } else {
+                            touchPlacementCandidate.update(mapPosition, builder->getObjectID(), builder->getCurrentProducedItem());
+                        }
+                        if((mouse->state & SDL_BUTTON_LMASK) && canUseWallLinePlacement(builder)) {
+                            touchPlacementCandidate.activateLine();
+                        }
                     }
                 }
             }
@@ -1981,8 +1937,18 @@ void Game::doInput()
                         if(builder) {
                             if(touchPlacementCandidate.matches(builder->getObjectID(),
                                                                builder->getCurrentProducedItem())) {
-                                const Coord mapPosition = touchPlacementCandidate.position();
-                                handlePlacementClick(mapPosition.x, mapPosition.y);
+                                if(touchPlacementCandidate.lineActive() && canUseWallLinePlacement(builder)
+                                   && isPackableMapCoord(touchPlacementCandidate.start())
+                                   && isPackableMapCoord(touchPlacementCandidate.position())) {
+                                    getCommandManager().addCommand(Command(pLocalPlayer->getPlayerID(), CMD_PLACE_WALL_LINE,
+                                        builder->getObjectID(), packMapCoord(touchPlacementCandidate.start()),
+                                        packMapCoord(touchPlacementCandidate.position())));
+                                    soundPlayer->playSound(Sound_PlaceStructure);
+                                    setCursorMode(CursorMode_Normal);
+                                } else {
+                                    const Coord mapPosition = touchPlacementCandidate.position();
+                                    handlePlacementClick(mapPosition.x, mapPosition.y);
+                                }
                             }
                         }
                     }
@@ -2102,6 +2068,10 @@ void Game::doInput()
         scrollLeftMode = false;
         scrollRightMode = false;
         scrollUpMode = false;
+    }
+
+    if(TouchInput::consumePlacementCancellation()) {
+        touchPlacementCandidate.clear();
     }
 }
 
@@ -2628,6 +2598,7 @@ void Game::initializeReplay() {
             quitGame();
         }
     }
+
 }
 
 void Game::initializeNetwork() {

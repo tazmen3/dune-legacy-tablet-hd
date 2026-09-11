@@ -667,7 +667,8 @@ void House::freeHarvester(int xPos, int yPos) {
 
 
 
-StructureBase* House::placeStructure(Uint32 builderID, int itemID, int xPos, int yPos, bool byScenario, bool bForcePlacing) {
+StructureBase* House::placeStructure(Uint32 builderID, int itemID, int xPos, int yPos, bool byScenario,
+                                     bool bForcePlacing, bool consumeBuilderItem) {
     if(!currentGameMap->tileExists(xPos,yPos)) {
         return nullptr;
     }
@@ -690,7 +691,7 @@ StructureBase* House::placeStructure(Uint32 builderID, int itemID, int xPos, int
     //      currentGameMap->getTile(xPos, yPos)->clearTerrain();
 
             if(pBuilder != nullptr) {
-                pBuilder->unSetWaitingToPlace();
+                if(consumeBuilderItem) pBuilder->unSetWaitingToPlace();
 
                 if(this == pLocalHouse) {
                     if(pBuilder->isSelected()) {
@@ -719,7 +720,7 @@ StructureBase* House::placeStructure(Uint32 builderID, int itemID, int xPos, int
                 });
 
             if(pBuilder != nullptr) {
-                pBuilder->unSetWaitingToPlace();
+                if(consumeBuilderItem) pBuilder->unSetWaitingToPlace();
 
                 if(this == pLocalHouse) {
                     if(pBuilder->isSelected()) {
@@ -775,7 +776,7 @@ StructureBase* House::placeStructure(Uint32 builderID, int itemID, int xPos, int
 
             // if this structure was built by a construction yard this construction yard must be informed
             if(pBuilder != nullptr) {
-                pBuilder->unSetWaitingToPlace();
+                if(consumeBuilderItem) pBuilder->unSetWaitingToPlace();
 
                 if(itemID == Structure_Palace) {
                     // cancel all other palaces

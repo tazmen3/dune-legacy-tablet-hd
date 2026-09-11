@@ -13,6 +13,7 @@
 #include <Network/NetworkManager.h>
 
 #include <Command.h>
+#include <misc/WallLinePlacement.h>
 #include <structures/BuilderBase.h>
 
 #include <enet/enet.h>
@@ -163,7 +164,27 @@ TEST_CASE("Production commands: new IDs are appended without renumbering history
     REQUIRE(CMD_TEST_SYNC == 26);
     REQUIRE(CMD_BUILDER_CANCELQUEUEENTRY == 27);
     REQUIRE(CMD_BUILDER_CANCELALL == 28);
+    REQUIRE(CMD_PLACE_WALL_LINE == 29);
     REQUIRE(NETWORK_PROTOCOL_VERSION == TEST_NETWORK_PROTOCOL_VERSION);
+}
+
+TEST_CASE_METHOD(ENetFixture, "Wall-line command serializes its builder and packed endpoints", "[wall][network]") {
+    const std::vector<Uint32> parameters = {41, packMapCoord(Coord(12, 9)), packMapCoord(Coord(18, 9))};
+
+    ENetPacketOStream ostream(ENET_PACKET_FLAG_RELIABLE);
+    // Command::save writes the player, command ID and parameter vector in this order.
+    ostream.writeUint8(3);
+    ostream.writeUint32(CMD_PLACE_WALL_LINE);
+    ostream.writeUint32Vector(parameters);
+    ENetPacketIStream istream(ostream.getPacket());
+
+    REQUIRE(istream.readUint8() == 3);
+    REQUIRE(istream.readUint32() == CMD_PLACE_WALL_LINE);
+    const auto restoredParameters = istream.readUint32Vector();
+    REQUIRE(restoredParameters.size() == 3);
+    REQUIRE(restoredParameters[0] == 41);
+    REQUIRE(unpackMapCoord(restoredParameters[1]) == Coord(12, 9));
+    REQUIRE(unpackMapCoord(restoredParameters[2]) == Coord(18, 9));
 }
 
 TEST_CASE_METHOD(ENetFixture, "Production queue entry: economic fields survive serialization", "[production][save]") {

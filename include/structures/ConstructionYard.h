@@ -35,6 +35,7 @@ public:
         \return true if placement was successful, false otherwise
     */
     bool doPlaceStructure(int x, int y);
+    bool doPlaceWallLine(const Coord& start, const Coord& end);
 };
 
 

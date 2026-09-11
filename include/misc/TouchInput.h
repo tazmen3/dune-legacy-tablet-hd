@@ -27,6 +27,7 @@ bool allowProductionRepeat(Uint32 builder, Uint32 item);
 void setProductionCatalogTarget(const ProductionCatalogTarget& target);
 void clearProductionCatalogTarget(Uint32 builderObjectID);
 bool getSelectionDragPreview(SDL_Point* start, SDL_Point* current);
+bool consumePlacementCancellation();
 #else
 inline bool isLongPressDispatch() { return false; }
 inline bool isTouchDispatch() { return false; }
@@ -36,6 +37,7 @@ inline bool allowProductionRepeat(Uint32, Uint32) { return true; }
 inline void setProductionCatalogTarget(const ProductionCatalogTarget&) {}
 inline void clearProductionCatalogTarget(Uint32) {}
 inline bool getSelectionDragPreview(SDL_Point*, SDL_Point*) { return false; }
+inline bool consumePlacementCancellation() { return false; }
 #endif
 
 /**

@@ -22,6 +22,8 @@
 #include <FileClasses/GFXManager.h>
 #include <House.h>
 #include <Game.h>
+#include <Map.h>
+#include <misc/WallLinePlacement.h>
 
 ConstructionYard::ConstructionYard(House* newOwner) : BuilderBase(newOwner) {
     ConstructionYard::init();
@@ -57,4 +59,33 @@ bool ConstructionYard::doPlaceStructure(int x, int y) {
     } else {
         return false;
     }
+}
+
+bool ConstructionYard::doPlaceWallLine(const Coord& start, const Coord& end) {
+    if(getCurrentProducedItem() != Structure_Wall || !isWaitingToPlace() || getCurrentUpgradeLevel() < 3) {
+        return false;
+    }
+
+    const auto plan = planWallLinePlacement(*currentGameMap, *this, start, end);
+    if(plan.constructibleCount == 0 || !getOwner()->tryTakeCredits(plan.additionalCost)) {
+        return false;
+    }
+
+    FixPoint chargedForAdditionalWalls = plan.additionalCost;
+    FixPoint spentOnCreatedAdditionalWalls = 0;
+    bool placedAnyWall = false;
+    for(const WallLineSegment& segment : plan.segments) {
+        if(!segment.constructible) continue;
+
+        StructureBase* placedWall = getOwner()->placeStructure(getObjectID(), Structure_Wall,
+            segment.position.x, segment.position.y, false, false, segment.prepaid);
+        if(placedWall == nullptr) {
+            getOwner()->returnCredits(chargedForAdditionalWalls - spentOnCreatedAdditionalWalls);
+            return placedAnyWall;
+        }
+        placedAnyWall = true;
+        if(!segment.prepaid) spentOnCreatedAdditionalWalls += plan.wallPrice;
+    }
+
+    return placedAnyWall;
 }

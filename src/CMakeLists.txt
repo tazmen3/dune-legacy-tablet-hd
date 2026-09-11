@@ -246,6 +246,9 @@ target_sources(dunelegacy
         structures/WindTrap.cpp
         structures/WOR.cpp
 
+        # Placement helpers
+        misc/WallLinePlacement.cpp
+
         # Units
         units/UnitBase.cpp
         units/AirUnit.cpp
