@@ -70,14 +70,14 @@ struct SlabAreaTileEvaluation {
     SlabAreaPlacementBlocker blocker = SlabAreaPlacementBlocker::None;
 };
 
-// A mobile ground unit deliberately does not enter this policy: concrete is
-// blocked by structures only, both during preview and at placement time.
+// Concrete follows the historical ground-occupation rule: all ground objects,
+// including infantry, vehicles and structures, block placement.
 inline SlabAreaTileEvaluation evaluateSlabAreaTileProperties(bool exists, bool isRock,
-                                                              bool isMountain, bool hasStructure,
+                                                              bool isMountain, bool hasGroundObject,
                                                               bool isConcrete, bool inBuildRange) {
     if(!exists) return {false, SlabAreaPlacementBlocker::OutOfMap};
     if(!isRock || isMountain) return {false, SlabAreaPlacementBlocker::Terrain};
-    if(hasStructure) return {false, SlabAreaPlacementBlocker::Occupied};
+    if(hasGroundObject) return {false, SlabAreaPlacementBlocker::Occupied};
     if(isConcrete) return {false, SlabAreaPlacementBlocker::AlreadyConcrete};
     if(!inBuildRange) return {false, SlabAreaPlacementBlocker::OutOfBuildRange};
     return {true, SlabAreaPlacementBlocker::None};

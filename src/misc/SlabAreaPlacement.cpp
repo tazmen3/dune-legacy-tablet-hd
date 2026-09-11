@@ -16,7 +16,7 @@ SlabAreaTileEvaluation evaluateSlabAreaTile(const Map& map, const BuilderBase& b
     }
     const Tile* tile = map.getTile(position);
     return evaluateSlabAreaTileProperties(
-        true, tile->isRock(), tile->isMountain(), tile->hasAStructure(), tile->isConcrete(),
+        true, tile->isRock(), tile->isMountain(), tile->hasAGroundObject(), tile->isConcrete(),
         map.isWithinBuildRange(position.x, position.y, builder.getOwner()));
 }
 

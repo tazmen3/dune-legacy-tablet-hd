@@ -77,14 +77,35 @@ TEST_CASE("Slab area: preview count and nominal cost exclude red cells", "[slab]
     REQUIRE(plan.additionalCost == FixPoint(5));
 }
 
-TEST_CASE("Slab area: units do not block concrete while structures still do", "[slab][occupation]") {
-    const auto tileUnderUnit = evaluateSlabAreaTileProperties(true, true, false, false, false, true);
-    REQUIRE(tileUnderUnit.canPlace);
-    REQUIRE(tileUnderUnit.blocker == SlabAreaPlacementBlocker::None);
+TEST_CASE("Slab area: every ground occupant blocks concrete", "[slab][occupation]") {
+    const auto tileUnderVehicle = evaluateSlabAreaTileProperties(true, true, false, true, false, true);
+    REQUIRE_FALSE(tileUnderVehicle.canPlace);
+    REQUIRE(tileUnderVehicle.blocker == SlabAreaPlacementBlocker::Occupied);
+
+    const auto tileUnderInfantry = evaluateSlabAreaTileProperties(true, true, false, true, false, true);
+    REQUIRE_FALSE(tileUnderInfantry.canPlace);
+    REQUIRE(tileUnderInfantry.blocker == SlabAreaPlacementBlocker::Occupied);
 
     const auto tileUnderStructure = evaluateSlabAreaTileProperties(true, true, false, true, false, true);
     REQUIRE_FALSE(tileUnderStructure.canPlace);
     REQUIRE(tileUnderStructure.blocker == SlabAreaPlacementBlocker::Occupied);
+
+    const auto freeTile = evaluateSlabAreaTileProperties(true, true, false, false, false, true);
+    REQUIRE(freeTile.canPlace);
+    REQUIRE(freeTile.blocker == SlabAreaPlacementBlocker::None);
+}
+
+TEST_CASE("Slab area: occupied cells consume neither price nor prepaid quota", "[slab][economy][occupation]") {
+    const std::vector<SlabAreaTileEvaluation> evaluations = {
+        {false, SlabAreaPlacementBlocker::Occupied}, {false, SlabAreaPlacementBlocker::Occupied},
+        {false, SlabAreaPlacementBlocker::Occupied}, {true, SlabAreaPlacementBlocker::None}
+    };
+    const auto plan = planSlabAreaPlacementFromEvaluations(Structure_Slab1, Coord(1, 1), Coord(4, 1),
+                                                            evaluations, 5, 50);
+    REQUIRE(plan.constructibleCount == 1);
+    REQUIRE(plan.nominalCost == FixPoint(5));
+    REQUIRE(plan.additionalCost == FixPoint(0));
+    REQUIRE(plan.tiles[3].prepaid);
 }
 
 TEST_CASE("Slab area: Slab1 prepays one tile and Slab4 prepays four valid tiles", "[slab][economy]") {
@@ -133,19 +154,19 @@ TEST_CASE("Slab area: progressive paid tiles preserve delay, refund, cancellatio
     REQUIRE(restored.cancelAndGetRefund() == FixPoint(5));
 }
 
-TEST_CASE("Slab area: delayed placement accepts units and refunds only a late structure failure",
+TEST_CASE("Slab area: delayed ground occupation refunds each rejected placement",
           "[slab][construction][occupation]") {
     SlabAreaConstructionState state;
     state.start({{Coord(2, 1)}, {Coord(3, 1)}}, 5, 1, Structure_Slab1);
 
     REQUIRE_FALSE(state.advanceCycle());
     REQUIRE(state.advanceCycle());
-    // A unit can have arrived after preview: it remains a successful placement.
-    REQUIRE(state.completeNextPosition(true) == FixPoint(0));
+    // A unit arriving after preview rejects this already-paid placement.
+    REQUIRE(state.completeNextPosition(false) == FixPoint(5));
 
     REQUIRE_FALSE(state.advanceCycle());
     REQUIRE(state.advanceCycle());
-    // A structure arriving after preview rejects the tile and refunds its debit.
+    // A structure arriving after preview behaves identically.
     REQUIRE(state.completeNextPosition(false) == FixPoint(5));
     REQUIRE_FALSE(state.isActive());
 }
