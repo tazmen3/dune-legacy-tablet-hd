@@ -1565,7 +1565,7 @@ void Game::drawScreen()
                         SDL_RenderCopy(renderer, image, nullptr, &drawLocation);
                     }
                     std::string areaText = fmt::sprintf(_("%d × %d • %d dalles • %d crédits • %d à payer • %d crédits"),
-                        plan.bounds.width(), plan.bounds.height(), plan.totalCount, lround(plan.nominalCost),
+                        plan.bounds.width(), plan.bounds.height(), plan.constructibleCount, lround(plan.nominalCost),
                         lround(plan.additionalCost), lround(plan.availableCredits));
                     if(plan.constructibleCount < plan.totalCount) {
                         areaText += fmt::sprintf(_(" • %d / %d constructibles"), plan.constructibleCount, plan.totalCount);

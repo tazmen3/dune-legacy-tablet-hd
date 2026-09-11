@@ -70,6 +70,19 @@ struct SlabAreaTileEvaluation {
     SlabAreaPlacementBlocker blocker = SlabAreaPlacementBlocker::None;
 };
 
+// A mobile ground unit deliberately does not enter this policy: concrete is
+// blocked by structures only, both during preview and at placement time.
+inline SlabAreaTileEvaluation evaluateSlabAreaTileProperties(bool exists, bool isRock,
+                                                              bool isMountain, bool hasStructure,
+                                                              bool isConcrete, bool inBuildRange) {
+    if(!exists) return {false, SlabAreaPlacementBlocker::OutOfMap};
+    if(!isRock || isMountain) return {false, SlabAreaPlacementBlocker::Terrain};
+    if(hasStructure) return {false, SlabAreaPlacementBlocker::Occupied};
+    if(isConcrete) return {false, SlabAreaPlacementBlocker::AlreadyConcrete};
+    if(!inBuildRange) return {false, SlabAreaPlacementBlocker::OutOfBuildRange};
+    return {true, SlabAreaPlacementBlocker::None};
+}
+
 SlabAreaTileEvaluation evaluateSlabAreaTile(const Map& map, const BuilderBase& builder,
                                             const Coord& position);
 
@@ -117,7 +130,6 @@ inline SlabAreaPlacementPlan planSlabAreaPlacementFromEvaluations(
                 tile.geometricallyValid = evaluations[evaluationIndex].canPlace;
                 tile.blocker = evaluations[evaluationIndex].blocker;
             }
-            result.nominalCost += unitPrice;
             if(tile.geometricallyValid) {
                 ++result.geometricallyValidCount;
                 if(prepaidRemaining > 0) {
@@ -128,7 +140,10 @@ inline SlabAreaPlacementPlan planSlabAreaPlacementFromEvaluations(
                     remainingCredits -= unitPrice;
                     result.additionalCost += unitPrice;
                 }
-                if(tile.constructible) ++result.constructibleCount;
+                if(tile.constructible) {
+                    ++result.constructibleCount;
+                    result.nominalCost += unitPrice;
+                }
             }
             result.tiles.push_back(tile);
         }

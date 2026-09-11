@@ -11,15 +11,13 @@
 
 SlabAreaTileEvaluation evaluateSlabAreaTile(const Map& map, const BuilderBase& builder,
                                             const Coord& position) {
-    if(!map.tileExists(position)) return {false, SlabAreaPlacementBlocker::OutOfMap};
-    const Tile* tile = map.getTile(position);
-    if(!tile->isRock() || tile->isMountain()) return {false, SlabAreaPlacementBlocker::Terrain};
-    if(tile->hasAGroundObject()) return {false, SlabAreaPlacementBlocker::Occupied};
-    if(tile->isConcrete()) return {false, SlabAreaPlacementBlocker::AlreadyConcrete};
-    if(!map.isWithinBuildRange(position.x, position.y, builder.getOwner())) {
-        return {false, SlabAreaPlacementBlocker::OutOfBuildRange};
+    if(!map.tileExists(position)) {
+        return evaluateSlabAreaTileProperties(false, false, false, false, false, false);
     }
-    return {true, SlabAreaPlacementBlocker::None};
+    const Tile* tile = map.getTile(position);
+    return evaluateSlabAreaTileProperties(
+        true, tile->isRock(), tile->isMountain(), tile->hasAStructure(), tile->isConcrete(),
+        map.isWithinBuildRange(position.x, position.y, builder.getOwner()));
 }
 
 SlabAreaPlacementPlan planSlabAreaPlacement(const Map& map, const BuilderBase& builder,
