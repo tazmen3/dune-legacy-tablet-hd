@@ -1785,6 +1785,10 @@ bool UnitBase::canPass(int xPos, int yPos) const {
         return false;
     }
 
+    if(pTile->isWallLineReserved()) {
+        return false;
+    }
+
     if(pTile->hasAGroundObject()) {
         ObjectBase *pObject = pTile->getGroundObject();
 

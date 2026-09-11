@@ -30,7 +30,7 @@
 #define DEFAULT_METASERVER  "https://dunelegacy.com/metaserver/metaserver.php"
 
 #define SAVEMAGIC           8675309
-#define SAVEGAMEVERSION     9807  // Production queue IDs and exact prepaid/refundable amounts
+#define SAVEGAMEVERSION     9808  // Construction Yard pending wall-line state
 
 #define MAX_PLAYERNAMELENGHT    24
 

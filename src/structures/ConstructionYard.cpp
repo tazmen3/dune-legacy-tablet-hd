@@ -24,6 +24,10 @@
 #include <Game.h>
 #include <Map.h>
 #include <misc/WallLinePlacement.h>
+#include <misc/InputStream.h>
+#include <misc/OutputStream.h>
+
+#include <vector>
 
 ConstructionYard::ConstructionYard(House* newOwner) : BuilderBase(newOwner) {
     ConstructionYard::init();
@@ -33,6 +37,11 @@ ConstructionYard::ConstructionYard(House* newOwner) : BuilderBase(newOwner) {
 
 ConstructionYard::ConstructionYard(InputStream& stream) : BuilderBase(stream) {
     ConstructionYard::init();
+
+    if(currentGame && currentGame->getLoadedSavegameVersion() >= 9808) {
+        wallLineConstruction.load(stream);
+        reservePendingWallLineConstruction();
+    }
 }
 
 void ConstructionYard::init() {
@@ -53,6 +62,24 @@ void ConstructionYard::init() {
 
 ConstructionYard::~ConstructionYard() = default;
 
+void ConstructionYard::save(OutputStream& stream) const {
+    BuilderBase::save(stream);
+
+    wallLineConstruction.save(stream);
+}
+
+bool ConstructionYard::update() {
+    if(!BuilderBase::update()) return false;
+
+    updateWallLineConstruction();
+    return true;
+}
+
+void ConstructionYard::destroy() {
+    refundPendingWallLineConstruction();
+    StructureBase::destroy();
+}
+
 bool ConstructionYard::doPlaceStructure(int x, int y) {
     if(isWaitingToPlace()) {
         return (getOwner()->placeStructure(getObjectID(), getCurrentProducedItem(), x, y) != nullptr);
@@ -62,7 +89,8 @@ bool ConstructionYard::doPlaceStructure(int x, int y) {
 }
 
 bool ConstructionYard::doPlaceWallLine(const Coord& start, const Coord& end) {
-    if(getCurrentProducedItem() != Structure_Wall || !isWaitingToPlace() || getCurrentUpgradeLevel() < 3) {
+    if(getCurrentProducedItem() != Structure_Wall || !isWaitingToPlace()
+       || !isWallLineUpgradeLevelUnlocked(getCurrentUpgradeLevel()) || wallLineConstruction.isActive()) {
         return false;
     }
 
@@ -71,21 +99,66 @@ bool ConstructionYard::doPlaceWallLine(const Coord& start, const Coord& end) {
         return false;
     }
 
-    FixPoint chargedForAdditionalWalls = plan.additionalCost;
-    FixPoint spentOnCreatedAdditionalWalls = 0;
-    bool placedAnyWall = false;
-    for(const WallLineSegment& segment : plan.segments) {
-        if(!segment.constructible) continue;
-
-        StructureBase* placedWall = getOwner()->placeStructure(getObjectID(), Structure_Wall,
-            segment.position.x, segment.position.y, false, false, segment.prepaid);
-        if(placedWall == nullptr) {
-            getOwner()->returnCredits(chargedForAdditionalWalls - spentOnCreatedAdditionalWalls);
-            return placedAnyWall;
-        }
-        placedAnyWall = true;
-        if(!segment.prepaid) spentOnCreatedAdditionalWalls += plan.wallPrice;
+    const auto prepaidWall = std::find_if(plan.segments.begin(), plan.segments.end(),
+                                          [](const WallLineSegment& segment) { return segment.prepaid; });
+    if(prepaidWall == plan.segments.end()) {
+        getOwner()->returnCredits(plan.additionalCost);
+        return false;
     }
 
-    return placedAnyWall;
+    // The first valid segment consumes the single ready wall. Every other valid
+    // segment has already been charged and is retained as deterministic yard state.
+    if(getOwner()->placeStructure(getObjectID(), Structure_Wall, prepaidWall->position.x, prepaidWall->position.y) == nullptr) {
+        getOwner()->returnCredits(plan.additionalCost);
+        return false;
+    }
+
+    std::vector<Coord> pendingPositions;
+    pendingPositions.reserve(static_cast<std::size_t>(std::max(0, plan.constructibleCount - 1)));
+    for(const WallLineSegment& segment : plan.segments) {
+        if(segment.constructible && !segment.prepaid) pendingPositions.push_back(segment.position);
+    }
+
+    const int wallBuildTime = currentGame->objectData.data[Structure_Wall][getOriginalHouseID()].buildtime;
+    wallLineConstruction.start(std::move(pendingPositions), plan.wallPrice,
+                               wallLineSegmentBuildCycles(wallBuildTime));
+    reservePendingWallLineConstruction();
+    return true;
+}
+
+void ConstructionYard::updateWallLineConstruction() {
+    if(!wallLineConstruction.advanceCycle()) return;
+
+    const Coord position = wallLineConstruction.getNextPosition();
+    // The initial command snapshot already authorised the line extension. Recheck
+    // only terrain and occupation here: delayed walls may intentionally be out of range.
+    const bool canStillPlace = evaluateWallLineContinuation(*currentGameMap, position, true).canPlace;
+    const bool placed = canStillPlace && (getOwner()->placeStructure(getObjectID(), Structure_Wall,
+        position.x, position.y, false, false, false) != nullptr);
+    // Keep the reservation until after placement, so the tile never becomes free
+    // between the construction footprint and the real wall.
+    releaseWallLineReservation(position);
+    const FixPoint refund = wallLineConstruction.completeNextPosition(placed);
+    if(refund > 0) getOwner()->returnCredits(refund);
+}
+
+void ConstructionYard::reservePendingWallLineConstruction() {
+    const WallLineConstructionSnapshot snapshot = wallLineConstruction.snapshot();
+    for(std::size_t i = snapshot.nextPosition; i < snapshot.pendingPositions.size(); ++i) {
+        const Coord& position = snapshot.pendingPositions[i];
+        if(currentGameMap->tileExists(position)) currentGameMap->getTile(position)->reserveWallLine();
+    }
+}
+
+void ConstructionYard::releaseWallLineReservation(const Coord& position) {
+    if(currentGameMap->tileExists(position)) currentGameMap->getTile(position)->releaseWallLineReservation();
+}
+
+void ConstructionYard::refundPendingWallLineConstruction() {
+    const WallLineConstructionSnapshot snapshot = wallLineConstruction.snapshot();
+    for(std::size_t i = snapshot.nextPosition; i < snapshot.pendingPositions.size(); ++i) {
+        releaseWallLineReservation(snapshot.pendingPositions[i]);
+    }
+    const FixPoint refund = wallLineConstruction.cancelAndGetRefund();
+    if(refund > 0) getOwner()->returnCredits(refund);
 }

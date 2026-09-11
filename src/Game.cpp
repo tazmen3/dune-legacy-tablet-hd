@@ -103,7 +103,7 @@ bool canUseWallLinePlacement(const BuilderBase* builder) {
     return constructionYard != nullptr
         && constructionYard->getCurrentProducedItem() == Structure_Wall
         && constructionYard->isWaitingToPlace()
-        && constructionYard->getCurrentUpgradeLevel() >= 3;
+        && isWallLineUpgradeLevelUnlocked(constructionYard->getCurrentUpgradeLevel());
 }
 
 } // namespace
@@ -1517,9 +1517,29 @@ void Game::drawScreen()
                             screenborder->world2screenY(segment.position.y * TILESIZE));
                         SDL_RenderCopy(renderer, image, nullptr, &drawLocation);
                     }
-                    const auto lineText = fmt::sprintf(_("%d / %d segments • coût total %d • %d à payer • %d crédits disponibles"),
-                        plan.constructibleCount, static_cast<int>(plan.segments.size()), lround(plan.nominalCost),
+                    std::string lineText = fmt::sprintf(_("%d / %d murs • %d cases valides • %d à payer • %d crédits"),
+                        plan.constructibleCount, static_cast<int>(plan.segments.size()), plan.geometricallyValidCount,
                         lround(plan.additionalCost), lround(plan.availableCredits));
+                    if(plan.constructibleCount < static_cast<int>(plan.segments.size())) {
+                        const bool creditLimitsLine = plan.constructibleCount < plan.geometricallyValidCount;
+                        switch(getWallLinePrimaryBlocker(plan)) {
+                            case WallLinePlacementBlocker::StartOutOfBuildRange:
+                                lineText += _(" • Limite : départ hors portée");
+                                break;
+                            case WallLinePlacementBlocker::OutOfMap:
+                                lineText += _(" • Limite : hors carte");
+                                break;
+                            case WallLinePlacementBlocker::Occupied:
+                                lineText += _(" • Limite : occupation");
+                                break;
+                            case WallLinePlacementBlocker::Terrain:
+                                lineText += creditLimitsLine ? _(" • Limite : terrain + crédits") : _(" • Limite : terrain");
+                                break;
+                            default:
+                                if(creditLimitsLine) lineText += _(" • Limite : crédits");
+                                break;
+                        }
+                    }
                     const auto textTexture = pFontManager->createTextureWithText(lineText, COLOR_WHITE, 14);
                     const SDL_Rect textLocation = calcDrawingRect(textTexture.get(), 16, topBarPos.y + topBarPos.h + 8);
                     SDL_RenderCopy(renderer, textTexture.get(), nullptr, &textLocation);

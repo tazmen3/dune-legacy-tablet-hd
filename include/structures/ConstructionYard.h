@@ -19,6 +19,7 @@
 #define CONSTRUCTIONYARD_H
 
 #include <structures/BuilderBase.h>
+#include <misc/WallLinePlacement.h>
 
 class ConstructionYard final : public BuilderBase
 {
@@ -28,6 +29,10 @@ public:
     void init();
     virtual ~ConstructionYard();
 
+    void save(OutputStream& stream) const override;
+    bool update() override;
+    void destroy() override;
+
     /**
         Places the just produced structure at x,y.
         \param  x           the x coordinate (in tile coordinates)
@@ -36,6 +41,14 @@ public:
     */
     bool doPlaceStructure(int x, int y);
     bool doPlaceWallLine(const Coord& start, const Coord& end);
+
+private:
+    void updateWallLineConstruction();
+    void reservePendingWallLineConstruction();
+    void releaseWallLineReservation(const Coord& position);
+    void refundPendingWallLineConstruction();
+
+    WallLineConstructionState wallLineConstruction;
 };
 
 

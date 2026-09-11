@@ -82,6 +82,37 @@ PlacementEvaluation evaluatePlacement(const Map& map, const BuilderBase& builder
     return result;
 }
 
+namespace {
+
+WallLineSegmentEvaluation evaluateWallLineTile(const Map& map, const Coord& origin, bool ignoreWallLineReservation) {
+    if(!map.tileExists(origin)) return {false, WallLinePlacementBlocker::OutOfMap};
+
+    const Tile* tile = map.getTile(origin);
+    if(!tile->isRock() || tile->isMountain()) return {false, WallLinePlacementBlocker::Terrain};
+    if(tile->hasAGroundObject() || (!ignoreWallLineReservation && tile->isWallLineReserved())) {
+        return {false, WallLinePlacementBlocker::Occupied};
+    }
+
+    return {true, WallLinePlacementBlocker::None};
+}
+
+} // namespace
+
+WallLineSegmentEvaluation evaluateWallLineStart(const Map& map, const BuilderBase& builder, const Coord& origin) {
+    WallLineSegmentEvaluation result = evaluateWallLineTile(map, origin, false);
+    if(!result.canPlace) return result;
+
+    if(!map.isWithinBuildRange(origin.x, origin.y, builder.getOwner())) {
+        return {false, WallLinePlacementBlocker::StartOutOfBuildRange};
+    }
+    return result;
+}
+
+WallLineSegmentEvaluation evaluateWallLineContinuation(const Map& map, const Coord& origin,
+                                                        bool ignoreWallLineReservation) {
+    return evaluateWallLineTile(map, origin, ignoreWallLineReservation);
+}
+
 WallLinePlacementPlan planWallLinePlacement(const Map& map, const BuilderBase& builder,
                                             const Coord& start, const Coord& requestedEnd) {
     FixPoint wallPrice = 0;
@@ -92,13 +123,23 @@ WallLinePlacementPlan planWallLinePlacement(const Map& map, const BuilderBase& b
         }
     }
     const Coord normalizedEnd = normalizeWallLineEnd(start, requestedEnd);
-    std::vector<bool> geometricValidity;
+    std::vector<WallLineSegmentEvaluation> evaluations;
     const int stepX = (normalizedEnd.x > start.x) - (normalizedEnd.x < start.x);
     const int stepY = (normalizedEnd.y > start.y) - (normalizedEnd.y < start.y);
+    bool lineInterrupted = false;
     for(Coord position = start;; position += Coord(stepX, stepY)) {
-        geometricValidity.push_back(evaluatePlacement(map, builder, Structure_Wall, position).canPlace);
+        WallLineSegmentEvaluation evaluation;
+        if(lineInterrupted) {
+            evaluation = {false, WallLinePlacementBlocker::Interrupted};
+        } else if(position == start) {
+            evaluation = evaluateWallLineStart(map, builder, position);
+        } else {
+            evaluation = evaluateWallLineContinuation(map, position);
+        }
+        evaluations.push_back(evaluation);
+        lineInterrupted = lineInterrupted || !evaluation.canPlace;
         if(position == normalizedEnd) break;
     }
-    return planWallLinePlacementFromValidity(start, requestedEnd, geometricValidity, wallPrice,
-                                             builder.getOwner()->getStoredCredits() + builder.getOwner()->getStartingCredits());
+    return planWallLinePlacementFromEvaluations(start, requestedEnd, evaluations, wallPrice,
+                                                builder.getOwner()->getStoredCredits() + builder.getOwner()->getStartingCredits());
 }

@@ -136,6 +136,9 @@ bool InfantryBase::canPass(int xPos, int yPos) const {
     bool passable = false;
     if(currentGameMap->tileExists(xPos, yPos)) {
         Tile* pTile = currentGameMap->getTile(xPos, yPos);
+        if(pTile->isWallLineReserved()) {
+            return false;
+        }
         if(!pTile->hasAGroundObject()) {
             if(pTile->getType() != Terrain_Mountain) {
                 passable = true;

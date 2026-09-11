@@ -405,11 +405,14 @@ public:
     void setOwner(int newOwner) noexcept { owner = newOwner; }
     void setSandRegion(Uint32 newSandRegion) noexcept { sandRegion = newSandRegion; }
     void setDestroyedStructureTile(int newDestroyedStructureTile) noexcept { destroyedStructureTile = newDestroyedStructureTile; };
+    void reserveWallLine();
+    void releaseWallLineReservation();
 
     bool hasAGroundObject() const noexcept { return (hasInfantry() || hasANonInfantryGroundObject()); }
     bool hasAnAirUnit() const noexcept { return !assignedAirUnitList.empty(); }
     bool hasAnUndergroundUnit() const noexcept { return !assignedUndergroundUnitList.empty(); }
     bool hasANonInfantryGroundObject() const noexcept { return !assignedNonInfantryGroundObjectList.empty(); }
+    bool isWallLineReserved() const noexcept { return wallLineReservationCount > 0; }
     bool hasAStructure() const;
     bool hasInfantry() const noexcept { return !assignedInfantryList.empty(); }
     bool hasAnObject() const noexcept { return (hasAGroundObject() || hasAnAirUnit() || hasAnUndergroundUnit()); }
@@ -448,7 +451,7 @@ public:
     int getDestroyedStructureTile() const noexcept { return  destroyedStructureTile; };
 
     bool isBlocked() const noexcept {
-        return (isMountain() || hasAGroundObject());
+        return (isMountain() || hasAGroundObject() || isWallLineReserved());
     }
 
 
@@ -487,6 +490,7 @@ private:
     std::list<Uint32>   assignedInfantryList;                     ///< all infantry units on this tile
     std::list<Uint32>   assignedUndergroundUnitList;              ///< all underground units on this tile
     std::list<Uint32>   assignedNonInfantryGroundObjectList;      ///< all structures/vehicles on this tile
+    Uint32              wallLineReservationCount = 0;             ///< Pending paid wall-line constructions
 
     Uint32      lastAccess[NUM_TEAMS];    ///< contains for every team when this tile was seen last by this house
     bool        explored[NUM_TEAMS];      ///< contains for every team if this tile is explored

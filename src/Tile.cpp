@@ -28,6 +28,7 @@
 #include <SoundPlayer.h>
 #include <ScreenBorder.h>
 #include <Explosion.h>
+#include <misc/draw_util.h>
 
 #include <structures/StructureBase.h>
 #include <units/InfantryBase.h>
@@ -66,6 +67,9 @@ Tile::Tile() {
 Tile::~Tile() = default;
 
 void Tile::load(InputStream& stream) {
+    // Pending wall-line reservations are rebuilt from Construction Yard state (9808)
+    // after the map itself is loaded; they are intentionally not tile-save data.
+    wallLineReservationCount = 0;
     type = stream.readUint32();
 
     stream.readBools(&explored[0], &explored[1], &explored[2], &explored[3], &explored[4], &explored[5], &explored[6]);
@@ -331,6 +335,13 @@ void Tile::blitGround(int xPos, int yPos) {
             SDL_RenderCopy(renderer, pGFXManager->getZoomedObjPic(ObjPic_SandDamage, currentZoomlevel), &source, &drawLocation);
         }
     }
+
+    // A paid wall-line segment has simulation-level occupancy before the wall is
+    // created. Draw a simple orange construction footprint without introducing assets.
+    if(isWallLineReserved()) {
+        renderFillRect(renderer, &drawLocation, COLOR_RGBA(255, 68, 0, 120));
+        renderDrawRect(renderer, &drawLocation, COLOR_ORANGE);
+    }
 }
 
 void Tile::blitStructures(int xPos, int yPos) const {
@@ -593,6 +604,20 @@ void Tile::unassignObject(Uint32 objectID) {
     if (hasAnUndergroundUnit()) unassignUndergroundUnit(objectID);
     if (hasANonInfantryGroundObject()) unassignNonInfantryGroundObject(objectID);
     if (hasAnAirUnit()) unassignAirUnit(objectID);
+}
+
+void Tile::reserveWallLine() {
+    const bool wasBlocked = isBlocked();
+    ++wallLineReservationCount;
+    if(currentGameMap != nullptr && !wasBlocked) currentGameMap->incrementPathingRevision();
+}
+
+void Tile::releaseWallLineReservation() {
+    if(wallLineReservationCount == 0) return;
+
+    const bool wasBlocked = isBlocked();
+    --wallLineReservationCount;
+    if(currentGameMap != nullptr && wasBlocked && !isBlocked()) currentGameMap->incrementPathingRevision();
 }
 
 
