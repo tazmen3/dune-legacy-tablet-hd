@@ -51,6 +51,7 @@ std::mutex Game::performanceLogMutex;
 #include <misc/TouchGesture.h>
 #include <misc/SelectionControl.h>
 #include <misc/WallLinePlacement.h>
+#include <misc/SlabAreaPlacement.h>
 
 #include <players/HumanPlayer.h>
 
@@ -104,6 +105,14 @@ bool canUseWallLinePlacement(const BuilderBase* builder) {
         && constructionYard->getCurrentProducedItem() == Structure_Wall
         && constructionYard->isWaitingToPlace()
         && isWallLineUpgradeLevelUnlocked(constructionYard->getCurrentUpgradeLevel());
+}
+
+bool canUseSlabAreaPlacement(const BuilderBase* builder) {
+    const auto* constructionYard = dynamic_cast<const ConstructionYard*>(builder);
+    return constructionYard != nullptr
+        && isSlabAreaItem(constructionYard->getCurrentProducedItem())
+        && constructionYard->isWaitingToPlace()
+        && isSlabAreaUpgradeLevelUnlocked(constructionYard->getCurrentUpgradeLevel());
 }
 
 } // namespace
@@ -1487,6 +1496,8 @@ void Game::drawScreen()
                     : Coord(screenborder->screen2MapX(drawnMouseX), screenborder->screen2MapY(drawnMouseY));
                 const bool drawWallLine = hasTouchCandidate && touchPlacementCandidate.lineActive()
                     && canUseWallLinePlacement(builder);
+                const bool drawSlabArea = hasTouchCandidate && touchPlacementCandidate.slabAreaActive()
+                    && canUseSlabAreaPlacement(builder);
                 const auto evaluation = evaluatePlacement(*currentGameMap, *builder, itemID, origin);
 
                 SDL_Texture* validPlace = nullptr;
@@ -1541,6 +1552,34 @@ void Game::drawScreen()
                         }
                     }
                     const auto textTexture = pFontManager->createTextureWithText(lineText, COLOR_WHITE, 14);
+                    const SDL_Rect textLocation = calcDrawingRect(textTexture.get(), 16, topBarPos.y + topBarPos.h + 8);
+                    SDL_RenderCopy(renderer, textTexture.get(), nullptr, &textLocation);
+                } else if(drawSlabArea) {
+                    const auto plan = planSlabAreaPlacement(*currentGameMap, *builder, itemID,
+                                                            touchPlacementCandidate.start(), origin);
+                    for(const SlabAreaTile& tile : plan.tiles) {
+                        SDL_Texture* image = tile.constructible ? validPlace : invalidPlace;
+                        SDL_Rect drawLocation = calcDrawingRect(image,
+                            screenborder->world2screenX(tile.position.x * TILESIZE),
+                            screenborder->world2screenY(tile.position.y * TILESIZE));
+                        SDL_RenderCopy(renderer, image, nullptr, &drawLocation);
+                    }
+                    std::string areaText = fmt::sprintf(_("%d × %d • %d dalles • %d crédits • %d à payer • %d crédits"),
+                        plan.bounds.width(), plan.bounds.height(), plan.totalCount, lround(plan.nominalCost),
+                        lround(plan.additionalCost), lround(plan.availableCredits));
+                    if(plan.constructibleCount < plan.totalCount) {
+                        areaText += fmt::sprintf(_(" • %d / %d constructibles"), plan.constructibleCount, plan.totalCount);
+                        const bool budgetLimited = plan.constructibleCount < plan.geometricallyValidCount;
+                        switch(getSlabAreaPrimaryBlocker(plan)) {
+                            case SlabAreaPlacementBlocker::OutOfMap: areaText += _(" • Limite : hors carte"); break;
+                            case SlabAreaPlacementBlocker::Occupied: areaText += _(" • Limite : occupation"); break;
+                            case SlabAreaPlacementBlocker::OutOfBuildRange: areaText += _(" • Limite : hors portée"); break;
+                            case SlabAreaPlacementBlocker::AlreadyConcrete: areaText += _(" • Limite : déjà bétonné"); break;
+                            case SlabAreaPlacementBlocker::Terrain: areaText += _(" • Limite : terrain"); break;
+                            default: if(budgetLimited) areaText += _(" • Limite : crédits"); break;
+                        }
+                    }
+                    const auto textTexture = pFontManager->createTextureWithText(areaText, COLOR_WHITE, 14);
                     const SDL_Rect textLocation = calcDrawingRect(textTexture.get(), 16, topBarPos.y + topBarPos.h + 8);
                     SDL_RenderCopy(renderer, textTexture.get(), nullptr, &textLocation);
                 } else {
@@ -1704,8 +1743,12 @@ void Game::doInput()
                         } else {
                             touchPlacementCandidate.update(mapPosition, builder->getObjectID(), builder->getCurrentProducedItem());
                         }
-                        if((mouse->state & SDL_BUTTON_LMASK) && canUseWallLinePlacement(builder)) {
-                            touchPlacementCandidate.activateLine();
+                        if((mouse->state & SDL_BUTTON_LMASK)) {
+                            if(canUseWallLinePlacement(builder)) {
+                                touchPlacementCandidate.activateLine();
+                            } else if(canUseSlabAreaPlacement(builder)) {
+                                touchPlacementCandidate.activateSlabArea();
+                            }
                         }
                     }
                 }
@@ -1961,6 +2004,14 @@ void Game::doInput()
                                    && isPackableMapCoord(touchPlacementCandidate.start())
                                    && isPackableMapCoord(touchPlacementCandidate.position())) {
                                     getCommandManager().addCommand(Command(pLocalPlayer->getPlayerID(), CMD_PLACE_WALL_LINE,
+                                        builder->getObjectID(), packMapCoord(touchPlacementCandidate.start()),
+                                        packMapCoord(touchPlacementCandidate.position())));
+                                    soundPlayer->playSound(Sound_PlaceStructure);
+                                    setCursorMode(CursorMode_Normal);
+                                } else if(touchPlacementCandidate.slabAreaActive() && canUseSlabAreaPlacement(builder)
+                                          && isPackableMapCoord(touchPlacementCandidate.start())
+                                          && isPackableMapCoord(touchPlacementCandidate.position())) {
+                                    getCommandManager().addCommand(Command(pLocalPlayer->getPlayerID(), CMD_PLACE_SLAB_AREA,
                                         builder->getObjectID(), packMapCoord(touchPlacementCandidate.start()),
                                         packMapCoord(touchPlacementCandidate.position())));
                                     soundPlayer->playSound(Sound_PlaceStructure);

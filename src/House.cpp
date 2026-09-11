@@ -16,6 +16,7 @@
  */
 
 #include <House.h>
+#include <misc/SlabAreaPlacement.h>
 
 #include <globals.h>
 #include <sand.h>
@@ -666,6 +667,17 @@ void House::freeHarvester(int xPos, int yPos) {
 
 
 
+
+bool House::placeConcreteSlab(int itemID, int xPos, int yPos) {
+    if(!isSlabAreaItem(itemID) || !currentGameMap->tileExists(xPos, yPos)) return false;
+    Tile* tile = currentGameMap->getTile(xPos, yPos);
+    if(tile->hasAGroundObject() || !tile->isRock() || tile->isMountain() || tile->isConcrete()) return false;
+    tile->setType(Terrain_Slab);
+    tile->setOwner(houseID);
+    currentGameMap->viewMap(getHouseID(), xPos, yPos,
+        currentGame->objectData.data[itemID][houseID].viewrange);
+    return true;
+}
 
 StructureBase* House::placeStructure(Uint32 builderID, int itemID, int xPos, int yPos, bool byScenario,
                                      bool bForcePlacing, bool consumeBuilderItem) {

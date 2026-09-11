@@ -15,6 +15,7 @@ target_sources(dunelegacy_tests
         VisualFeedbackTest.cpp
         PlacementCandidateTest.cpp
         WallLinePlacementTest.cpp
+        SlabAreaPlacementTest.cpp
         ProductionEconomyTest.cpp
         ProductionControlsTest.cpp
         BuilderListInputRoutingTest.cpp

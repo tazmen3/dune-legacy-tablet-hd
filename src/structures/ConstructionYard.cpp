@@ -24,6 +24,7 @@
 #include <Game.h>
 #include <Map.h>
 #include <misc/WallLinePlacement.h>
+#include <misc/SlabAreaPlacement.h>
 #include <misc/InputStream.h>
 #include <misc/OutputStream.h>
 
@@ -41,6 +42,9 @@ ConstructionYard::ConstructionYard(InputStream& stream) : BuilderBase(stream) {
     if(currentGame && currentGame->getLoadedSavegameVersion() >= 9808) {
         wallLineConstruction.load(stream);
         reservePendingWallLineConstruction();
+    }
+    if(currentGame && currentGame->getLoadedSavegameVersion() >= 9809) {
+        slabAreaConstruction.load(stream);
     }
 }
 
@@ -66,17 +70,20 @@ void ConstructionYard::save(OutputStream& stream) const {
     BuilderBase::save(stream);
 
     wallLineConstruction.save(stream);
+    slabAreaConstruction.save(stream);
 }
 
 bool ConstructionYard::update() {
     if(!BuilderBase::update()) return false;
 
     updateWallLineConstruction();
+    updateSlabAreaConstruction();
     return true;
 }
 
 void ConstructionYard::destroy() {
     refundPendingWallLineConstruction();
+    refundPendingSlabAreaConstruction();
     StructureBase::destroy();
 }
 
@@ -126,6 +133,36 @@ bool ConstructionYard::doPlaceWallLine(const Coord& start, const Coord& end) {
     return true;
 }
 
+bool ConstructionYard::doPlaceSlabArea(const Coord& start, const Coord& end) {
+    const int itemID = getCurrentProducedItem();
+    if(!isSlabAreaItem(itemID) || !isWaitingToPlace()
+       || !isSlabAreaUpgradeLevelUnlocked(getCurrentUpgradeLevel()) || slabAreaConstruction.isActive()) {
+        return false;
+    }
+
+    const auto plan = planSlabAreaPlacement(*currentGameMap, *this, itemID, start, end);
+    if(plan.constructibleCount == 0 || !getOwner()->tryTakeCredits(plan.additionalCost)) return false;
+
+    // A ready product remains the historical prepayment.  Consume it once and
+    // atomically apply only its valid row-major quota; paid cells are delayed.
+    unSetWaitingToPlace();
+    std::vector<SlabAreaPendingPosition> pendingPositions;
+    pendingPositions.reserve(static_cast<std::size_t>(std::max(0, plan.constructibleCount)));
+    for(const SlabAreaTile& tile : plan.tiles) {
+        if(!tile.constructible) continue;
+        if(tile.prepaid) {
+            getOwner()->placeConcreteSlab(itemID, tile.position.x, tile.position.y);
+        } else {
+            pendingPositions.push_back({tile.position});
+        }
+    }
+
+    const int buildTime = currentGame->objectData.data[itemID][getOriginalHouseID()].buildtime;
+    slabAreaConstruction.start(std::move(pendingPositions), plan.unitPrice,
+                               slabAreaTileBuildCycles(buildTime, itemID), itemID);
+    return true;
+}
+
 void ConstructionYard::updateWallLineConstruction() {
     if(!wallLineConstruction.advanceCycle()) return;
 
@@ -139,6 +176,20 @@ void ConstructionYard::updateWallLineConstruction() {
     // between the construction footprint and the real wall.
     releaseWallLineReservation(position);
     const FixPoint refund = wallLineConstruction.completeNextPosition(placed);
+    if(refund > 0) getOwner()->returnCredits(refund);
+}
+
+void ConstructionYard::updateSlabAreaConstruction() {
+    if(!slabAreaConstruction.advanceCycle()) return;
+
+    const auto pending = slabAreaConstruction.getNextPosition();
+    // Unlike walls, a slab is never reserved.  Re-evaluate all constraints
+    // independently at placement time and continue after a failed tile.
+    const bool canStillPlace = evaluateSlabAreaTile(*currentGameMap, *this, pending.position).canPlace;
+    const auto snapshot = slabAreaConstruction.snapshot();
+    const bool placed = canStillPlace
+        && getOwner()->placeConcreteSlab(snapshot.itemID, pending.position.x, pending.position.y);
+    const FixPoint refund = slabAreaConstruction.completeNextPosition(placed);
     if(refund > 0) getOwner()->returnCredits(refund);
 }
 
@@ -160,5 +211,10 @@ void ConstructionYard::refundPendingWallLineConstruction() {
         releaseWallLineReservation(snapshot.pendingPositions[i]);
     }
     const FixPoint refund = wallLineConstruction.cancelAndGetRefund();
+    if(refund > 0) getOwner()->returnCredits(refund);
+}
+
+void ConstructionYard::refundPendingSlabAreaConstruction() {
+    const FixPoint refund = slabAreaConstruction.cancelAndGetRefund();
     if(refund > 0) getOwner()->returnCredits(refund);
 }

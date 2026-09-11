@@ -24,19 +24,21 @@ namespace TouchInput {
 */
 class PlacementCandidate {
 public:
+    enum class Mode { None, WallLine, SlabArea };
+
     void begin(const Coord& mapPosition, std::uint32_t builderObjectID, std::uint32_t itemID) {
         start_ = mapPosition;
         position_ = mapPosition;
         builderObjectID_ = builderObjectID;
         itemID_ = itemID;
         valid_ = true;
-        lineActive_ = false;
+        mode_ = Mode::None;
     }
 
     void update(const Coord& mapPosition, std::uint32_t builderObjectID, std::uint32_t itemID) {
         if(!valid_ || builderObjectID_ != builderObjectID || itemID_ != itemID) {
             start_ = mapPosition;
-            lineActive_ = false;
+            mode_ = Mode::None;
         }
         position_ = mapPosition;
         builderObjectID_ = builderObjectID;
@@ -44,11 +46,12 @@ public:
         valid_ = true;
     }
 
-    void activateLine() { lineActive_ = valid_; }
+    void activateLine() { if(valid_) mode_ = Mode::WallLine; }
+    void activateSlabArea() { if(valid_ && position_ != start_) mode_ = Mode::SlabArea; }
 
     void clear() {
         valid_ = false;
-        lineActive_ = false;
+        mode_ = Mode::None;
         start_ = Coord::Invalid();
         position_ = Coord::Invalid();
         builderObjectID_ = 0;
@@ -63,11 +66,13 @@ public:
 
     const Coord& position() const { return position_; }
     const Coord& start() const { return start_; }
-    bool lineActive() const { return lineActive_; }
+    bool lineActive() const { return mode_ == Mode::WallLine; }
+    bool slabAreaActive() const { return mode_ == Mode::SlabArea; }
+    Mode mode() const { return mode_; }
 
 private:
     bool valid_ = false;
-    bool lineActive_ = false;
+    Mode mode_ = Mode::None;
     Coord start_ = Coord::Invalid();
     Coord position_ = Coord::Invalid();
     std::uint32_t builderObjectID_ = 0;

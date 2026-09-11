@@ -37,6 +37,7 @@
 #include <structures/StarPort.h>
 #include <structures/ConstructionYard.h>
 #include <misc/WallLinePlacement.h>
+#include <misc/SlabAreaPlacement.h>
 
 Command::Command(Uint8 playerID, CMDTYPE id)
  : playerID(playerID), commandID(id)
@@ -327,6 +328,21 @@ void Command::executeCommand() const {
                 return;
             }
             pConstYard->doPlaceWallLine(unpackMapCoord(parameter[1]), unpackMapCoord(parameter[2]));
+        } break;
+
+        case CMD_PLACE_SLAB_AREA: {
+            if(parameter.size() != 3) {
+                THROW(std::invalid_argument, "Command::executeCommand(): CMD_PLACE_SLAB_AREA needs 3 Parameters!");
+            }
+            ConstructionYard* pConstYard = dynamic_cast<ConstructionYard*>(currentGame->getObjectManager().getObject(parameter[0]));
+            if(pConstYard == nullptr) {
+                return;
+            }
+            Player* pIssuingPlayer = currentGame->getPlayerByID(playerID);
+            if(pIssuingPlayer == nullptr || pConstYard->getOwner() != pIssuingPlayer->getHouse()) {
+                return;
+            }
+            pConstYard->doPlaceSlabArea(unpackMapCoord(parameter[1]), unpackMapCoord(parameter[2]));
         } break;
 
         case CMD_BUILDER_CANCELQUEUEENTRY: {

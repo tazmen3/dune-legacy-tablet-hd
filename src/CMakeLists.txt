@@ -248,6 +248,7 @@ target_sources(dunelegacy
 
         # Placement helpers
         misc/WallLinePlacement.cpp
+        misc/SlabAreaPlacement.cpp
 
         # Units
         units/UnitBase.cpp

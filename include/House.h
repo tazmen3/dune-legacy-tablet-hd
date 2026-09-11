@@ -200,6 +200,9 @@ public:
     void freeHarvester(const Coord& coord) { freeHarvester(coord.x, coord.y); };
     StructureBase* placeStructure(Uint32 builderID, int itemID, int xPos, int yPos, bool byScenario = false,
                                   bool bForcePlacing = false, bool consumeBuilderItem = true);
+    // Atomic single-tile slab placement used by deterministic progressive areas.
+    // It deliberately does not consume a builder item or update placement UI.
+    bool placeConcreteSlab(int itemID, int xPos, int yPos);
     UnitBase* createUnit(int itemID, bool byScenario = false);
     UnitBase* placeUnit(int itemID, int xPos, int yPos, bool byScenario = false);
 

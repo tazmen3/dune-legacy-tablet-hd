@@ -20,6 +20,7 @@
 
 #include <structures/BuilderBase.h>
 #include <misc/WallLinePlacement.h>
+#include <misc/SlabAreaPlacement.h>
 
 class ConstructionYard final : public BuilderBase
 {
@@ -41,14 +42,18 @@ public:
     */
     bool doPlaceStructure(int x, int y);
     bool doPlaceWallLine(const Coord& start, const Coord& end);
+    bool doPlaceSlabArea(const Coord& start, const Coord& end);
 
 private:
     void updateWallLineConstruction();
     void reservePendingWallLineConstruction();
     void releaseWallLineReservation(const Coord& position);
     void refundPendingWallLineConstruction();
+    void updateSlabAreaConstruction();
+    void refundPendingSlabAreaConstruction();
 
     WallLineConstructionState wallLineConstruction;
+    SlabAreaConstructionState slabAreaConstruction;
 };
 
 
