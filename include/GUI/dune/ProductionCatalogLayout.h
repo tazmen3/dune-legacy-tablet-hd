@@ -18,12 +18,12 @@ struct ProductionCatalogLayoutInput {
     int availableWidth = 0;
     int availableHeight = 0;
     int entryCount = 0;
-    int cellWidth = 91;
-    int cellHeight = 55;
-    int spacing = 5;
-    int padding = 5;
+    int cellWidth = 82;
+    int cellHeight = 52;
+    int spacing = 4;
+    int padding = 4;
     int maxColumns = 6;
-    int maxRows = 3;
+    int maxRows = 2;
 };
 
 struct ProductionCatalogGridLayout {
@@ -57,6 +57,7 @@ struct ProductionCatalogPanelBounds {
 };
 
 constexpr int PRODUCTION_CATALOG_PANEL_MARGIN = 5;
+constexpr int PRODUCTION_CATALOG_TAB_HEIGHT = 24;
 
 constexpr int productionCatalogMax(int first, int second) {
     return first > second ? first : second;
@@ -124,6 +125,38 @@ constexpr ProductionCatalogPanelBounds calculateProductionCatalogPanelBounds(
         layout.panelWidth,
         layout.panelHeight
     };
+}
+
+/** The tab strip shares the grid's width and sits immediately above it. */
+constexpr ProductionCatalogPanelBounds calculateProductionCatalogTabBounds(
+        const ProductionCatalogPanelBounds& gridBounds, int categoryCount) {
+    if(gridBounds.width <= 0 || categoryCount <= 0) return {};
+    return {
+        gridBounds.x,
+        productionCatalogMax(0, gridBounds.y - PRODUCTION_CATALOG_TAB_HEIGHT - PRODUCTION_CATALOG_PANEL_MARGIN),
+        gridBounds.width,
+        PRODUCTION_CATALOG_TAB_HEIGHT
+    };
+}
+
+/** The touch target is the contiguous tab strip and grid. */
+constexpr ProductionCatalogPanelBounds calculateProductionCatalogControlBounds(
+        const ProductionCatalogPanelBounds& gridBounds, int categoryCount) {
+    const auto tabs = calculateProductionCatalogTabBounds(gridBounds, categoryCount);
+    if(tabs.height == 0) return gridBounds;
+    return {gridBounds.x, tabs.y, gridBounds.width,
+            gridBounds.y + gridBounds.height - tabs.y};
+}
+
+constexpr int getProductionCatalogCategoryTabIndexAtPoint(
+        const ProductionCatalogPanelBounds& tabs, int categoryCount, int pointX, int pointY) {
+    if(tabs.width <= 0 || tabs.height <= 0 || categoryCount <= 0
+       || pointX < tabs.x || pointX >= tabs.x + tabs.width
+       || pointY < tabs.y || pointY >= tabs.y + tabs.height) return -1;
+    const int tabWidth = tabs.width / categoryCount;
+    if(tabWidth <= 0) return -1;
+    const int index = (pointX - tabs.x) / tabWidth;
+    return index < categoryCount ? index : categoryCount - 1;
 }
 
 constexpr ProductionCatalogGridCell getProductionCatalogGridCell(

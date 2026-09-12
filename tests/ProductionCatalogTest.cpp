@@ -126,3 +126,65 @@ TEST_CASE("Production catalogue activation requires the same still-available pre
     entry.availability = ProductionCatalogAvailability::SoldOut;
     REQUIRE_FALSE(shouldActivateProductionCatalogEntry(true, 2, 73, 2, entry, true));
 }
+
+TEST_CASE("Production catalogue categories classify structures and units without changing availability", "[production][catalogue]") {
+    REQUIRE(getProductionCatalogCategory(Structure_Slab1) == ProductionCatalogCategory::Support);
+    REQUIRE(getProductionCatalogCategory(Structure_HighTechFactory) == ProductionCatalogCategory::Support);
+    REQUIRE(getProductionCatalogCategory(Structure_ConstructionYard) == ProductionCatalogCategory::Support);
+    REQUIRE(getProductionCatalogCategory(Structure_Wall) == ProductionCatalogCategory::Defense);
+    REQUIRE(getProductionCatalogCategory(Structure_GunTurret) == ProductionCatalogCategory::Defense);
+    REQUIRE(getProductionCatalogCategory(Structure_RocketTurret) == ProductionCatalogCategory::Defense);
+    REQUIRE(getProductionCatalogCategory(Structure_Barracks) == ProductionCatalogCategory::Military);
+    REQUIRE(getProductionCatalogCategory(Structure_Palace) == ProductionCatalogCategory::Military);
+    REQUIRE(getProductionCatalogCategory(Unit_Carryall) == ProductionCatalogCategory::Support);
+    REQUIRE(getProductionCatalogCategory(Unit_Harvester) == ProductionCatalogCategory::Support);
+    REQUIRE(getProductionCatalogCategory(Unit_MCV) == ProductionCatalogCategory::Support);
+    REQUIRE(getProductionCatalogCategory(Unit_Tank) == ProductionCatalogCategory::Military);
+    REQUIRE(getProductionCatalogCategory(9999) == ProductionCatalogCategory::Military);
+}
+
+TEST_CASE("Production catalogue category filtering preserves source order and locked entries", "[production][catalogue]") {
+    const std::vector<ProductionCatalogEntry> catalog = {
+        {Structure_Wall, 50, ProductionCatalogAvailability::LockedTechLevel},
+        {Structure_Slab1, 20, ProductionCatalogAvailability::Available},
+        {Unit_Tank, 300, ProductionCatalogAvailability::SoldOut},
+        {Structure_GunTurret, 125, ProductionCatalogAvailability::Available},
+        {Unit_Frigate, 0, ProductionCatalogAvailability::NotProducedByBuilder}
+    };
+
+    const auto categories = getProductionCatalogCategories(catalog);
+    const std::vector<ProductionCatalogCategory> expectedCategories = {
+        ProductionCatalogCategory::Support,
+        ProductionCatalogCategory::Defense,
+        ProductionCatalogCategory::Military};
+    REQUIRE(categories == expectedCategories);
+    const auto defense = getProductionCatalogEntriesForCategory(catalog, ProductionCatalogCategory::Defense);
+    REQUIRE(defense.size() == 2);
+    REQUIRE(defense[0].itemID == Structure_Wall);
+    REQUIRE(defense[1].itemID == Structure_GunTurret);
+    const auto military = getProductionCatalogEntriesForCategory(catalog, ProductionCatalogCategory::Military);
+    REQUIRE(military.size() == 1);
+    REQUIRE(military[0].availability == ProductionCatalogAvailability::SoldOut);
+    REQUIRE(catalog[0].availability == ProductionCatalogAvailability::LockedTechLevel);
+}
+
+TEST_CASE("Production catalogue cell presentation clamps progress and keeps Starport progress-free", "[production][catalogue]") {
+    auto state = makeProductionCatalogCellPresentation({true, false, true, false, false, false, 3, 100, 125.0});
+    REQUIRE(state.showsProgress);
+    REQUIRE(state.progressFraction == 1.0);
+    REQUIRE(state.waitingToPlace);
+    REQUIRE(state.queueCount == 3);
+
+    state = makeProductionCatalogCellPresentation({true, false, false, true, true, false, 0, 0, 20.0});
+    REQUIRE_FALSE(state.showsProgress);
+    REQUIRE(state.onHold);
+    REQUIRE(state.unitLimitReached);
+    REQUIRE(state.progressFraction == 0.0);
+
+    state = makeProductionCatalogCellPresentation({true, true, true, true, true, false, 2, 100, 50.0});
+    REQUIRE_FALSE(state.showsProgress);
+    REQUIRE_FALSE(state.waitingToPlace);
+    REQUIRE_FALSE(state.onHold);
+    REQUIRE_FALSE(state.unitLimitReached);
+    REQUIRE(state.queueCount == 2);
+}

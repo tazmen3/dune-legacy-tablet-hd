@@ -10,7 +10,11 @@
 #ifndef PRODUCTIONCATALOG_H
 #define PRODUCTIONCATALOG_H
 
+#include <data.h>
+
+#include <array>
 #include <cstdint>
+#include <vector>
 
 /**
     Presentation-only availability for an entry in a production catalogue.
@@ -32,6 +36,126 @@ struct ProductionCatalogEntry {
     // -1 means that this producer has no stock concept for the item.
     int availableStock = -1;
 };
+
+/**
+    Presentation-only grouping for the touch catalogue.  It is deliberately
+    kept separate from BuilderBase so it can never alter what a builder offers.
+*/
+enum class ProductionCatalogCategory {
+    Support,
+    Defense,
+    Military
+};
+
+constexpr ProductionCatalogCategory getProductionCatalogCategory(std::uint32_t itemID) {
+    switch(itemID) {
+        case Structure_Slab1:
+        case Structure_Slab4:
+        case Structure_WindTrap:
+        case Structure_Refinery:
+        case Structure_Silo:
+        case Structure_Radar:
+        case Structure_RepairYard:
+        case Structure_HighTechFactory:
+        case Structure_IX:
+        case Structure_StarPort:
+        case Structure_ConstructionYard:
+        case Unit_Carryall:
+        case Unit_Harvester:
+        case Unit_MCV:
+            return ProductionCatalogCategory::Support;
+
+        case Structure_Wall:
+        case Structure_GunTurret:
+        case Structure_RocketTurret:
+            return ProductionCatalogCategory::Defense;
+
+        default:
+            // Military is the safe fallback for combat and future units. This
+            // does not make an item producible; it only classifies an entry
+            // already exposed by BuilderBase::getProductionCatalog().
+            return ProductionCatalogCategory::Military;
+    }
+}
+
+constexpr bool isProductionCatalogEntryDisplayed(const ProductionCatalogEntry& entry) {
+    return entry.availability != ProductionCatalogAvailability::NotProducedByBuilder;
+}
+
+constexpr bool isProductionCatalogEntryInCategory(
+        const ProductionCatalogEntry& entry, ProductionCatalogCategory category) {
+    return isProductionCatalogEntryDisplayed(entry)
+        && getProductionCatalogCategory(entry.itemID) == category;
+}
+
+inline std::vector<ProductionCatalogCategory> getProductionCatalogCategories(
+        const std::vector<ProductionCatalogEntry>& catalog) {
+    constexpr std::array allCategories = {
+        ProductionCatalogCategory::Support,
+        ProductionCatalogCategory::Defense,
+        ProductionCatalogCategory::Military
+    };
+    std::vector<ProductionCatalogCategory> categories;
+    for(const auto category : allCategories) {
+        for(const auto& entry : catalog) {
+            if(isProductionCatalogEntryInCategory(entry, category)) {
+                categories.push_back(category);
+                break;
+            }
+        }
+    }
+    return categories;
+}
+
+inline std::vector<ProductionCatalogEntry> getProductionCatalogEntriesForCategory(
+        const std::vector<ProductionCatalogEntry>& catalog, ProductionCatalogCategory category) {
+    std::vector<ProductionCatalogEntry> entries;
+    entries.reserve(catalog.size());
+    for(const auto& entry : catalog) {
+        if(isProductionCatalogEntryInCategory(entry, category)) entries.push_back(entry);
+    }
+    return entries;
+}
+
+struct ProductionCatalogCellPresentationInput {
+    bool isCurrentItem = false;
+    bool isStarport = false;
+    bool waitingToPlace = false;
+    bool onHold = false;
+    bool unitLimitReached = false;
+    bool palaceAlreadyBuilt = false;
+    int queueCount = 0;
+    int price = 0;
+    double productionProgress = 0.0;
+};
+
+struct ProductionCatalogCellPresentation {
+    int queueCount = 0;
+    double progressFraction = 0.0;
+    bool showsProgress = false;
+    bool waitingToPlace = false;
+    bool onHold = false;
+    bool unitLimitReached = false;
+    bool palaceAlreadyBuilt = false;
+};
+
+constexpr double clampProductionCatalogProgress(double value) {
+    return value < 0.0 ? 0.0 : (value > 1.0 ? 1.0 : value);
+}
+
+constexpr ProductionCatalogCellPresentation makeProductionCatalogCellPresentation(
+        const ProductionCatalogCellPresentationInput& input) {
+    const bool showsProgress = input.isCurrentItem && !input.isStarport && input.price > 0;
+    return {
+        input.queueCount > 0 ? input.queueCount : 0,
+        showsProgress ? clampProductionCatalogProgress(input.productionProgress / input.price) : 0.0,
+        showsProgress,
+        input.isCurrentItem && !input.isStarport && input.waitingToPlace,
+        input.isCurrentItem && !input.isStarport && input.onHold,
+        input.isCurrentItem && !input.isStarport && input.unitLimitReached,
+        input.palaceAlreadyBuilt
+    };
+}
 
 constexpr bool isProductionCatalogEntryActivatable(
         const ProductionCatalogEntry& entry, bool purchasesEnabled) {
