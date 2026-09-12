@@ -19,11 +19,14 @@
 #define BUILDERBASE_H
 
 #include <structures/StructureBase.h>
+#include <structures/ProductionCatalog.h>
 
+#include <ObjectData.h>
 #include <data.h>
 
 #include <list>
 #include <string>
+#include <vector>
 
 class BuildItem {
 public:
@@ -133,6 +136,13 @@ public:
         modify buildList appropriately.
     */
     virtual void updateBuildList();
+
+    /**
+        Returns the ordered, read-only catalogue for ordinary builders. This
+        does not alter buildList, production queues, prices, or admission.
+        Starport will provide its CHOAM-specific catalogue in a later step.
+    */
+    virtual std::vector<ProductionCatalogEntry> getProductionCatalog() const;
 
     void setWaitingToPlace();
     void unSetWaitingToPlace();
@@ -270,6 +280,9 @@ protected:
     }
 
     void produceNextAvailableItem();
+
+    ProductionCatalogAvailability getProductionCatalogAvailability(
+            const ObjectData::ObjectDataStruct& objData) const;
 
 protected:
     static const int itemOrder[];  ///< the order in which items are in the build list

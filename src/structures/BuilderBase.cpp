@@ -314,28 +314,56 @@ void BuilderBase::updateBuildList()
 
         const ObjectData::ObjectDataStruct& objData = currentGame->objectData.data[itemID2Add][originalHouseID];
 
-        if(!objData.enabled || (objData.builder != (int) itemID) || (objData.upgradeLevel > curUpgradeLev) || (objData.techLevel > currentGame->techLevel)) {
-            // first simple checks have rejected this item as being available for built in this builder
-            removeItem(buildList, iter, itemID2Add);
+        if(getProductionCatalogAvailability(objData) == ProductionCatalogAvailability::Available) {
+            insertItem(buildList, iter, itemID2Add);
         } else {
+            removeItem(buildList, iter, itemID2Add);
+        }
+    }
 
-            // check if prerequisites are met
-            bool bPrerequisitesMet = true;
-            for(int itemID2Test = Structure_FirstID; itemID2Test <= Structure_LastID; itemID2Test++) {
-                if(objData.prerequisiteStructuresSet[itemID2Test] && (owner->getNumItems(itemID2Test) <= 0)) {
-                    bPrerequisitesMet = false;
-                    break;
-                }
-            }
+}
 
-            if(bPrerequisitesMet) {
-                insertItem(buildList, iter, itemID2Add);
-            } else {
-                removeItem(buildList, iter, itemID2Add);
+ProductionCatalogAvailability BuilderBase::getProductionCatalogAvailability(
+        const ObjectData::ObjectDataStruct& objData) const {
+    ProductionCatalogEligibility eligibility;
+    eligibility.enabled = objData.enabled;
+    eligibility.belongsToBuilder = (objData.builder == static_cast<int>(itemID));
+    eligibility.techLevelMet = (objData.techLevel <= currentGame->techLevel);
+    eligibility.upgradeLevelMet = (objData.upgradeLevel <= curUpgradeLev);
+
+    // Match the historical order: only inspect prerequisites for an item that
+    // already belongs to this builder and passed its simple availability gates.
+    eligibility.prerequisitesMet = true;
+    if(eligibility.enabled && eligibility.belongsToBuilder
+       && eligibility.upgradeLevelMet && eligibility.techLevelMet) {
+        for(int itemID2Test = Structure_FirstID; itemID2Test <= Structure_LastID; ++itemID2Test) {
+            if(objData.prerequisiteStructuresSet[itemID2Test]
+               && owner->getNumItems(itemID2Test) <= 0) {
+                eligibility.prerequisitesMet = false;
+                break;
             }
         }
     }
 
+    return evaluateProductionCatalogAvailability(eligibility);
+}
+
+std::vector<ProductionCatalogEntry> BuilderBase::getProductionCatalog() const {
+    std::vector<ProductionCatalogEntry> catalog;
+
+    for(int i = 0; itemOrder[i] != ItemID_Invalid; ++i) {
+        const Uint32 candidateItemID = itemOrder[i];
+        const ObjectData::ObjectDataStruct& objData = currentGame->objectData.data[candidateItemID][originalHouseID];
+        const ProductionCatalogAvailability availability = getProductionCatalogAvailability(objData);
+
+        if(availability == ProductionCatalogAvailability::NotProducedByBuilder) {
+            continue;
+        }
+
+        catalog.push_back({candidateItemID, objData.price, availability});
+    }
+
+    return catalog;
 }
 
 void BuilderBase::setWaitingToPlace() {
