@@ -27,6 +27,7 @@
 #include <GUI/PictureLabel.h>
 #include <GUI/dune/ChatManager.h>
 #include <GUI/dune/NewsTicker.h>
+#include <GUI/dune/ProductionCatalogGrid.h>
 
 #include <RadarView.h>
 
@@ -109,6 +110,7 @@ private:
     RadarView           radarView;              ///< This is the minimap/radar in the side bar
 
     ChatManager         chatManager;            ///< Manages chat manages shown overlayed with the main map
+    ProductionCatalogGrid productionCatalogGrid;///< Read-only catalogue over the lower-left game area
     TextButton          ornithopterSelectButton;///< Button that selects all owned ornithopters
     TextButton          deselectButton;         ///< Clears the complete local selection
 };

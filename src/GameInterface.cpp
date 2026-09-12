@@ -27,6 +27,8 @@
 #include <GUI/ObjectInterfaces/ObjectInterface.h>
 #include <GUI/ObjectInterfaces/MultiUnitInterface.h>
 
+#include <structures/BuilderBase.h>
+
 #include <misc/draw_util.h>
 #include <misc/SDL2pp.h>
 #include <misc/SelectionControl.h>
@@ -103,6 +105,11 @@ GameInterface::GameInterface() : Window(0,0,0,0) {
     deselectButton.resize(ornithopterButtonSize.x, ornithopterButtonSize.y);
     windowWidget.addWidget(&deselectButton, ornithopterButtonPos, ornithopterButtonSize);
     deselectButton.setVisible(false);
+
+    // The catalogue is a game-area overlay. It is added before chat so chat text stays legible above it.
+    windowWidget.addWidget(&productionCatalogGrid,
+                           Point(0, 0),
+                           Point(getRendererWidth() - sideBar.getSize().x, getRendererHeight()));
 
     // add chat manager
     windowWidget.addWidget(&chatManager, Point(20, 60), Point(getRendererWidth() - sideBar.getSize().x, 360));
@@ -185,6 +192,15 @@ void GameInterface::draw(Point position) {
 
 void GameInterface::updateObjectInterface() {
     const auto& selection = currentGame->getSelectedList();
+
+    productionCatalogGrid.clear();
+    if(selection.size() == 1) {
+        auto* selectedObject = currentGame->getObjectManager().getObject(*selection.begin());
+        auto* selectedBuilder = dynamic_cast<BuilderBase*>(selectedObject);
+        if(selectedBuilder != nullptr && ((pLocalHouse == selectedBuilder->getOwner()) || debug)) {
+            productionCatalogGrid.setBuilderObjectID(selectedBuilder->getObjectID());
+        }
+    }
 
     if(selection.empty()) {
         ornithopterSelectButton.setVisible(true);

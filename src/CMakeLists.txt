@@ -179,6 +179,7 @@ target_sources(dunelegacy
         GUI/dune/NewsTicker.cpp
         GUI/dune/MessageTicker.cpp
         GUI/dune/BuilderList.cpp
+        GUI/dune/ProductionCatalogGrid.cpp
         GUI/dune/WaitingForOtherPlayers.cpp
 
         # Menu

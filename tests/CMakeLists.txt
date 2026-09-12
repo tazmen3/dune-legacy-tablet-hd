@@ -18,6 +18,7 @@ target_sources(dunelegacy_tests
         SlabAreaPlacementTest.cpp
         ProductionEconomyTest.cpp
         ProductionCatalogTest.cpp
+        ProductionCatalogLayoutTest.cpp
         ProductionControlsTest.cpp
         BuilderListInputRoutingTest.cpp
         SaveGameNameTest.cpp
