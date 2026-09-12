@@ -55,6 +55,12 @@ ProductionQueueControls::~ProductionQueueControls() {
     clearTouchTarget();
 }
 
+void ProductionQueueControls::cancelButtonPresses() {
+    primaryButton.cancelPress();
+    cancelButton.cancelPress();
+    cancelAllButton.cancelPress();
+}
+
 void ProductionQueueControls::clearTouchTarget() {
     TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::QueueControls,
                                              builderObjectID);
@@ -63,6 +69,7 @@ void ProductionQueueControls::clearTouchTarget() {
 void ProductionQueueControls::setBuilderObjectID(Uint32 newBuilderObjectID) {
     if(builderObjectID != newBuilderObjectID) {
         clearTouchTarget();
+        cancelButtonPresses();
         controlBounds = {};
         leftPressInsideControls = false;
         rightPressInsideControls = false;
@@ -73,6 +80,7 @@ void ProductionQueueControls::setBuilderObjectID(Uint32 newBuilderObjectID) {
 
 void ProductionQueueControls::clear() {
     clearTouchTarget();
+    cancelButtonPresses();
     builderObjectID = NONE_ID;
     controlBounds = {};
     leftPressInsideControls = false;
@@ -103,6 +111,7 @@ bool ProductionQueueControls::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) 
     } else {
         StaticContainer::handleMouseMovement(-1, -1, false);
     }
+    cancelButtonPresses();
     return true;
 }
 
@@ -134,6 +143,7 @@ void ProductionQueueControls::draw(Point position) {
     if(builder == nullptr) {
         controlBounds = {};
         clearTouchTarget();
+        cancelButtonPresses();
         setButtonsVisible(false, false, false);
         return;
     }
@@ -147,6 +157,7 @@ void ProductionQueueControls::draw(Point position) {
     if(!showPrimary && !visibility.cancel && !visibility.cancelAll) {
         controlBounds = {};
         clearTouchTarget();
+        cancelButtonPresses();
         setButtonsVisible(false, false, false);
         return;
     }
@@ -160,6 +171,7 @@ void ProductionQueueControls::draw(Point position) {
     if(panelBounds.width <= 0 || panelBounds.y < CONTROL_HEIGHT + CONTROL_MARGIN) {
         controlBounds = {};
         clearTouchTarget();
+        cancelButtonPresses();
         setButtonsVisible(false, false, false);
         return;
     }

@@ -17,9 +17,22 @@
 
 class ProductionQueueButton : public TextButton {
 public:
+    void cancelPress() { bPressed = false; }
+
+    void setVisible(bool visible) override {
+        if(!visible) cancelPress();
+        TextButton::setVisible(visible);
+    }
+
     bool handleMouseLeft(Sint32 x, Sint32 y, bool pressed) override {
-        if(x < 0 || x >= getSize().x || y < 0 || y >= getSize().y) return false;
-        if(!isEnabled() || !isVisible()) return true;
+        if(x < 0 || x >= getSize().x || y < 0 || y >= getSize().y) {
+            if(!pressed) cancelPress();
+            return false;
+        }
+        if(!isEnabled() || !isVisible()) {
+            cancelPress();
+            return true;
+        }
 
         if(pressed) {
             bPressed = true;
@@ -48,6 +61,7 @@ private:
     void onCancelCurrent();
     void onCancelAll();
     void clearTouchTarget();
+    void cancelButtonPresses();
     bool isPointInsideControls(Sint32 x, Sint32 y) const;
     void setButtonsVisible(bool primary, bool cancel, bool cancelAll);
 
