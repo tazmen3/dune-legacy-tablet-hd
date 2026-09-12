@@ -193,13 +193,16 @@ void GameInterface::draw(Point position) {
 void GameInterface::updateObjectInterface() {
     const auto& selection = currentGame->getSelectedList();
 
-    productionCatalogGrid.clear();
     if(selection.size() == 1) {
         auto* selectedObject = currentGame->getObjectManager().getObject(*selection.begin());
         auto* selectedBuilder = dynamic_cast<BuilderBase*>(selectedObject);
         if(selectedBuilder != nullptr && ((pLocalHouse == selectedBuilder->getOwner()) || debug)) {
             productionCatalogGrid.setBuilderObjectID(selectedBuilder->getObjectID());
+        } else {
+            productionCatalogGrid.clear();
         }
+    } else {
+        productionCatalogGrid.clear();
     }
 
     if(selection.empty()) {

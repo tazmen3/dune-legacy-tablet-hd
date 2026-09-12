@@ -24,8 +24,8 @@ bool isTouchDispatch();
 bool isTapDispatch();
 bool tapStartedInsideMap();
 bool allowProductionRepeat(Uint32 builder, Uint32 item);
-void setProductionCatalogTarget(const ProductionCatalogTarget& target);
-void clearProductionCatalogTarget(Uint32 builderObjectID);
+void setProductionCatalogTarget(ProductionCatalogTargetSource source, const ProductionCatalogTarget& target);
+void clearProductionCatalogTarget(ProductionCatalogTargetSource source, Uint32 builderObjectID = 0);
 bool getSelectionDragPreview(SDL_Point* start, SDL_Point* current);
 bool consumePlacementCancellation();
 #else
@@ -34,8 +34,8 @@ inline bool isTouchDispatch() { return false; }
 inline bool isTapDispatch() { return false; }
 inline bool tapStartedInsideMap() { return false; }
 inline bool allowProductionRepeat(Uint32, Uint32) { return true; }
-inline void setProductionCatalogTarget(const ProductionCatalogTarget&) {}
-inline void clearProductionCatalogTarget(Uint32) {}
+inline void setProductionCatalogTarget(ProductionCatalogTargetSource, const ProductionCatalogTarget&) {}
+inline void clearProductionCatalogTarget(ProductionCatalogTargetSource, Uint32 = 0) {}
 inline bool getSelectionDragPreview(SDL_Point*, SDL_Point*) { return false; }
 inline bool consumePlacementCancellation() { return false; }
 #endif

@@ -15,6 +15,7 @@
 #include <FileClasses/TextManager.h>
 #include <Game.h>
 #include <misc/draw_util.h>
+#include <misc/TouchInput.h>
 #include <sand.h>
 #include <structures/BuilderBase.h>
 
@@ -62,12 +63,21 @@ ProductionCatalogGrid::ProductionCatalogGrid() {
     setVisible(false);
 }
 
+ProductionCatalogGrid::~ProductionCatalogGrid() {
+    TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
+}
+
 void ProductionCatalogGrid::setBuilderObjectID(Uint32 newBuilderObjectID) {
+    if(builderObjectID != newBuilderObjectID) {
+        TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
+        panelBounds = {};
+    }
     builderObjectID = newBuilderObjectID;
     setVisible(builderObjectID != NONE_ID);
 }
 
 void ProductionCatalogGrid::clear() {
+    TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
     builderObjectID = NONE_ID;
     panelBounds = {};
     setVisible(false);
@@ -90,6 +100,7 @@ void ProductionCatalogGrid::draw(Point position) {
 
     auto* builder = dynamic_cast<BuilderBase*>(currentGame->getObjectManager().getObject(builderObjectID));
     if(builder == nullptr) {
+        TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
         panelBounds = {};
         return;
     }
@@ -109,6 +120,7 @@ void ProductionCatalogGrid::draw(Point position) {
         static_cast<int>(entries.size())
     });
     if(layout.maxVisibleEntries == 0) {
+        TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
         panelBounds = {};
         return;
     }
@@ -119,6 +131,13 @@ void ProductionCatalogGrid::draw(Point position) {
         layout.panelWidth,
         layout.panelHeight
     };
+    TouchInput::setProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid, {
+        builderObjectID,
+        position.x + panelBounds.x,
+        position.y + panelBounds.y,
+        panelBounds.width,
+        panelBounds.height
+    });
     SDL_Rect panel = {
         position.x + panelBounds.x,
         position.y + panelBounds.y,

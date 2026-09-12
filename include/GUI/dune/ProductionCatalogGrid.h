@@ -17,6 +17,7 @@
 class ProductionCatalogGrid : public Widget {
 public:
     ProductionCatalogGrid();
+    ~ProductionCatalogGrid() override;
 
     void setBuilderObjectID(Uint32 newBuilderObjectID);
     void clear();

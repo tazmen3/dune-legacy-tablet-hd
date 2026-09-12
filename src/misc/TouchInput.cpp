@@ -75,9 +75,7 @@ struct TouchState {
     bool placementCancellationPending = false;
     bool mapTapEligible = false;
     bool lastPointerWasTouch = false;
-    bool productionCatalogTargetValid = false;
-    TouchInput::ProductionCatalogTarget productionCatalogTarget{};
-    TouchInput::ProductionCatalogTouchGuard productionCatalogTouch;
+    TouchInput::ProductionCatalogTouchSession productionCatalogTouch;
 };
 
 TouchState state;
@@ -228,8 +226,7 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
         state.gesture.begin(point.x, point.y);
         state.panEligible = state.camera && state.camera->isScreenCoordInsideMap(point.x, point.y);
         state.mapTapEligible = state.panEligible;
-        if(state.productionCatalogTargetValid
-           && state.productionCatalogTouch.begin(state.productionCatalogTarget, point.x, point.y, finger.timestamp)) {
+        if(state.productionCatalogTouch.begin(point.x, point.y, finger.timestamp)) {
             state.panEligible = false;
             state.mapTapEligible = false;
             state.panBlocked = true;
@@ -489,25 +486,21 @@ bool allowProductionRepeat(Uint32 builder, Uint32 item) {
     return true;
 }
 
-void setProductionCatalogTarget(const ProductionCatalogTarget& target) {
-    if(state.productionCatalogTouch.isTracking()
-       && !state.productionCatalogTouch.target().sameRegion(target)) {
-        state.productionCatalogTouch.cancel();
+void setProductionCatalogTarget(ProductionCatalogTargetSource source, const ProductionCatalogTarget& target) {
+    const bool wasTracking = state.productionCatalogTouch.isTracking();
+    const auto activeSource = state.productionCatalogTouch.activeSource();
+    state.productionCatalogTouch.setTarget(source, target);
+    if(wasTracking && activeSource == source && !state.productionCatalogTouch.isTracking()) {
         state.gesture.cancel();
         state.panBlocked = true;
     }
-    state.productionCatalogTarget = target;
-    state.productionCatalogTargetValid = target.builderObjectID != 0
-        && target.width > 0 && target.height > 0;
 }
 
-void clearProductionCatalogTarget(Uint32 builderObjectID) {
-    if(state.productionCatalogTargetValid && state.productionCatalogTarget.builderObjectID == builderObjectID) {
-        state.productionCatalogTargetValid = false;
-    }
-    if(state.productionCatalogTouch.isTracking()
-       && state.productionCatalogTouch.target().builderObjectID == builderObjectID) {
-        state.productionCatalogTouch.cancel();
+void clearProductionCatalogTarget(ProductionCatalogTargetSource source, Uint32 builderObjectID) {
+    const bool wasTracking = state.productionCatalogTouch.isTracking();
+    const auto activeSource = state.productionCatalogTouch.activeSource();
+    state.productionCatalogTouch.clearTarget(source, builderObjectID);
+    if(wasTracking && activeSource == source && !state.productionCatalogTouch.isTracking()) {
         state.gesture.cancel();
         state.panBlocked = true;
     }

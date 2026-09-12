@@ -102,7 +102,8 @@ BuilderList::BuilderList(Uint32 builderObjectID) {
 }
 
 BuilderList::~BuilderList() {
-    TouchInput::clearProductionCatalogTarget(builderObjectID);
+    TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList,
+                                             builderObjectID);
 }
 
 void BuilderList::handleMouseMovement(Sint32 x, Sint32 y, bool insideOverlay) {
@@ -389,7 +390,7 @@ void BuilderList::draw(Point position) {
         if(visibleButtons > 0) {
             const Point first = getButtonPosition(0);
             const Point last = getButtonPosition(visibleButtons - 1);
-            TouchInput::setProductionCatalogTarget({
+            TouchInput::setProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList, {
                 builderObjectID,
                 position.x + first.x,
                 position.y + first.y,
@@ -397,10 +398,12 @@ void BuilderList::draw(Point position) {
                 last.y - first.y + BUILDERBTN_HEIGHT
             });
         } else {
-            TouchInput::clearProductionCatalogTarget(builderObjectID);
+            TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList,
+                                                     builderObjectID);
         }
     } else {
-        TouchInput::clearProductionCatalogTarget(builderObjectID);
+        TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList,
+                                                 builderObjectID);
     }
 #endif
 

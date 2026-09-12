@@ -83,6 +83,73 @@ struct ProductionCatalogTarget {
     }
 };
 
+enum class ProductionCatalogTargetSource {
+    LegacyBuilderList,
+    Grid
+};
+
+struct ProductionCatalogTargetSelection {
+    bool found = false;
+    ProductionCatalogTargetSource source = ProductionCatalogTargetSource::LegacyBuilderList;
+    ProductionCatalogTarget target{};
+};
+
+/**
+    The two production catalogue surfaces deliberately keep separate slots.
+    Their regions must never be merged: the map between the sidebar list and
+    the lower-left grid remains interactive.
+*/
+class ProductionCatalogTargetRegistry {
+public:
+    void set(ProductionCatalogTargetSource source, const ProductionCatalogTarget& target) {
+        auto& slot = getSlot(source);
+        slot.target = target;
+        slot.valid = target.builderObjectID != 0 && target.width > 0 && target.height > 0;
+    }
+
+    bool clear(ProductionCatalogTargetSource source, std::uint32_t builderObjectID = 0) {
+        auto& slot = getSlot(source);
+        if(!slot.valid || (builderObjectID != 0 && slot.target.builderObjectID != builderObjectID)) {
+            return false;
+        }
+        slot = {};
+        return true;
+    }
+
+    ProductionCatalogTargetSelection find(int pointX, int pointY) const {
+        // The regions do not normally overlap. Legacy keeps deterministic priority
+        // if a transient layout ever does.
+        if(legacyBuilderList_.valid && legacyBuilderList_.target.contains(pointX, pointY)) {
+            return {true, ProductionCatalogTargetSource::LegacyBuilderList, legacyBuilderList_.target};
+        }
+        if(grid_.valid && grid_.target.contains(pointX, pointY)) {
+            return {true, ProductionCatalogTargetSource::Grid, grid_.target};
+        }
+        return {};
+    }
+
+    bool has(ProductionCatalogTargetSource source) const {
+        return getSlot(source).valid;
+    }
+
+private:
+    struct Slot {
+        bool valid = false;
+        ProductionCatalogTarget target{};
+    };
+
+    Slot& getSlot(ProductionCatalogTargetSource source) {
+        return source == ProductionCatalogTargetSource::Grid ? grid_ : legacyBuilderList_;
+    }
+
+    const Slot& getSlot(ProductionCatalogTargetSource source) const {
+        return source == ProductionCatalogTargetSource::Grid ? grid_ : legacyBuilderList_;
+    }
+
+    Slot legacyBuilderList_;
+    Slot grid_;
+};
+
 /**
  * Pure guard for the production catalogue. A short touch remains a normal
  * catalogue tap; a hold is consumed so Android's historical synthetic
@@ -140,6 +207,53 @@ private:
     std::uint32_t pressedAt_ = 0;
     bool tracking_ = false;
     bool armed_ = false;
+};
+
+/**
+    Couples a selected target slot to the existing touch guard. Updating the
+    other slot cannot disturb the active gesture; changing/removing its own
+    source cancels the gesture before it can reach map input.
+*/
+class ProductionCatalogTouchSession {
+public:
+    void setTarget(ProductionCatalogTargetSource source, const ProductionCatalogTarget& target) {
+        targets_.set(source, target);
+        if(touch_.isTracking() && activeSource_ == source && !touch_.target().sameRegion(target)) {
+            cancel();
+        }
+    }
+
+    void clearTarget(ProductionCatalogTargetSource source, std::uint32_t builderObjectID = 0) {
+        if(touch_.isTracking() && activeSource_ == source
+           && (builderObjectID == 0 || touch_.target().builderObjectID == builderObjectID)) {
+            cancel();
+        }
+        targets_.clear(source, builderObjectID);
+    }
+
+    bool begin(int pointX, int pointY, std::uint32_t timestamp) {
+        const auto selection = targets_.find(pointX, pointY);
+        if(!selection.found || !touch_.begin(selection.target, pointX, pointY, timestamp)) {
+            return false;
+        }
+        activeSource_ = selection.source;
+        return true;
+    }
+
+    void move(int pointX, int pointY) { touch_.move(pointX, pointY); }
+    ProductionCatalogTouchAction release(int pointX, int pointY, std::uint32_t timestamp) {
+        return touch_.release(pointX, pointY, timestamp);
+    }
+    void cancel() { touch_.cancel(); }
+    bool isTracking() const { return touch_.isTracking(); }
+    bool isArmed() const { return touch_.isArmed(); }
+    ProductionCatalogTargetSource activeSource() const { return activeSource_; }
+    const ProductionCatalogTargetRegistry& targets() const { return targets_; }
+
+private:
+    ProductionCatalogTargetRegistry targets_;
+    ProductionCatalogTouchGuard touch_;
+    ProductionCatalogTargetSource activeSource_ = ProductionCatalogTargetSource::LegacyBuilderList;
 };
 
 } // namespace TouchInput
