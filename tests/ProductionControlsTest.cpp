@@ -30,6 +30,10 @@ TouchInput::ProductionCatalogTarget gridTarget() {
     return { 77, 20, 340, 581, 185 };
 }
 
+TouchInput::ProductionCatalogTarget queueControlsTarget() {
+    return { 77, 20, 300, 581, 30 };
+}
+
 TouchInput::ProductionCatalogTouchAction releaseAfter(std::uint32_t elapsed) {
     TouchInput::ProductionCatalogTouchGuard touch;
     REQUIRE(touch.begin(target(), 120, 210, 1000));
@@ -140,6 +144,17 @@ TEST_CASE("Production catalogue target slots recognize the Grid independently", 
     REQUIRE_FALSE(targets.find(700, 300).found);
 }
 
+TEST_CASE("Production catalogue target slots recognize QueueControls independently", "[touch][production][targets]") {
+    TouchInput::ProductionCatalogTargetRegistry targets;
+    targets.set(TouchInput::ProductionCatalogTargetSource::QueueControls, queueControlsTarget());
+
+    const auto selection = targets.find(100, 310);
+    REQUIRE(selection.found);
+    REQUIRE(selection.source == TouchInput::ProductionCatalogTargetSource::QueueControls);
+    REQUIRE(selection.target.sameRegion(queueControlsTarget()));
+    REQUIRE_FALSE(targets.find(100, 340).found);
+}
+
 TEST_CASE("Production catalogue target slots select either visible catalogue without bridging the map", "[touch][production][targets]") {
     TouchInput::ProductionCatalogTargetRegistry targets;
     targets.set(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList, target());
@@ -160,6 +175,18 @@ TEST_CASE("Production catalogue target slots clear only their own surface", "[to
     REQUIRE_FALSE(targets.has(TouchInput::ProductionCatalogTargetSource::Grid));
     REQUIRE(targets.clear(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList, target().builderObjectID));
     REQUIRE_FALSE(targets.has(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList));
+}
+
+TEST_CASE("Production queue controls and Grid keep independent touch slots", "[touch][production][targets]") {
+    TouchInput::ProductionCatalogTargetRegistry targets;
+    targets.set(TouchInput::ProductionCatalogTargetSource::Grid, gridTarget());
+    targets.set(TouchInput::ProductionCatalogTargetSource::QueueControls, queueControlsTarget());
+
+    REQUIRE(targets.has(TouchInput::ProductionCatalogTargetSource::Grid));
+    REQUIRE(targets.has(TouchInput::ProductionCatalogTargetSource::QueueControls));
+    REQUIRE(targets.clear(TouchInput::ProductionCatalogTargetSource::QueueControls));
+    REQUIRE(targets.has(TouchInput::ProductionCatalogTargetSource::Grid));
+    REQUIRE_FALSE(targets.has(TouchInput::ProductionCatalogTargetSource::QueueControls));
 }
 
 TEST_CASE("Production catalogue session tracks the slot where the gesture began", "[touch][production][targets]") {
@@ -217,6 +244,35 @@ TEST_CASE("Production catalogue Grid keeps horizontal motion and legacy gestures
     legacySession.setTarget(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList, target());
     REQUIRE(legacySession.begin(120, 210, 10));
     REQUIRE(legacySession.release(120, 170, 110) == TouchInput::ProductionCatalogTouchAction::None);
+}
+
+TEST_CASE("Production queue controls keep swipe, hold and second-finger gestures inert", "[touch][production][targets][scroll]") {
+    TouchInput::ProductionCatalogTouchSession session;
+    session.setTarget(TouchInput::ProductionCatalogTargetSource::Grid, gridTarget());
+    session.setTarget(TouchInput::ProductionCatalogTargetSource::QueueControls, queueControlsTarget());
+
+    REQUIRE(session.begin(100, 310, 10));
+    REQUIRE(session.release(100, 270, 110) == TouchInput::ProductionCatalogTouchAction::None);
+
+    REQUIRE(session.begin(100, 310, 200));
+    REQUIRE(session.release(100, 310, 800) == TouchInput::ProductionCatalogTouchAction::HoldSuppressed);
+
+    REQUIRE(session.begin(100, 310, 900));
+    session.cancel();
+    REQUIRE(session.release(100, 310, 1000) == TouchInput::ProductionCatalogTouchAction::None);
+}
+
+TEST_CASE("Production queue controls tap stays a UI tap and other target updates do not interrupt it", "[touch][production][targets]") {
+    TouchInput::ProductionCatalogTouchSession session;
+    session.setTarget(TouchInput::ProductionCatalogTargetSource::Grid, gridTarget());
+    session.setTarget(TouchInput::ProductionCatalogTargetSource::QueueControls, queueControlsTarget());
+
+    REQUIRE(session.begin(100, 310, 10));
+    auto movedGrid = gridTarget();
+    movedGrid.x += 2;
+    session.setTarget(TouchInput::ProductionCatalogTargetSource::Grid, movedGrid);
+    REQUIRE(session.isTracking());
+    REQUIRE(session.release(100, 310, 100) == TouchInput::ProductionCatalogTouchAction::Tap);
 }
 
 TEST_CASE("Production pause control toggles independently from catalogue taps", "[touch][production]") {

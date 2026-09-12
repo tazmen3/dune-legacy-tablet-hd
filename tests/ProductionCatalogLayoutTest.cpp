@@ -101,6 +101,19 @@ TEST_CASE("Production catalogue grid panel never exceeds available width", "[pro
     }
 }
 
+TEST_CASE("Production catalogue controls and grid share a bottom-aligned panel bound", "[production][catalogue][layout]") {
+    const auto layout = layoutFor(18);
+    const auto panel = calculateProductionCatalogPanelBounds(layout, 533);
+
+    REQUIRE(panel.x == PRODUCTION_CATALOG_PANEL_MARGIN);
+    REQUIRE(panel.y == 343);
+    REQUIRE(panel.width == layout.panelWidth);
+    REQUIRE(panel.height == layout.panelHeight);
+
+    const auto constrained = calculateProductionCatalogPanelBounds(layout, 100);
+    REQUIRE(constrained.y == 0);
+}
+
 TEST_CASE("Production catalogue grid keeps one bounded column for tiny widths", "[production][catalogue][layout]") {
     const auto layout = layoutFor(1, 1, 1);
     REQUIRE(layout.columns == 1);

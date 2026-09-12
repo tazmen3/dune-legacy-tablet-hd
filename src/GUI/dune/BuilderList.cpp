@@ -522,17 +522,15 @@ void BuilderList::onDown() {
 
 void BuilderList::onOrder() {
     StarPort* pStarport = dynamic_cast<StarPort*>(currentGame->getObjectManager().getObject(builderObjectID));
-    if(pStarport) {
-        pStarport->handlePlaceOrderClick();
+    if(pStarport && TouchInput::requestStarportOrder(*pStarport)) {
+        soundPlayer->playSound(Sound_ButtonClick);
     }
 }
 
 void BuilderList::onPauseToggle() {
     BuilderBase* pBuilder = dynamic_cast<BuilderBase*>(currentGame->getObjectManager().getObject(builderObjectID));
-    if(pBuilder && !dynamic_cast<StarPort*>(pBuilder)
-       && !pBuilder->getProductionQueue().empty() && !pBuilder->isWaitingToPlace()) {
+    if(pBuilder && TouchInput::requestProductionPauseToggle(*pBuilder, dynamic_cast<StarPort*>(pBuilder) != nullptr)) {
         soundPlayer->playSound(Sound_ButtonClick);
-        pBuilder->handleSetOnHoldClick(TouchInput::nextProductionOnHoldState(pBuilder->isOnHold()));
     }
 }
 

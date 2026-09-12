@@ -56,6 +56,8 @@ struct ProductionCatalogPanelBounds {
     int height = 0;
 };
 
+constexpr int PRODUCTION_CATALOG_PANEL_MARGIN = 5;
+
 constexpr int productionCatalogMax(int first, int second) {
     return first > second ? first : second;
 }
@@ -109,6 +111,18 @@ constexpr ProductionCatalogGridLayout calculateProductionCatalogGridLayout(
         entryCount > maxVisibleEntries,
         requiredRows,
         maxScrollRow
+    };
+}
+
+constexpr ProductionCatalogPanelBounds calculateProductionCatalogPanelBounds(
+        const ProductionCatalogGridLayout& layout, int availableHeight) {
+    if(layout.maxVisibleEntries == 0) return {};
+
+    return {
+        PRODUCTION_CATALOG_PANEL_MARGIN,
+        productionCatalogMax(0, availableHeight - layout.panelHeight - PRODUCTION_CATALOG_PANEL_MARGIN),
+        layout.panelWidth,
+        layout.panelHeight
     };
 }
 

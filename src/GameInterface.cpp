@@ -110,6 +110,9 @@ GameInterface::GameInterface() : Window(0,0,0,0) {
     windowWidget.addWidget(&productionCatalogGrid,
                            Point(0, 0),
                            Point(getRendererWidth() - sideBar.getSize().x, getRendererHeight()));
+    windowWidget.addWidget(&productionQueueControls,
+                           Point(0, 0),
+                           Point(getRendererWidth() - sideBar.getSize().x, getRendererHeight()));
 
     // add chat manager
     windowWidget.addWidget(&chatManager, Point(20, 60), Point(getRendererWidth() - sideBar.getSize().x, 360));
@@ -198,11 +201,14 @@ void GameInterface::updateObjectInterface() {
         auto* selectedBuilder = dynamic_cast<BuilderBase*>(selectedObject);
         if(selectedBuilder != nullptr && ((pLocalHouse == selectedBuilder->getOwner()) || debug)) {
             productionCatalogGrid.setBuilderObjectID(selectedBuilder->getObjectID());
+            productionQueueControls.setBuilderObjectID(selectedBuilder->getObjectID());
         } else {
             productionCatalogGrid.clear();
+            productionQueueControls.clear();
         }
     } else {
         productionCatalogGrid.clear();
+        productionQueueControls.clear();
     }
 
     if(selection.empty()) {

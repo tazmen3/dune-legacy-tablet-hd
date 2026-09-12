@@ -46,6 +46,8 @@ struct ProductionControlVisibility {
     bool pause = false;
     bool cancel = false;
     bool cancelAll = false;
+    bool order = false;
+    bool orderEnabled = false;
 };
 
 constexpr ProductionControlVisibility productionControlVisibility(
@@ -54,7 +56,9 @@ constexpr ProductionControlVisibility productionControlVisibility(
     return {
         hasQueue && !waitingToPlace && !isStarport,
         canCancel,
-        canCancel
+        canCancel,
+        isStarport,
+        isStarport && starportCanOrder
     };
 }
 
@@ -67,8 +71,24 @@ bool requestCancelCurrentProduction(Builder& builder) {
 }
 
 template<typename Builder>
+bool requestProductionPauseToggle(Builder& builder, bool isStarport) {
+    if(isStarport || builder.getProductionQueue().empty() || builder.isWaitingToPlace()) return false;
+
+    builder.handleSetOnHoldClick(nextProductionOnHoldState(builder.isOnHold()));
+    return true;
+}
+
+template<typename Builder>
 void requestCancelAllProduction(Builder& builder) {
     builder.handleCancelAllProductionClick();
+}
+
+template<typename Starport>
+bool requestStarportOrder(Starport& starport) {
+    if(!starport.okToOrder()) return false;
+
+    starport.handlePlaceOrderClick();
+    return true;
 }
 
 struct ProductionCatalogTarget {
@@ -92,7 +112,8 @@ struct ProductionCatalogTarget {
 
 enum class ProductionCatalogTargetSource {
     LegacyBuilderList,
-    Grid
+    Grid,
+    QueueControls
 };
 
 struct ProductionCatalogTargetSelection {
@@ -102,7 +123,7 @@ struct ProductionCatalogTargetSelection {
 };
 
 /**
-    The two production catalogue surfaces deliberately keep separate slots.
+    Production surfaces deliberately keep separate slots.
     Their regions must never be merged: the map between the sidebar list and
     the lower-left grid remains interactive.
 */
@@ -132,6 +153,9 @@ public:
         if(grid_.valid && grid_.target.contains(pointX, pointY)) {
             return {true, ProductionCatalogTargetSource::Grid, grid_.target};
         }
+        if(queueControls_.valid && queueControls_.target.contains(pointX, pointY)) {
+            return {true, ProductionCatalogTargetSource::QueueControls, queueControls_.target};
+        }
         return {};
     }
 
@@ -146,15 +170,24 @@ private:
     };
 
     Slot& getSlot(ProductionCatalogTargetSource source) {
-        return source == ProductionCatalogTargetSource::Grid ? grid_ : legacyBuilderList_;
+        switch(source) {
+            case ProductionCatalogTargetSource::Grid: return grid_;
+            case ProductionCatalogTargetSource::QueueControls: return queueControls_;
+            default: return legacyBuilderList_;
+        }
     }
 
     const Slot& getSlot(ProductionCatalogTargetSource source) const {
-        return source == ProductionCatalogTargetSource::Grid ? grid_ : legacyBuilderList_;
+        switch(source) {
+            case ProductionCatalogTargetSource::Grid: return grid_;
+            case ProductionCatalogTargetSource::QueueControls: return queueControls_;
+            default: return legacyBuilderList_;
+        }
     }
 
     Slot legacyBuilderList_;
     Slot grid_;
+    Slot queueControls_;
 };
 
 /**

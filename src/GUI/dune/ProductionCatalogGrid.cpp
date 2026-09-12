@@ -26,7 +26,6 @@
 
 namespace {
 
-constexpr int GRID_MARGIN = 5;
 constexpr int PRICE_AREA_HEIGHT = 16;
 
 bool isLocked(ProductionCatalogAvailability availability) {
@@ -238,12 +237,7 @@ void ProductionCatalogGrid::draw(Point position) {
         return;
     }
 
-    panelBounds = {
-        GRID_MARGIN,
-        std::max(0, getSize().y - layout.panelHeight - GRID_MARGIN),
-        layout.panelWidth,
-        layout.panelHeight
-    };
+    panelBounds = calculateProductionCatalogPanelBounds(layout, getSize().y);
     renderedLayout = layout;
     renderedEntryCount = static_cast<int>(entries.size());
     firstVisibleRow = clampProductionCatalogScrollRow(renderedLayout, firstVisibleRow);
