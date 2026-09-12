@@ -310,11 +310,19 @@ void ProductionCatalogGrid::draw(Point position) {
     }
 
     const auto entries = getProductionCatalogEntriesForCategory(catalog, selectedCategory);
+    const int stableColumnCount = getProductionCatalogStableColumnCount(catalog, renderedCategories);
 
     const auto layout = calculateProductionCatalogGridLayout({
         getSize().x,
         getSize().y,
-        static_cast<int>(entries.size())
+        static_cast<int>(entries.size()),
+        82,
+        52,
+        4,
+        4,
+        8,
+        2,
+        stableColumnCount
     });
     if(layout.maxVisibleEntries == 0) {
         TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);

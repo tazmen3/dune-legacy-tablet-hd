@@ -40,24 +40,26 @@ TEST_CASE("Production catalogue grid lays out compact two-row pages deterministi
     REQUIRE(layoutFor(1).visibleRows == 1);
     REQUIRE(layoutFor(6).columns == 6);
     REQUIRE(layoutFor(6).visibleRows == 1);
-    REQUIRE(layoutFor(7).columns == 6);
-    REQUIRE(layoutFor(7).visibleRows == 2);
-    REQUIRE(layoutFor(12).columns == 6);
+    REQUIRE(layoutFor(7).columns == 7);
+    REQUIRE(layoutFor(7).visibleRows == 1);
+    REQUIRE(layoutFor(8).columns == 8);
+    REQUIRE(layoutFor(8).visibleRows == 1);
+    REQUIRE(layoutFor(12).columns == 8);
     REQUIRE(layoutFor(12).visibleRows == 2);
 
     const auto eighteen = layoutFor(18);
-    REQUIRE(eighteen.columns == 6);
+    REQUIRE(eighteen.columns == 8);
     REQUIRE(eighteen.visibleRows == 2);
-    REQUIRE(eighteen.maxVisibleEntries == 12);
-    REQUIRE(eighteen.panelWidth == 520);
+    REQUIRE(eighteen.maxVisibleEntries == 16);
+    REQUIRE(eighteen.panelWidth == 692);
     REQUIRE(eighteen.panelHeight == 116);
 }
 
 TEST_CASE("Production catalogue grid reports overflow without adding scrolling", "[production][catalogue][layout]") {
     const auto layout = layoutFor(19);
-    REQUIRE(layout.columns == 6);
+    REQUIRE(layout.columns == 8);
     REQUIRE(layout.visibleRows == 2);
-    REQUIRE(layout.maxVisibleEntries == 12);
+    REQUIRE(layout.maxVisibleEntries == 16);
     REQUIRE(layout.hasOverflow);
 }
 
@@ -69,11 +71,11 @@ TEST_CASE("Production catalogue grid exposes full-row scrolling limits", "[produ
     REQUIRE(scrollProductionCatalogRows(eighteen, 0, 1) == 1);
 
     const auto nineteen = layoutFor(19);
-    REQUIRE(nineteen.totalRows == 4);
-    REQUIRE(nineteen.maxScrollRow == 2);
+    REQUIRE(nineteen.totalRows == 3);
+    REQUIRE(nineteen.maxScrollRow == 1);
     REQUIRE(scrollProductionCatalogRows(nineteen, 0, -1) == 0);
     REQUIRE(scrollProductionCatalogRows(nineteen, 0, 1) == 1);
-    REQUIRE(scrollProductionCatalogRows(nineteen, 2, 1) == 2);
+    REQUIRE(scrollProductionCatalogRows(nineteen, 1, 1) == 1);
 
     const auto twentyFive = layoutFor(25, 496, 480);
     REQUIRE(twentyFive.columns == 5);
@@ -114,6 +116,22 @@ TEST_CASE("Production catalogue controls and grid share a bottom-aligned panel b
     REQUIRE(constrained.y == 0);
 }
 
+TEST_CASE("Production catalogue grid can keep category widths stable without making empty cells actionable", "[production][catalogue][layout][input-routing]") {
+    const auto support = calculateProductionCatalogGridLayout({709, 533, 6, 82, 52, 4, 4, 8, 2, 6});
+    const auto defense = calculateProductionCatalogGridLayout({709, 533, 3, 82, 52, 4, 4, 8, 2, 6});
+    const auto military = calculateProductionCatalogGridLayout({709, 533, 4, 82, 52, 4, 4, 8, 2, 6});
+
+    REQUIRE(support.columns == 6);
+    REQUIRE(defense.columns == 6);
+    REQUIRE(military.columns == 6);
+    REQUIRE(support.panelWidth == defense.panelWidth);
+    REQUIRE(defense.panelWidth == military.panelWidth);
+    const ProductionCatalogPanelBounds panel{5, 412, defense.panelWidth, defense.panelHeight};
+    const auto emptyCell = getProductionCatalogGridCell(defense, 3);
+    REQUIRE(getProductionCatalogGridIndexAtPoint(defense, panel, 3,
+            panel.x + emptyCell.x + 1, panel.y + emptyCell.y + 1) == -1);
+}
+
 TEST_CASE("Production catalogue tabs stay directly above the compact grid", "[production][catalogue][layout][input-routing]") {
     const auto layout = layoutFor(12);
     const auto grid = calculateProductionCatalogPanelBounds(layout, 533);
@@ -141,29 +159,29 @@ TEST_CASE("Production catalogue grid cell coordinates preserve catalogue order",
     const auto layout = layoutFor(18);
     const auto first = getProductionCatalogGridCell(layout, 0);
     const auto lastFirstRow = getProductionCatalogGridCell(layout, 5);
-    const auto firstSecondRow = getProductionCatalogGridCell(layout, 6);
-    const auto finalCell = getProductionCatalogGridCell(layout, 11);
+    const auto firstSecondRow = getProductionCatalogGridCell(layout, 8);
+    const auto finalCell = getProductionCatalogGridCell(layout, 15);
 
     REQUIRE(first.index == 0);
     REQUIRE(lastFirstRow.column == 5);
     REQUIRE(lastFirstRow.row == 0);
     REQUIRE(firstSecondRow.column == 0);
     REQUIRE(firstSecondRow.row == 1);
-    REQUIRE(finalCell.column == 5);
+    REQUIRE(finalCell.column == 7);
     REQUIRE(finalCell.row == 1);
-    REQUIRE(getProductionCatalogGridCell(layout, 12).index == -1);
+    REQUIRE(getProductionCatalogGridCell(layout, 16).index == -1);
 }
 
 TEST_CASE("Production catalogue grid hit-test distinguishes cells from panel gaps", "[production][catalogue][layout][input-routing]") {
     const auto layout = layoutFor(18);
     const ProductionCatalogPanelBounds panel{5, 412, layout.panelWidth, layout.panelHeight};
     const auto first = getProductionCatalogGridCell(layout, 0);
-    const auto finalCell = getProductionCatalogGridCell(layout, 11);
+    const auto finalCell = getProductionCatalogGridCell(layout, 15);
     const auto firstSecondRow = getProductionCatalogGridCell(layout, 6);
 
     REQUIRE(getProductionCatalogGridIndexAtPoint(layout, panel, 18, panel.x + first.x + 1, panel.y + first.y + 1) == 0);
     REQUIRE(getProductionCatalogGridIndexAtPoint(layout, panel, 18,
-            panel.x + finalCell.x + 1, panel.y + finalCell.y + 1) == 11);
+            panel.x + finalCell.x + 1, panel.y + finalCell.y + 1) == 15);
     REQUIRE(getProductionCatalogGridIndexAtPoint(layout, panel, 18,
             panel.x + firstSecondRow.x + 1, panel.y + firstSecondRow.y + 1) == 6);
     REQUIRE(getProductionCatalogGridIndexAtPoint(layout, panel, 18,
@@ -193,22 +211,22 @@ TEST_CASE("Production catalogue grid maps visible cells through the scroll row",
     const auto layout = layoutFor(19);
     const ProductionCatalogPanelBounds panel{5, 412, layout.panelWidth, layout.panelHeight};
     const auto firstCell = getProductionCatalogGridCell(layout, 0);
-    const auto lastAvailableCell = getProductionCatalogGridCell(layout, 11);
-    const auto missingCell = getProductionCatalogGridCell(layout, 12);
+    const auto lastAvailableCell = getProductionCatalogGridCell(layout, 10);
+    const auto missingCell = getProductionCatalogGridCell(layout, 11);
 
     REQUIRE(getProductionCatalogGridCatalogIndexAtPoint(layout, panel, 19, 1,
-            panel.x + firstCell.x + 1, panel.y + firstCell.y + 1) == 6);
+            panel.x + firstCell.x + 1, panel.y + firstCell.y + 1) == 8);
     REQUIRE(getProductionCatalogGridCatalogIndexAtPoint(layout, panel, 19, 1,
-            panel.x + lastAvailableCell.x + 1, panel.y + lastAvailableCell.y + 1) == 17);
+            panel.x + lastAvailableCell.x + 1, panel.y + lastAvailableCell.y + 1) == 18);
     REQUIRE(getProductionCatalogGridCatalogIndexAtPoint(layout, panel, 19, 1,
             panel.x + missingCell.x + 1, panel.y + missingCell.y + 1) == -1);
 }
 
 TEST_CASE("Production catalogue grid consumes only events inside its visual panel", "[production][catalogue][layout][input-routing]") {
-    const ProductionCatalogPanelBounds panel{5, 412, 520, 116};
+    const ProductionCatalogPanelBounds panel{5, 412, 692, 116};
     REQUIRE(isProductionCatalogPanelPointInside(panel, 5, 412));
-    REQUIRE(isProductionCatalogPanelPointInside(panel, 524, 527));
-    REQUIRE_FALSE(isProductionCatalogPanelPointInside(panel, 525, 527));
+    REQUIRE(isProductionCatalogPanelPointInside(panel, 696, 527));
+    REQUIRE_FALSE(isProductionCatalogPanelPointInside(panel, 697, 527));
     REQUIRE_FALSE(isProductionCatalogPanelPointInside(panel, 4, 412));
     REQUIRE_FALSE(isProductionCatalogPanelPointInside(panel, 5, 528));
 }

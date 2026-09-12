@@ -129,12 +129,23 @@ TEST_CASE("Production catalogue activation requires the same still-available pre
 
 TEST_CASE("Production catalogue categories classify structures and units without changing availability", "[production][catalogue]") {
     REQUIRE(getProductionCatalogCategory(Structure_Slab1) == ProductionCatalogCategory::Support);
-    REQUIRE(getProductionCatalogCategory(Structure_HighTechFactory) == ProductionCatalogCategory::Support);
-    REQUIRE(getProductionCatalogCategory(Structure_ConstructionYard) == ProductionCatalogCategory::Support);
+    REQUIRE(getProductionCatalogCategory(Structure_Slab4) == ProductionCatalogCategory::Support);
+    REQUIRE(getProductionCatalogCategory(Structure_WindTrap) == ProductionCatalogCategory::Support);
+    REQUIRE(getProductionCatalogCategory(Structure_Refinery) == ProductionCatalogCategory::Support);
+    REQUIRE(getProductionCatalogCategory(Structure_Silo) == ProductionCatalogCategory::Support);
+    REQUIRE(getProductionCatalogCategory(Structure_Radar) == ProductionCatalogCategory::Support);
     REQUIRE(getProductionCatalogCategory(Structure_Wall) == ProductionCatalogCategory::Defense);
     REQUIRE(getProductionCatalogCategory(Structure_GunTurret) == ProductionCatalogCategory::Defense);
     REQUIRE(getProductionCatalogCategory(Structure_RocketTurret) == ProductionCatalogCategory::Defense);
+    REQUIRE(getProductionCatalogCategory(Structure_RepairYard) == ProductionCatalogCategory::Military);
+    REQUIRE(getProductionCatalogCategory(Structure_HighTechFactory) == ProductionCatalogCategory::Military);
+    REQUIRE(getProductionCatalogCategory(Structure_IX) == ProductionCatalogCategory::Military);
+    REQUIRE(getProductionCatalogCategory(Structure_StarPort) == ProductionCatalogCategory::Military);
+    REQUIRE(getProductionCatalogCategory(Structure_ConstructionYard) == ProductionCatalogCategory::Military);
     REQUIRE(getProductionCatalogCategory(Structure_Barracks) == ProductionCatalogCategory::Military);
+    REQUIRE(getProductionCatalogCategory(Structure_WOR) == ProductionCatalogCategory::Military);
+    REQUIRE(getProductionCatalogCategory(Structure_LightFactory) == ProductionCatalogCategory::Military);
+    REQUIRE(getProductionCatalogCategory(Structure_HeavyFactory) == ProductionCatalogCategory::Military);
     REQUIRE(getProductionCatalogCategory(Structure_Palace) == ProductionCatalogCategory::Military);
     REQUIRE(getProductionCatalogCategory(Unit_Carryall) == ProductionCatalogCategory::Support);
     REQUIRE(getProductionCatalogCategory(Unit_Harvester) == ProductionCatalogCategory::Support);
@@ -166,6 +177,26 @@ TEST_CASE("Production catalogue category filtering preserves source order and lo
     REQUIRE(military.size() == 1);
     REQUIRE(military[0].availability == ProductionCatalogAvailability::SoldOut);
     REQUIRE(catalog[0].availability == ProductionCatalogAvailability::LockedTechLevel);
+}
+
+TEST_CASE("Production catalogue derives a stable panel width from its widest category", "[production][catalogue]") {
+    const std::vector<ProductionCatalogEntry> catalog = {
+        {Structure_Slab1, 20, ProductionCatalogAvailability::Available},
+        {Structure_Slab4, 20, ProductionCatalogAvailability::Available},
+        {Structure_WindTrap, 20, ProductionCatalogAvailability::Available},
+        {Structure_Refinery, 20, ProductionCatalogAvailability::Available},
+        {Structure_Silo, 20, ProductionCatalogAvailability::Available},
+        {Structure_Radar, 20, ProductionCatalogAvailability::Available},
+        {Structure_Wall, 20, ProductionCatalogAvailability::Available},
+        {Structure_GunTurret, 20, ProductionCatalogAvailability::Available},
+        {Structure_RocketTurret, 20, ProductionCatalogAvailability::Available},
+        {Structure_Barracks, 20, ProductionCatalogAvailability::Available},
+        {Structure_WOR, 20, ProductionCatalogAvailability::Available},
+        {Structure_LightFactory, 20, ProductionCatalogAvailability::Available},
+        {Structure_HeavyFactory, 20, ProductionCatalogAvailability::Available}
+    };
+    const auto categories = getProductionCatalogCategories(catalog);
+    REQUIRE(getProductionCatalogStableColumnCount(catalog, categories) == 6);
 }
 
 TEST_CASE("Production catalogue cell presentation clamps progress and keeps Starport progress-free", "[production][catalogue]") {

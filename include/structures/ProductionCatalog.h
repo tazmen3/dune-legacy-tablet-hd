@@ -55,11 +55,6 @@ constexpr ProductionCatalogCategory getProductionCatalogCategory(std::uint32_t i
         case Structure_Refinery:
         case Structure_Silo:
         case Structure_Radar:
-        case Structure_RepairYard:
-        case Structure_HighTechFactory:
-        case Structure_IX:
-        case Structure_StarPort:
-        case Structure_ConstructionYard:
         case Unit_Carryall:
         case Unit_Harvester:
         case Unit_MCV:
@@ -115,6 +110,25 @@ inline std::vector<ProductionCatalogEntry> getProductionCatalogEntriesForCategor
         if(isProductionCatalogEntryInCategory(entry, category)) entries.push_back(entry);
     }
     return entries;
+}
+
+/**
+    The widest currently available category determines a stable grid width for
+    a selected builder. The result is still only a presentation hint: the
+    catalogue entries themselves and their availability remain untouched.
+*/
+inline int getProductionCatalogStableColumnCount(
+        const std::vector<ProductionCatalogEntry>& catalog,
+        const std::vector<ProductionCatalogCategory>& categories) {
+    int largestCategorySize = 0;
+    for(const auto category : categories) {
+        int categorySize = 0;
+        for(const auto& entry : catalog) {
+            if(isProductionCatalogEntryInCategory(entry, category)) ++categorySize;
+        }
+        if(categorySize > largestCategorySize) largestCategorySize = categorySize;
+    }
+    return largestCategorySize;
 }
 
 struct ProductionCatalogCellPresentationInput {

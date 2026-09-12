@@ -22,8 +22,11 @@ struct ProductionCatalogLayoutInput {
     int cellHeight = 52;
     int spacing = 4;
     int padding = 4;
-    int maxColumns = 6;
+    int maxColumns = 8;
     int maxRows = 2;
+    // A presentation hint used to keep all category panels for one builder
+    // equally wide. Empty cells remain non-actionable.
+    int minimumColumns = 0;
 };
 
 struct ProductionCatalogGridLayout {
@@ -88,7 +91,10 @@ constexpr ProductionCatalogGridLayout calculateProductionCatalogGridLayout(
 
     const int columnsThatFit = productionCatalogMax(1,
         (availableWidth - 2 * horizontalPadding + spacing) / (cellWidth + spacing));
-    const int columns = productionCatalogMin(entryCount,
+    const int minimumColumns = productionCatalogMin(requestedColumns,
+        productionCatalogMax(1, input.minimumColumns));
+    const int desiredColumns = productionCatalogMax(entryCount, minimumColumns);
+    const int columns = productionCatalogMin(desiredColumns,
         productionCatalogMin(requestedColumns, columnsThatFit));
 
     const int rowsThatFit = productionCatalogMax(1,
