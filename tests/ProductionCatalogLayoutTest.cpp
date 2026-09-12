@@ -99,6 +99,41 @@ TEST_CASE("Production catalogue grid cell coordinates preserve catalogue order",
     REQUIRE(getProductionCatalogGridCell(layout, 18).index == -1);
 }
 
+TEST_CASE("Production catalogue grid hit-test distinguishes cells from panel gaps", "[production][catalogue][layout][input-routing]") {
+    const auto layout = layoutFor(18);
+    const ProductionCatalogPanelBounds panel{5, 343, layout.panelWidth, layout.panelHeight};
+    const auto first = getProductionCatalogGridCell(layout, 0);
+    const auto finalCell = getProductionCatalogGridCell(layout, 17);
+    const auto firstSecondRow = getProductionCatalogGridCell(layout, 6);
+
+    REQUIRE(getProductionCatalogGridIndexAtPoint(layout, panel, 18, panel.x + first.x + 1, panel.y + first.y + 1) == 0);
+    REQUIRE(getProductionCatalogGridIndexAtPoint(layout, panel, 18,
+            panel.x + finalCell.x + 1, panel.y + finalCell.y + 1) == 17);
+    REQUIRE(getProductionCatalogGridIndexAtPoint(layout, panel, 18,
+            panel.x + firstSecondRow.x + 1, panel.y + firstSecondRow.y + 1) == 6);
+    REQUIRE(getProductionCatalogGridIndexAtPoint(layout, panel, 18,
+            panel.x + layout.padding + layout.cellWidth, panel.y + first.y + 1) == -1);
+    REQUIRE(getProductionCatalogGridIndexAtPoint(layout, panel, 18,
+            panel.x + first.x + 1, panel.y + layout.padding + layout.cellHeight) == -1);
+    REQUIRE(getProductionCatalogGridIndexAtPoint(layout, panel, 18, panel.x, panel.y) == -1);
+    REQUIRE(getProductionCatalogGridIndexAtPoint(layout, panel, 18, panel.x - 1, panel.y) == -1);
+}
+
+TEST_CASE("Production catalogue grid hit-test honors actual entry count and reduced columns", "[production][catalogue][layout][input-routing]") {
+    const auto sevenEntries = layoutFor(7);
+    const ProductionCatalogPanelBounds sevenPanel{5, 343, sevenEntries.panelWidth, sevenEntries.panelHeight};
+    const auto missingCell = getProductionCatalogGridCell(sevenEntries, 7);
+    REQUIRE(getProductionCatalogGridIndexAtPoint(sevenEntries, sevenPanel, 7,
+            sevenPanel.x + missingCell.x + 1, sevenPanel.y + missingCell.y + 1) == -1);
+
+    const auto reduced = layoutFor(18, 496, 480);
+    const ProductionCatalogPanelBounds reducedPanel{5, 290, reduced.panelWidth, reduced.panelHeight};
+    const auto firstSecondRow = getProductionCatalogGridCell(reduced, 5);
+    REQUIRE(reduced.columns == 5);
+    REQUIRE(getProductionCatalogGridIndexAtPoint(reduced, reducedPanel, 18,
+            reducedPanel.x + firstSecondRow.x + 1, reducedPanel.y + firstSecondRow.y + 1) == 5);
+}
+
 TEST_CASE("Production catalogue grid consumes only events inside its visual panel", "[production][catalogue][layout][input-routing]") {
     const ProductionCatalogPanelBounds panel{5, 343, 581, 185};
     REQUIRE(isProductionCatalogPanelPointInside(panel, 5, 343));
@@ -108,10 +143,10 @@ TEST_CASE("Production catalogue grid consumes only events inside its visual pane
     REQUIRE_FALSE(isProductionCatalogPanelPointInside(panel, 5, 528));
 }
 
-TEST_CASE("Production catalogue grid input remains read-only", "[production][catalogue][input-routing]") {
+TEST_CASE("Production catalogue grid reuses the existing production handler only", "[production][catalogue][input-routing]") {
     const auto grid = readTextFile(sourceRoot() / "src" / "GUI" / "dune" / "ProductionCatalogGrid.cpp");
 
-    REQUIRE(grid.find("handleProduceItemClick") == std::string::npos);
+    REQUIRE(grid.find("handleProduceItemClick") != std::string::npos);
     REQUIRE(grid.find("CommandManager") == std::string::npos);
     REQUIRE(grid.find("handleCancelItemClick") == std::string::npos);
 }

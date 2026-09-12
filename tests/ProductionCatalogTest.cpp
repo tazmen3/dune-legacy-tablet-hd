@@ -97,3 +97,32 @@ TEST_CASE("Starport catalogue: read-only evaluation preserves CHOAM inputs", "[p
     REQUIRE(eligibility.choamPrice == before.choamPrice);
     REQUIRE(eligibility.stock == before.stock);
 }
+
+TEST_CASE("Production catalogue: only Available entries with purchases enabled are activatable", "[production][catalogue][activation]") {
+    ProductionCatalogEntry entry{73, 625, ProductionCatalogAvailability::Available, 3};
+    REQUIRE(isProductionCatalogEntryActivatable(entry, true));
+    REQUIRE_FALSE(isProductionCatalogEntryActivatable(entry, false));
+
+    for(const auto availability : {
+            ProductionCatalogAvailability::LockedTechLevel,
+            ProductionCatalogAvailability::LockedUpgrade,
+            ProductionCatalogAvailability::MissingPrerequisite,
+            ProductionCatalogAvailability::SoldOut,
+            ProductionCatalogAvailability::NotProducedByBuilder }) {
+        entry.availability = availability;
+        REQUIRE_FALSE(isProductionCatalogEntryActivatable(entry, true));
+    }
+}
+
+TEST_CASE("Production catalogue activation requires the same still-available pressed item", "[production][catalogue][activation]") {
+    ProductionCatalogEntry entry{73, 625, ProductionCatalogAvailability::Available, 3};
+    REQUIRE(shouldActivateProductionCatalogEntry(true, 2, 73, 2, entry, true));
+    REQUIRE_FALSE(shouldActivateProductionCatalogEntry(false, 2, 73, 2, entry, true));
+    REQUIRE_FALSE(shouldActivateProductionCatalogEntry(true, 2, 73, 3, entry, true));
+
+    entry.itemID = 74;
+    REQUIRE_FALSE(shouldActivateProductionCatalogEntry(true, 2, 73, 2, entry, true));
+    entry.itemID = 73;
+    entry.availability = ProductionCatalogAvailability::SoldOut;
+    REQUIRE_FALSE(shouldActivateProductionCatalogEntry(true, 2, 73, 2, entry, true));
+}

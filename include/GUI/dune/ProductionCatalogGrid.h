@@ -28,8 +28,17 @@ public:
     void draw(Point position) override;
 
 private:
+    void resetPressedCell();
+
     Uint32 builderObjectID = NONE_ID;
     ProductionCatalogPanelBounds panelBounds;
+    ProductionCatalogGridLayout renderedLayout;
+    int renderedEntryCount = 0;
+    bool leftPressInsidePanel = false;
+    bool rightPressInsidePanel = false;
+    bool hasPressedItem = false;
+    int pressedCellIndex = -1;
+    Uint32 pressedItemID = 0;
     sdl2::texture_ptr pLockedTextTexture;
     sdl2::texture_ptr pSoldOutTextTexture;
 };

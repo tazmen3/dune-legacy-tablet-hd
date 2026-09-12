@@ -129,4 +129,37 @@ constexpr bool isProductionCatalogPanelPointInside(
         && pointY >= bounds.y && pointY < bounds.y + bounds.height;
 }
 
+/**
+    Returns the visible catalogue entry below a panel-local pointer, or -1 for
+    panel padding and inter-cell spacing. A point in the panel is not by itself
+    an actionable cell.
+*/
+constexpr int getProductionCatalogGridIndexAtPoint(
+        const ProductionCatalogGridLayout& layout, const ProductionCatalogPanelBounds& bounds,
+        int entryCount, int pointX, int pointY) {
+    if(!isProductionCatalogPanelPointInside(bounds, pointX, pointY)
+       || layout.columns <= 0 || layout.visibleRows <= 0) {
+        return -1;
+    }
+
+    const int localX = pointX - bounds.x - layout.padding;
+    const int localY = pointY - bounds.y - layout.padding;
+    if(localX < 0 || localY < 0) return -1;
+
+    const int columnStride = layout.cellWidth + layout.spacing;
+    const int rowStride = layout.cellHeight + layout.spacing;
+    if(columnStride <= 0 || rowStride <= 0) return -1;
+
+    const int column = localX / columnStride;
+    const int row = localY / rowStride;
+    if(column >= layout.columns || row >= layout.visibleRows
+       || localX % columnStride >= layout.cellWidth || localY % rowStride >= layout.cellHeight) {
+        return -1;
+    }
+
+    const int index = row * layout.columns + column;
+    return index < productionCatalogMin(productionCatalogMax(0, entryCount), layout.maxVisibleEntries)
+        ? index : -1;
+}
+
 #endif // PRODUCTIONCATALOGLAYOUT_H

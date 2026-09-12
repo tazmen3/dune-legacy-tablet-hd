@@ -70,11 +70,19 @@ TEST_CASE("Production catalogue: a hold emits only one suppressed result", "[tou
 TEST_CASE("Production catalogue: micro movement stays armed", "[touch][production]") {
     TouchInput::ProductionCatalogTouchGuard touch;
     REQUIRE(touch.begin(target(), 120, 210, 10));
-    touch.move(99, 199);
+    touch.move(125, 214);
     REQUIRE(touch.isArmed());
-    touch.move(88, 188);
+    touch.move(128, 214);
     REQUIRE(touch.isArmed());
-    REQUIRE(touch.release(88, 188, 110) == TouchInput::ProductionCatalogTouchAction::Tap);
+    REQUIRE(touch.release(128, 214, 110) == TouchInput::ProductionCatalogTouchAction::Tap);
+}
+
+TEST_CASE("Production catalogue: large internal movement suppresses a tap", "[touch][production]") {
+    TouchInput::ProductionCatalogTouchGuard touch;
+    REQUIRE(touch.begin(gridTarget(), 100, 400, 10));
+    touch.move(150, 400); // Still in the panel, but beyond the 12 px movement tolerance.
+    REQUIRE_FALSE(touch.isArmed());
+    REQUIRE(touch.release(150, 400, 110) == TouchInput::ProductionCatalogTouchAction::None);
 }
 
 TEST_CASE("Production catalogue: leaving the tolerated region cancels the touch", "[touch][production]") {

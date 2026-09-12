@@ -164,6 +164,8 @@ public:
         }
 
         target_ = target;
+        startX_ = pointX;
+        startY_ = pointY;
         pressedAt_ = timestamp;
         tracking_ = true;
         armed_ = true;
@@ -171,8 +173,14 @@ public:
     }
 
     void move(int pointX, int pointY) {
-        if(tracking_ && armed_ && !target_.contains(pointX, pointY, PRODUCTION_MOVEMENT_TOLERANCE)) {
-            armed_ = false;
+        if(tracking_ && armed_) {
+            const int dx = pointX - startX_;
+            const int dy = pointY - startY_;
+            const int toleranceSquared = PRODUCTION_MOVEMENT_TOLERANCE * PRODUCTION_MOVEMENT_TOLERANCE;
+            if(dx*dx + dy*dy > toleranceSquared
+               || !target_.contains(pointX, pointY, PRODUCTION_MOVEMENT_TOLERANCE)) {
+                armed_ = false;
+            }
         }
     }
 
@@ -204,6 +212,8 @@ public:
 
 private:
     ProductionCatalogTarget target_{};
+    int startX_ = 0;
+    int startY_ = 0;
     std::uint32_t pressedAt_ = 0;
     bool tracking_ = false;
     bool armed_ = false;

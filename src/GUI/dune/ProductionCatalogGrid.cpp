@@ -17,6 +17,7 @@
 #include <misc/draw_util.h>
 #include <misc/TouchInput.h>
 #include <sand.h>
+#include <SoundPlayer.h>
 #include <structures/BuilderBase.h>
 
 #include <algorithm>
@@ -55,6 +56,18 @@ void drawCenteredTexture(SDL_Texture* texture, const SDL_Rect& bounds) {
     SDL_RenderCopy(renderer, texture, nullptr, &destination);
 }
 
+std::vector<ProductionCatalogEntry> getDisplayedEntries(const BuilderBase& builder) {
+    const auto catalog = builder.getProductionCatalog();
+    std::vector<ProductionCatalogEntry> entries;
+    entries.reserve(catalog.size());
+    for(const auto& entry : catalog) {
+        if(entry.availability != ProductionCatalogAvailability::NotProducedByBuilder) {
+            entries.push_back(entry);
+        }
+    }
+    return entries;
+}
+
 } // namespace
 
 ProductionCatalogGrid::ProductionCatalogGrid() {
@@ -67,10 +80,20 @@ ProductionCatalogGrid::~ProductionCatalogGrid() {
     TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
 }
 
+void ProductionCatalogGrid::resetPressedCell() {
+    leftPressInsidePanel = false;
+    hasPressedItem = false;
+    pressedCellIndex = -1;
+    pressedItemID = 0;
+}
+
 void ProductionCatalogGrid::setBuilderObjectID(Uint32 newBuilderObjectID) {
     if(builderObjectID != newBuilderObjectID) {
         TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
         panelBounds = {};
+        renderedLayout = {};
+        renderedEntryCount = 0;
+        resetPressedCell();
     }
     builderObjectID = newBuilderObjectID;
     setVisible(builderObjectID != NONE_ID);
@@ -80,15 +103,95 @@ void ProductionCatalogGrid::clear() {
     TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
     builderObjectID = NONE_ID;
     panelBounds = {};
+    renderedLayout = {};
+    renderedEntryCount = 0;
+    resetPressedCell();
+    rightPressInsidePanel = false;
     setVisible(false);
 }
 
-bool ProductionCatalogGrid::handleMouseLeft(Sint32 x, Sint32 y, bool) {
-    return isVisible() && isProductionCatalogPanelPointInside(panelBounds, x, y);
+bool ProductionCatalogGrid::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
+    if(!isVisible()) return false;
+
+    const bool insidePanel = isProductionCatalogPanelPointInside(panelBounds, x, y);
+    if(pressed) {
+        if(!insidePanel) return false;
+
+        leftPressInsidePanel = true;
+        pressedCellIndex = getProductionCatalogGridIndexAtPoint(
+            renderedLayout, panelBounds, renderedEntryCount, x, y);
+        hasPressedItem = false;
+        pressedItemID = 0;
+
+        auto* builder = dynamic_cast<BuilderBase*>(currentGame->getObjectManager().getObject(builderObjectID));
+        if(builder != nullptr && pressedCellIndex >= 0) {
+            const auto entries = getDisplayedEntries(*builder);
+            if(pressedCellIndex < static_cast<int>(entries.size())
+               && isProductionCatalogEntryActivatable(entries[pressedCellIndex],
+                                                       builder->isProductionCatalogPurchaseEnabled())) {
+                pressedItemID = entries[pressedCellIndex].itemID;
+                hasPressedItem = true;
+            }
+        }
+        return true;
+    }
+
+    if(!leftPressInsidePanel) return insidePanel;
+
+    const int pressedIndex = pressedCellIndex;
+    const Uint32 itemID = pressedItemID;
+    const bool hadPressedItem = hasPressedItem;
+    resetPressedCell();
+    if(pressedIndex < 0 || !hadPressedItem) return true;
+
+    auto* builder = dynamic_cast<BuilderBase*>(currentGame->getObjectManager().getObject(builderObjectID));
+    if(builder == nullptr) return true;
+
+    const auto entries = getDisplayedEntries(*builder);
+    const int releasedIndex = getProductionCatalogGridIndexAtPoint(
+        renderedLayout, panelBounds, static_cast<int>(entries.size()), x, y);
+    if(releasedIndex < 0 || releasedIndex >= static_cast<int>(entries.size())) {
+        return true;
+    }
+
+    const auto& entry = entries[releasedIndex];
+    if(!shouldActivateProductionCatalogEntry(hadPressedItem, pressedIndex, itemID, releasedIndex,
+                                             entry, builder->isProductionCatalogPurchaseEnabled())) {
+        return true;
+    }
+
+    if(itemID == builder->getCurrentProducedItem() && builder->isWaitingToPlace()) {
+        soundPlayer->playSound(Sound_ButtonClick);
+        if(currentGame->currentCursorMode == Game::CursorMode_Placing) {
+            currentGame->setCursorMode(Game::CursorMode_Normal);
+        } else {
+            currentGame->setCursorMode(Game::CursorMode_Placing);
+        }
+    } else if(TouchInput::shouldUseLegacyMouseResume(
+                  TouchInput::isTouchDispatch(), itemID == builder->getCurrentProducedItem(), builder->isOnHold())) {
+        soundPlayer->playSound(Sound_ButtonClick);
+        builder->handleSetOnHoldClick(false);
+    } else {
+        soundPlayer->playSound(Sound_ButtonClick);
+        builder->handleProduceItemClick(itemID, SDL_GetModState() & KMOD_SHIFT);
+    }
+
+    return true;
 }
 
-bool ProductionCatalogGrid::handleMouseRight(Sint32 x, Sint32 y, bool) {
-    return isVisible() && isProductionCatalogPanelPointInside(panelBounds, x, y);
+bool ProductionCatalogGrid::handleMouseRight(Sint32 x, Sint32 y, bool pressed) {
+    if(!isVisible()) return false;
+
+    const bool insidePanel = isProductionCatalogPanelPointInside(panelBounds, x, y);
+    if(pressed) {
+        rightPressInsidePanel = insidePanel;
+        return insidePanel;
+    }
+    if(rightPressInsidePanel) {
+        rightPressInsidePanel = false;
+        return true;
+    }
+    return insidePanel;
 }
 
 bool ProductionCatalogGrid::handleMouseWheel(Sint32 x, Sint32 y, bool) {
@@ -102,17 +205,12 @@ void ProductionCatalogGrid::draw(Point position) {
     if(builder == nullptr) {
         TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
         panelBounds = {};
+        renderedLayout = {};
+        renderedEntryCount = 0;
         return;
     }
 
-    const auto catalog = builder->getProductionCatalog();
-    std::vector<ProductionCatalogEntry> entries;
-    entries.reserve(catalog.size());
-    for(const auto& entry : catalog) {
-        if(entry.availability != ProductionCatalogAvailability::NotProducedByBuilder) {
-            entries.push_back(entry);
-        }
-    }
+    const auto entries = getDisplayedEntries(*builder);
 
     const auto layout = calculateProductionCatalogGridLayout({
         getSize().x,
@@ -122,6 +220,8 @@ void ProductionCatalogGrid::draw(Point position) {
     if(layout.maxVisibleEntries == 0) {
         TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
         panelBounds = {};
+        renderedLayout = {};
+        renderedEntryCount = 0;
         return;
     }
 
@@ -131,6 +231,8 @@ void ProductionCatalogGrid::draw(Point position) {
         layout.panelWidth,
         layout.panelHeight
     };
+    renderedLayout = layout;
+    renderedEntryCount = static_cast<int>(entries.size());
     TouchInput::setProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid, {
         builderObjectID,
         position.x + panelBounds.x,

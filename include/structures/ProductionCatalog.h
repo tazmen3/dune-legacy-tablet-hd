@@ -33,6 +33,19 @@ struct ProductionCatalogEntry {
     int availableStock = -1;
 };
 
+constexpr bool isProductionCatalogEntryActivatable(
+        const ProductionCatalogEntry& entry, bool purchasesEnabled) {
+    return purchasesEnabled && entry.availability == ProductionCatalogAvailability::Available;
+}
+
+constexpr bool shouldActivateProductionCatalogEntry(
+        bool pressStartedInCell, int pressedIndex, std::uint32_t pressedItemID, int releasedIndex,
+        const ProductionCatalogEntry& releasedEntry, bool purchasesEnabled) {
+    return pressStartedInCell && pressedIndex >= 0 && pressedIndex == releasedIndex
+        && pressedItemID == releasedEntry.itemID
+        && isProductionCatalogEntryActivatable(releasedEntry, purchasesEnabled);
+}
+
 /**
     Inputs kept separate from ObjectData and Game so the catalogue decision is
     deterministic and independently testable.
