@@ -20,6 +20,8 @@
 
 #include <structures/BuilderBase.h>
 
+#include <optional>
+
 class StarPort final : public BuilderBase
 {
 public:
@@ -71,6 +73,8 @@ public:
 
 
     void updateBuildList() override;
+    std::vector<ProductionCatalogEntry> getProductionCatalog() const override;
+    bool isProductionCatalogPurchaseEnabled() const override { return okToOrder(); }
 
     /**
         Begin with the deploying of the delivered units.
@@ -97,6 +101,8 @@ protected:
     void updateStructureSpecificStuff() override;
 
 private:
+    std::optional<ProductionCatalogEntry> getStarPortCatalogEntry(Uint32 itemID) const;
+
     Sint32  arrivalTimer;       ///< When will the frigate arrive?
     bool    deploying;          ///< Currently deploying units
 };

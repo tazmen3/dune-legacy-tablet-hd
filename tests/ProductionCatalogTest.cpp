@@ -46,3 +46,54 @@ TEST_CASE("Production catalogue: unrelated item is excluded", "[production][cata
     REQUIRE(evaluateProductionCatalogAvailability(eligibility)
             == ProductionCatalogAvailability::NotProducedByBuilder);
 }
+
+namespace {
+
+StarPortCatalogEligibility availableStarPortItem() {
+    return {true, true, false, 625, 3};
+}
+
+} // namespace
+
+TEST_CASE("Starport catalogue: listed item with stock is available", "[production][catalogue][starport]") {
+    const auto eligibility = availableStarPortItem();
+    REQUIRE(isStarPortCatalogItemIncluded(eligibility));
+    REQUIRE(evaluateStarPortCatalogAvailability(eligibility)
+            == ProductionCatalogAvailability::Available);
+}
+
+TEST_CASE("Starport catalogue: listed item with no stock is sold out", "[production][catalogue][starport]") {
+    auto eligibility = availableStarPortItem();
+    eligibility.stock = 0;
+    REQUIRE(isStarPortCatalogItemIncluded(eligibility));
+    REQUIRE(evaluateStarPortCatalogAvailability(eligibility)
+            == ProductionCatalogAvailability::SoldOut);
+}
+
+TEST_CASE("Starport catalogue: item absent from CHOAM is excluded", "[production][catalogue][starport]") {
+    auto eligibility = availableStarPortItem();
+    eligibility.listedInChoam = false;
+    REQUIRE_FALSE(isStarPortCatalogItemIncluded(eligibility));
+}
+
+TEST_CASE("Starport catalogue: entry exposes current CHOAM price and stock", "[production][catalogue][starport]") {
+    const auto eligibility = availableStarPortItem();
+    const auto entry = makeStarPortCatalogEntry(73, eligibility);
+    REQUIRE(entry.itemID == 73);
+    REQUIRE(entry.price == eligibility.choamPrice);
+    REQUIRE(entry.availableStock == eligibility.stock);
+}
+
+TEST_CASE("Starport catalogue: campaign ornithopter is excluded", "[production][catalogue][starport]") {
+    auto eligibility = availableStarPortItem();
+    eligibility.ornithopterInCampaign = true;
+    REQUIRE_FALSE(isStarPortCatalogItemIncluded(eligibility));
+}
+
+TEST_CASE("Starport catalogue: read-only evaluation preserves CHOAM inputs", "[production][catalogue][starport]") {
+    const auto eligibility = availableStarPortItem();
+    const auto before = eligibility;
+    static_cast<void>(makeStarPortCatalogEntry(73, eligibility));
+    REQUIRE(eligibility.choamPrice == before.choamPrice);
+    REQUIRE(eligibility.stock == before.stock);
+}

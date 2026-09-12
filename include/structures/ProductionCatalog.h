@@ -21,13 +21,16 @@ enum class ProductionCatalogAvailability {
     LockedTechLevel,
     LockedUpgrade,
     MissingPrerequisite,
-    NotProducedByBuilder
+    NotProducedByBuilder,
+    SoldOut
 };
 
 struct ProductionCatalogEntry {
     std::uint32_t itemID = 0;
     int price = 0;
     ProductionCatalogAvailability availability = ProductionCatalogAvailability::NotProducedByBuilder;
+    // -1 means that this producer has no stock concept for the item.
+    int availableStock = -1;
 };
 
 /**
@@ -57,6 +60,35 @@ constexpr ProductionCatalogAvailability evaluateProductionCatalogAvailability(
         return ProductionCatalogAvailability::MissingPrerequisite;
     }
     return ProductionCatalogAvailability::Available;
+}
+
+/**
+    Read-only CHOAM inputs. The Starport deliberately does not use the normal
+    Builder ObjectData eligibility rules.
+*/
+struct StarPortCatalogEligibility {
+    bool enabled = false;
+    bool listedInChoam = false;
+    bool ornithopterInCampaign = false;
+    int choamPrice = 0;
+    int stock = 0;
+};
+
+constexpr bool isStarPortCatalogItemIncluded(const StarPortCatalogEligibility& eligibility) {
+    return eligibility.enabled && eligibility.listedInChoam && !eligibility.ornithopterInCampaign;
+}
+
+constexpr ProductionCatalogAvailability evaluateStarPortCatalogAvailability(
+        const StarPortCatalogEligibility& eligibility) {
+    return eligibility.stock > 0
+        ? ProductionCatalogAvailability::Available
+        : ProductionCatalogAvailability::SoldOut;
+}
+
+constexpr ProductionCatalogEntry makeStarPortCatalogEntry(
+        std::uint32_t itemID, const StarPortCatalogEligibility& eligibility) {
+    return {itemID, eligibility.choamPrice,
+            evaluateStarPortCatalogAvailability(eligibility), eligibility.stock};
 }
 
 #endif // PRODUCTIONCATALOG_H

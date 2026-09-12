@@ -144,6 +144,13 @@ public:
     */
     virtual std::vector<ProductionCatalogEntry> getProductionCatalog() const;
 
+    /**
+        Returns whether the catalogue may currently submit production requests.
+        Ordinary builders are always enabled; the Starport overrides this for
+        its global order-arrival state.
+    */
+    virtual bool isProductionCatalogPurchaseEnabled() const { return true; }
+
     void setWaitingToPlace();
     void unSetWaitingToPlace();
 

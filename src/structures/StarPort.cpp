@@ -229,21 +229,49 @@ void StarPort::doCancelOrder() {
 void StarPort::updateBuildList() {
     std::list<BuildItem>::iterator iter = buildList.begin();
 
-    Choam& choam = owner->getChoam();
-
     for(int i = 0; itemOrder[i] != ItemID_Invalid; ++i) {
+        const Uint32 candidateItemID = itemOrder[i];
+        const std::optional<ProductionCatalogEntry> catalogEntry = getStarPortCatalogEntry(candidateItemID);
 
-        const ObjectData::ObjectDataStruct& objData = currentGame->objectData.data[itemOrder[i]][originalHouseID];
-
-        // Exclude ornithopters from starport in campaign games (can still build from factory)
-        bool isOrnithopterInCampaign = (itemOrder[i] == Unit_Ornithopter && currentGame->gameType == GameType::Campaign);
-
-        if(objData.enabled && (choam.getNumAvailable(itemOrder[i]) != INVALID) && !isOrnithopterInCampaign) {
-            insertItem(buildList, iter, itemOrder[i], choam.getPrice(itemOrder[i]));
+        if(catalogEntry.has_value()) {
+            insertItem(buildList, iter, candidateItemID, catalogEntry->price);
         } else {
-            removeItem(buildList, iter, itemOrder[i]);
+            removeItem(buildList, iter, candidateItemID);
         }
     }
+}
+
+std::vector<ProductionCatalogEntry> StarPort::getProductionCatalog() const {
+    std::vector<ProductionCatalogEntry> catalog;
+
+    for(int i = 0; itemOrder[i] != ItemID_Invalid; ++i) {
+        if(const std::optional<ProductionCatalogEntry> entry = getStarPortCatalogEntry(itemOrder[i]); entry.has_value()) {
+            catalog.push_back(*entry);
+        }
+    }
+
+    return catalog;
+}
+
+std::optional<ProductionCatalogEntry> StarPort::getStarPortCatalogEntry(Uint32 candidateItemID) const {
+    const ObjectData::ObjectDataStruct& objData = currentGame->objectData.data[candidateItemID][originalHouseID];
+    const Choam& choam = owner->getChoam();
+    const int stock = choam.getNumAvailable(candidateItemID);
+
+    StarPortCatalogEligibility eligibility = {
+        objData.enabled,
+        stock != INVALID,
+        candidateItemID == Unit_Ornithopter && currentGame->gameType == GameType::Campaign,
+        0,
+        stock
+    };
+
+    if(!isStarPortCatalogItemIncluded(eligibility)) {
+        return std::nullopt;
+    }
+
+    eligibility.choamPrice = choam.getPrice(candidateItemID);
+    return makeStarPortCatalogEntry(candidateItemID, eligibility);
 }
 
 void StarPort::updateStructureSpecificStuff() {
