@@ -87,12 +87,19 @@ void ProductionCatalogGrid::resetPressedCell() {
     pressedItemID = 0;
 }
 
+void ProductionCatalogGrid::scrollRows(int delta) {
+    firstVisibleRow = scrollProductionCatalogRows(renderedLayout, firstVisibleRow, delta);
+    resetPressedCell();
+    rightPressInsidePanel = false;
+}
+
 void ProductionCatalogGrid::setBuilderObjectID(Uint32 newBuilderObjectID) {
     if(builderObjectID != newBuilderObjectID) {
         TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
         panelBounds = {};
         renderedLayout = {};
         renderedEntryCount = 0;
+        firstVisibleRow = 0;
         resetPressedCell();
     }
     builderObjectID = newBuilderObjectID;
@@ -105,6 +112,7 @@ void ProductionCatalogGrid::clear() {
     panelBounds = {};
     renderedLayout = {};
     renderedEntryCount = 0;
+    firstVisibleRow = 0;
     resetPressedCell();
     rightPressInsidePanel = false;
     setVisible(false);
@@ -118,8 +126,8 @@ bool ProductionCatalogGrid::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
         if(!insidePanel) return false;
 
         leftPressInsidePanel = true;
-        pressedCellIndex = getProductionCatalogGridIndexAtPoint(
-            renderedLayout, panelBounds, renderedEntryCount, x, y);
+        pressedCellIndex = getProductionCatalogGridCatalogIndexAtPoint(
+            renderedLayout, panelBounds, renderedEntryCount, firstVisibleRow, x, y);
         hasPressedItem = false;
         pressedItemID = 0;
 
@@ -148,8 +156,8 @@ bool ProductionCatalogGrid::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
     if(builder == nullptr) return true;
 
     const auto entries = getDisplayedEntries(*builder);
-    const int releasedIndex = getProductionCatalogGridIndexAtPoint(
-        renderedLayout, panelBounds, static_cast<int>(entries.size()), x, y);
+    const int releasedIndex = getProductionCatalogGridCatalogIndexAtPoint(
+        renderedLayout, panelBounds, static_cast<int>(entries.size()), firstVisibleRow, x, y);
     if(releasedIndex < 0 || releasedIndex >= static_cast<int>(entries.size())) {
         return true;
     }
@@ -194,8 +202,11 @@ bool ProductionCatalogGrid::handleMouseRight(Sint32 x, Sint32 y, bool pressed) {
     return insidePanel;
 }
 
-bool ProductionCatalogGrid::handleMouseWheel(Sint32 x, Sint32 y, bool) {
-    return isVisible() && isProductionCatalogPanelPointInside(panelBounds, x, y);
+bool ProductionCatalogGrid::handleMouseWheel(Sint32 x, Sint32 y, bool up) {
+    if(!isVisible() || !isProductionCatalogPanelPointInside(panelBounds, x, y)) return false;
+
+    scrollRows(up ? -1 : 1);
+    return true;
 }
 
 void ProductionCatalogGrid::draw(Point position) {
@@ -207,6 +218,7 @@ void ProductionCatalogGrid::draw(Point position) {
         panelBounds = {};
         renderedLayout = {};
         renderedEntryCount = 0;
+        firstVisibleRow = 0;
         return;
     }
 
@@ -222,6 +234,7 @@ void ProductionCatalogGrid::draw(Point position) {
         panelBounds = {};
         renderedLayout = {};
         renderedEntryCount = 0;
+        firstVisibleRow = 0;
         return;
     }
 
@@ -233,6 +246,7 @@ void ProductionCatalogGrid::draw(Point position) {
     };
     renderedLayout = layout;
     renderedEntryCount = static_cast<int>(entries.size());
+    firstVisibleRow = clampProductionCatalogScrollRow(renderedLayout, firstVisibleRow);
     TouchInput::setProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid, {
         builderObjectID,
         position.x + panelBounds.x,
@@ -250,9 +264,11 @@ void ProductionCatalogGrid::draw(Point position) {
     renderDrawRect(renderer, &panel, COLOR_RGB(125,80,0));
 
     const bool purchasesEnabled = builder->isProductionCatalogPurchaseEnabled();
-    const int visibleEntries = std::min(static_cast<int>(entries.size()), layout.maxVisibleEntries);
-    for(int index = 0; index < visibleEntries; ++index) {
-        const auto cell = getProductionCatalogGridCell(layout, index);
+    const int firstCatalogIndex = firstVisibleRow * layout.columns;
+    const int visibleEntries = std::min(
+        std::max(0, static_cast<int>(entries.size()) - firstCatalogIndex), layout.maxVisibleEntries);
+    for(int visibleIndex = 0; visibleIndex < visibleEntries; ++visibleIndex) {
+        const auto cell = getProductionCatalogGridCell(layout, visibleIndex);
         SDL_Rect cellBounds = {
             panel.x + cell.x,
             panel.y + cell.y,
@@ -261,7 +277,7 @@ void ProductionCatalogGrid::draw(Point position) {
         };
         renderDrawRect(renderer, &cellBounds, COLOR_RGB(125,80,0));
 
-        const auto& entry = entries[index];
+        const auto& entry = entries[firstCatalogIndex + visibleIndex];
         SDL_Texture* itemTexture = resolveItemPicture(static_cast<int>(entry.itemID));
         const SDL_Rect iconBounds = {
             cellBounds.x + 3,
@@ -291,5 +307,22 @@ void ProductionCatalogGrid::draw(Point position) {
         } else if(isLocked(entry.availability)) {
             drawCenteredTexture(pLockedTextTexture.get(), cellBounds);
         }
+    }
+
+    if(firstVisibleRow > 0) {
+        const SDL_Point points[] = {
+            { panel.x + panel.w - 5, panel.y + 4 },
+            { panel.x + panel.w - 3, panel.y + 2 },
+            { panel.x + panel.w - 1, panel.y + 4 }
+        };
+        SDL_RenderDrawLines(renderer, points, 3);
+    }
+    if(firstVisibleRow < layout.maxScrollRow) {
+        const SDL_Point points[] = {
+            { panel.x + panel.w - 5, panel.y + panel.h - 4 },
+            { panel.x + panel.w - 3, panel.y + panel.h - 2 },
+            { panel.x + panel.w - 1, panel.y + panel.h - 4 }
+        };
+        SDL_RenderDrawLines(renderer, points, 3);
     }
 }

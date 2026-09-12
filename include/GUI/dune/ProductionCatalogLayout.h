@@ -37,6 +37,8 @@ struct ProductionCatalogGridLayout {
     int spacing = 0;
     int padding = 0;
     bool hasOverflow = false;
+    int totalRows = 0;
+    int maxScrollRow = 0;
 };
 
 struct ProductionCatalogGridCell {
@@ -92,6 +94,7 @@ constexpr ProductionCatalogGridLayout calculateProductionCatalogGridLayout(
     const int requiredRows = (entryCount + columns - 1) / columns;
     const int visibleRows = productionCatalogMin(requiredRows, visibleRowLimit);
     const int maxVisibleEntries = columns * visibleRowLimit;
+    const int maxScrollRow = productionCatalogMax(0, requiredRows - visibleRows);
 
     return {
         columns,
@@ -103,7 +106,9 @@ constexpr ProductionCatalogGridLayout calculateProductionCatalogGridLayout(
         cellHeight,
         spacing,
         horizontalPadding,
-        entryCount > maxVisibleEntries
+        entryCount > maxVisibleEntries,
+        requiredRows,
+        maxScrollRow
     };
 }
 
@@ -160,6 +165,25 @@ constexpr int getProductionCatalogGridIndexAtPoint(
     const int index = row * layout.columns + column;
     return index < productionCatalogMin(productionCatalogMax(0, entryCount), layout.maxVisibleEntries)
         ? index : -1;
+}
+
+constexpr int clampProductionCatalogScrollRow(const ProductionCatalogGridLayout& layout, int firstVisibleRow) {
+    return productionCatalogMin(productionCatalogMax(0, firstVisibleRow), layout.maxScrollRow);
+}
+
+constexpr int scrollProductionCatalogRows(
+        const ProductionCatalogGridLayout& layout, int firstVisibleRow, int delta) {
+    return clampProductionCatalogScrollRow(layout, firstVisibleRow + delta);
+}
+
+constexpr int getProductionCatalogGridCatalogIndexAtPoint(
+        const ProductionCatalogGridLayout& layout, const ProductionCatalogPanelBounds& bounds,
+        int entryCount, int firstVisibleRow, int pointX, int pointY) {
+    const int visibleIndex = getProductionCatalogGridIndexAtPoint(layout, bounds, entryCount, pointX, pointY);
+    if(visibleIndex < 0) return -1;
+
+    const int catalogIndex = clampProductionCatalogScrollRow(layout, firstVisibleRow) * layout.columns + visibleIndex;
+    return catalogIndex < productionCatalogMax(0, entryCount) ? catalogIndex : -1;
 }
 
 #endif // PRODUCTIONCATALOGLAYOUT_H

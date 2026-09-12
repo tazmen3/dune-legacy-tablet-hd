@@ -61,6 +61,32 @@ TEST_CASE("Production catalogue grid reports overflow without adding scrolling",
     REQUIRE(layout.hasOverflow);
 }
 
+TEST_CASE("Production catalogue grid exposes full-row scrolling limits", "[production][catalogue][layout][scroll]") {
+    const auto eighteen = layoutFor(18);
+    REQUIRE(eighteen.totalRows == 3);
+    REQUIRE(eighteen.maxScrollRow == 0);
+    REQUIRE(scrollProductionCatalogRows(eighteen, 0, -1) == 0);
+    REQUIRE(scrollProductionCatalogRows(eighteen, 0, 1) == 0);
+
+    const auto nineteen = layoutFor(19);
+    REQUIRE(nineteen.totalRows == 4);
+    REQUIRE(nineteen.maxScrollRow == 1);
+    REQUIRE(scrollProductionCatalogRows(nineteen, 0, -1) == 0);
+    REQUIRE(scrollProductionCatalogRows(nineteen, 0, 1) == 1);
+    REQUIRE(scrollProductionCatalogRows(nineteen, 1, 1) == 1);
+
+    const auto twentyFive = layoutFor(25, 496, 480);
+    REQUIRE(twentyFive.columns == 5);
+    REQUIRE(twentyFive.totalRows == 5);
+    REQUIRE(twentyFive.visibleRows == 3);
+    REQUIRE(twentyFive.maxScrollRow == 2);
+    REQUIRE(clampProductionCatalogScrollRow(twentyFive, -3) == 0);
+    REQUIRE(clampProductionCatalogScrollRow(twentyFive, 5) == 2);
+    REQUIRE(scrollProductionCatalogRows(twentyFive, 2, -1) == 1);
+
+    REQUIRE(clampProductionCatalogScrollRow(layoutFor(10), 2) == 0);
+}
+
 TEST_CASE("Production catalogue grid reduces columns on narrower game areas", "[production][catalogue][layout]") {
     const auto layout = layoutFor(18, 496, 480);
     REQUIRE(layout.columns == 5);
@@ -134,6 +160,21 @@ TEST_CASE("Production catalogue grid hit-test honors actual entry count and redu
             reducedPanel.x + firstSecondRow.x + 1, reducedPanel.y + firstSecondRow.y + 1) == 5);
 }
 
+TEST_CASE("Production catalogue grid maps visible cells through the scroll row", "[production][catalogue][layout][input-routing][scroll]") {
+    const auto layout = layoutFor(19);
+    const ProductionCatalogPanelBounds panel{5, 343, layout.panelWidth, layout.panelHeight};
+    const auto firstCell = getProductionCatalogGridCell(layout, 0);
+    const auto lastAvailableCell = getProductionCatalogGridCell(layout, 12);
+    const auto missingCell = getProductionCatalogGridCell(layout, 13);
+
+    REQUIRE(getProductionCatalogGridCatalogIndexAtPoint(layout, panel, 19, 1,
+            panel.x + firstCell.x + 1, panel.y + firstCell.y + 1) == 6);
+    REQUIRE(getProductionCatalogGridCatalogIndexAtPoint(layout, panel, 19, 1,
+            panel.x + lastAvailableCell.x + 1, panel.y + lastAvailableCell.y + 1) == 18);
+    REQUIRE(getProductionCatalogGridCatalogIndexAtPoint(layout, panel, 19, 1,
+            panel.x + missingCell.x + 1, panel.y + missingCell.y + 1) == -1);
+}
+
 TEST_CASE("Production catalogue grid consumes only events inside its visual panel", "[production][catalogue][layout][input-routing]") {
     const ProductionCatalogPanelBounds panel{5, 343, 581, 185};
     REQUIRE(isProductionCatalogPanelPointInside(panel, 5, 343));
@@ -149,4 +190,5 @@ TEST_CASE("Production catalogue grid reuses the existing production handler only
     REQUIRE(grid.find("handleProduceItemClick") != std::string::npos);
     REQUIRE(grid.find("CommandManager") == std::string::npos);
     REQUIRE(grid.find("handleCancelItemClick") == std::string::npos);
+    REQUIRE(grid.find("scrollRows(up ? -1 : 1)") != std::string::npos);
 }

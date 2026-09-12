@@ -194,6 +194,31 @@ TEST_CASE("Production catalogue Grid holds and second-finger cancellation stay i
     REQUIRE(session.release(100, 400, 1300) == TouchInput::ProductionCatalogTouchAction::None);
 }
 
+TEST_CASE("Production catalogue Grid turns vertical swipes into a single row scroll", "[touch][production][targets][scroll]") {
+    TouchInput::ProductionCatalogTouchSession session;
+    session.setTarget(TouchInput::ProductionCatalogTargetSource::Grid, gridTarget());
+
+    REQUIRE(session.begin(100, 400, 10));
+    session.move(101, 360);
+    REQUIRE(session.release(101, 360, 110) == TouchInput::ProductionCatalogTouchAction::ScrollDown);
+
+    REQUIRE(session.begin(100, 400, 200));
+    session.move(99, 440);
+    REQUIRE(session.release(99, 440, 900) == TouchInput::ProductionCatalogTouchAction::ScrollUp);
+}
+
+TEST_CASE("Production catalogue Grid keeps horizontal motion and legacy gestures inert", "[touch][production][targets][scroll]") {
+    TouchInput::ProductionCatalogTouchSession gridSession;
+    gridSession.setTarget(TouchInput::ProductionCatalogTargetSource::Grid, gridTarget());
+    REQUIRE(gridSession.begin(100, 400, 10));
+    REQUIRE(gridSession.release(150, 402, 110) == TouchInput::ProductionCatalogTouchAction::None);
+
+    TouchInput::ProductionCatalogTouchSession legacySession;
+    legacySession.setTarget(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList, target());
+    REQUIRE(legacySession.begin(120, 210, 10));
+    REQUIRE(legacySession.release(120, 170, 110) == TouchInput::ProductionCatalogTouchAction::None);
+}
+
 TEST_CASE("Production pause control toggles independently from catalogue taps", "[touch][production]") {
     bool onHold = false;
     onHold = TouchInput::nextProductionOnHoldState(onHold);

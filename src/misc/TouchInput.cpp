@@ -125,6 +125,19 @@ SDL_Event makeMouseButton(Uint32 type, LogicalPoint point, Uint32 windowID, Uint
     return event;
 }
 
+SDL_Event makeMouseWheel(Uint32 windowID, bool up) {
+    SDL_Event event{};
+    event.type = SDL_MOUSEWHEEL;
+    event.wheel.type = SDL_MOUSEWHEEL;
+    event.wheel.timestamp = SDL_GetTicks();
+    event.wheel.windowID = windowID;
+    event.wheel.which = SDL_TOUCH_MOUSEID;
+    event.wheel.x = 0;
+    event.wheel.y = up ? 1 : -1;
+    event.wheel.direction = SDL_MOUSEWHEEL_NORMAL;
+    return event;
+}
+
 void queueEvent(const SDL_Event& event, bool tap = false, bool startedInsideMap = false) {
     state.pendingEvents.push_back({ event, tap, startedInsideMap });
 }
@@ -147,6 +160,21 @@ void queueCompletedGesture() {
         queueEvent(makeMouseButton(SDL_MOUSEBUTTONDOWN, state.last, state.windowID), true, state.mapTapEligible);
         queueEvent(makeMouseButton(SDL_MOUSEBUTTONUP, state.last, state.windowID), true, state.mapTapEligible);
     }
+}
+
+LogicalPoint clampToProductionCatalogTarget(LogicalPoint point, const TouchInput::ProductionCatalogTarget& target) {
+    return {
+        std::max(target.x, std::min(point.x, target.x + target.width - 1)),
+        std::max(target.y, std::min(point.y, target.y + target.height - 1))
+    };
+}
+
+void queueProductionCatalogScroll(TouchInput::ProductionCatalogTouchAction action) {
+    const auto point = clampToProductionCatalogTarget(
+        state.last, state.productionCatalogTouch.activeTarget());
+    queueEvent(makeMouseMotion(point, { 0, 0 }, state.windowID, 0));
+    queueEvent(makeMouseWheel(state.windowID,
+                              action == TouchInput::ProductionCatalogTouchAction::ScrollUp));
 }
 
 void resetGesture() {
@@ -329,6 +357,8 @@ void handleFingerUp(const SDL_TouchFingerEvent& finger) {
         const auto action = state.productionCatalogTouch.release(state.last.x, state.last.y, finger.timestamp);
         if(TouchInput::isProductionCatalogTap(action)) {
             queueCompletedGesture();
+        } else if(TouchInput::isProductionCatalogScroll(action)) {
+            queueProductionCatalogScroll(action);
         }
         state.gesture.cancel();
     } else if(state.primaryActive && key == state.primaryFinger && state.placementGesture && !state.gesture.isCancelled()) {

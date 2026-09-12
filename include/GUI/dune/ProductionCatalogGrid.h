@@ -29,11 +29,13 @@ public:
 
 private:
     void resetPressedCell();
+    void scrollRows(int delta);
 
     Uint32 builderObjectID = NONE_ID;
     ProductionCatalogPanelBounds panelBounds;
     ProductionCatalogGridLayout renderedLayout;
     int renderedEntryCount = 0;
+    int firstVisibleRow = 0;
     bool leftPressInsidePanel = false;
     bool rightPressInsidePanel = false;
     bool hasPressedItem = false;

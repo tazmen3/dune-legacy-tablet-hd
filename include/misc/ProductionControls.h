@@ -20,11 +20,18 @@ constexpr int PRODUCTION_MOVEMENT_TOLERANCE = 12;
 enum class ProductionCatalogTouchAction {
     None,
     Tap,
-    HoldSuppressed
+    HoldSuppressed,
+    ScrollUp,
+    ScrollDown
 };
 
 constexpr bool isProductionCatalogTap(ProductionCatalogTouchAction action) {
     return action == ProductionCatalogTouchAction::Tap;
+}
+
+constexpr bool isProductionCatalogScroll(ProductionCatalogTouchAction action) {
+    return action == ProductionCatalogTouchAction::ScrollUp
+        || action == ProductionCatalogTouchAction::ScrollDown;
 }
 
 constexpr bool nextProductionOnHoldState(bool currentlyOnHold) {
@@ -209,6 +216,8 @@ public:
     bool isTracking() const { return tracking_; }
     bool isArmed() const { return tracking_ && armed_; }
     const ProductionCatalogTarget& target() const { return target_; }
+    int startX() const { return startX_; }
+    int startY() const { return startY_; }
 
 private:
     ProductionCatalogTarget target_{};
@@ -252,12 +261,24 @@ public:
 
     void move(int pointX, int pointY) { touch_.move(pointX, pointY); }
     ProductionCatalogTouchAction release(int pointX, int pointY, std::uint32_t timestamp) {
+        if(touch_.isTracking() && activeSource_ == ProductionCatalogTargetSource::Grid) {
+            const int dx = pointX - touch_.startX();
+            const int dy = pointY - touch_.startY();
+            const int absoluteX = dx < 0 ? -dx : dx;
+            const int absoluteY = dy < 0 ? -dy : dy;
+            if(absoluteY > absoluteX && absoluteY > PRODUCTION_MOVEMENT_TOLERANCE) {
+                touch_.cancel();
+                return dy < 0 ? ProductionCatalogTouchAction::ScrollDown
+                              : ProductionCatalogTouchAction::ScrollUp;
+            }
+        }
         return touch_.release(pointX, pointY, timestamp);
     }
     void cancel() { touch_.cancel(); }
     bool isTracking() const { return touch_.isTracking(); }
     bool isArmed() const { return touch_.isArmed(); }
     ProductionCatalogTargetSource activeSource() const { return activeSource_; }
+    const ProductionCatalogTarget& activeTarget() const { return touch_.target(); }
     const ProductionCatalogTargetRegistry& targets() const { return targets_; }
 
 private:
