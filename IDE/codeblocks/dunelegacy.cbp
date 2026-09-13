@@ -154,7 +154,6 @@
 		<Unit filename="../../include/GUI/Widget.h" />
 		<Unit filename="../../include/GUI/Window.h" />
 		<Unit filename="../../include/GUI/dune/AnimationLabel.h" />
-		<Unit filename="../../include/GUI/dune/BuilderList.h" />
 		<Unit filename="../../include/GUI/dune/ChatManager.h" />
 		<Unit filename="../../include/GUI/dune/DigitsCounter.h" />
 		<Unit filename="../../include/GUI/dune/DigitsTextBox.h" />
@@ -388,7 +387,6 @@
 		<Unit filename="../../src/GUI/TextView.cpp" />
 		<Unit filename="../../src/GUI/Widget.cpp" />
 		<Unit filename="../../src/GUI/Window.cpp" />
-		<Unit filename="../../src/GUI/dune/BuilderList.cpp" />
 		<Unit filename="../../src/GUI/dune/ChatManager.cpp" />
 		<Unit filename="../../src/GUI/dune/DuneStyle.cpp" />
 		<Unit filename="../../src/GUI/dune/GameOptionsWindow.cpp" />

@@ -320,7 +320,6 @@ IF %ERRORLEVEL% LSS 8 exit 0</Command>
     <ClInclude Include="..\..\include\GUI\Container.h" />
     <ClInclude Include="..\..\include\GUI\DropDownBox.h" />
     <ClInclude Include="..\..\include\GUI\dune\AnimationLabel.h" />
-    <ClInclude Include="..\..\include\GUI\dune\BuilderList.h" />
     <ClInclude Include="..\..\include\GUI\dune\ChatManager.h" />
     <ClInclude Include="..\..\include\GUI\dune\DigitsCounter.h" />
     <ClInclude Include="..\..\include\GUI\dune\DigitsTextBox.h" />
@@ -844,7 +843,6 @@ IF %ERRORLEVEL% LSS 8 exit 0</Command>
     </ClCompile>
     <ClCompile Include="..\..\src\GUI\Button.cpp" />
     <ClCompile Include="..\..\src\GUI\DropDownBox.cpp" />
-    <ClCompile Include="..\..\src\GUI\dune\BuilderList.cpp" />
     <ClCompile Include="..\..\src\GUI\dune\ChatManager.cpp" />
     <ClCompile Include="..\..\src\GUI\dune\DuneStyle.cpp" />
     <ClCompile Include="..\..\src\GUI\dune\GameOptionsWindow.cpp" />

@@ -111,14 +111,13 @@ struct ProductionCatalogTarget {
 };
 
 enum class ProductionCatalogTargetSource {
-    LegacyBuilderList,
     Grid,
     QueueControls
 };
 
 struct ProductionCatalogTargetSelection {
     bool found = false;
-    ProductionCatalogTargetSource source = ProductionCatalogTargetSource::LegacyBuilderList;
+    ProductionCatalogTargetSource source = ProductionCatalogTargetSource::Grid;
     ProductionCatalogTarget target{};
 };
 
@@ -145,11 +144,8 @@ public:
     }
 
     ProductionCatalogTargetSelection find(int pointX, int pointY) const {
-        // The regions do not normally overlap. Legacy keeps deterministic priority
-        // if a transient layout ever does.
-        if(legacyBuilderList_.valid && legacyBuilderList_.target.contains(pointX, pointY)) {
-            return {true, ProductionCatalogTargetSource::LegacyBuilderList, legacyBuilderList_.target};
-        }
+        // The regions do not normally overlap. Keep deterministic priority if a
+        // transient layout ever does.
         if(grid_.valid && grid_.target.contains(pointX, pointY)) {
             return {true, ProductionCatalogTargetSource::Grid, grid_.target};
         }
@@ -170,22 +166,13 @@ private:
     };
 
     Slot& getSlot(ProductionCatalogTargetSource source) {
-        switch(source) {
-            case ProductionCatalogTargetSource::Grid: return grid_;
-            case ProductionCatalogTargetSource::QueueControls: return queueControls_;
-            default: return legacyBuilderList_;
-        }
+        return source == ProductionCatalogTargetSource::Grid ? grid_ : queueControls_;
     }
 
     const Slot& getSlot(ProductionCatalogTargetSource source) const {
-        switch(source) {
-            case ProductionCatalogTargetSource::Grid: return grid_;
-            case ProductionCatalogTargetSource::QueueControls: return queueControls_;
-            default: return legacyBuilderList_;
-        }
+        return source == ProductionCatalogTargetSource::Grid ? grid_ : queueControls_;
     }
 
-    Slot legacyBuilderList_;
     Slot grid_;
     Slot queueControls_;
 };
@@ -193,7 +180,7 @@ private:
 /**
  * Pure guard for the production catalogue. A short touch remains a normal
  * catalogue tap; a hold is consumed so Android's historical synthetic
- * right-click cannot perform a destructive BuilderList action.
+ * right-click cannot perform a destructive production action.
  */
 class ProductionCatalogTouchGuard {
 public:
@@ -317,7 +304,7 @@ public:
 private:
     ProductionCatalogTargetRegistry targets_;
     ProductionCatalogTouchGuard touch_;
-    ProductionCatalogTargetSource activeSource_ = ProductionCatalogTargetSource::LegacyBuilderList;
+    ProductionCatalogTargetSource activeSource_ = ProductionCatalogTargetSource::Grid;
 };
 
 } // namespace TouchInput

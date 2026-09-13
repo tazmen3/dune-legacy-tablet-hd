@@ -73,7 +73,6 @@
 		1358FE5E13D3B72F00FAD5B7 /* globals.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1358FD9E13D3B72F00FAD5B7 /* globals.cpp */; };
 		1358FE5F13D3B72F00FAD5B7 /* Button.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1358FDA013D3B72F00FAD5B7 /* Button.cpp */; };
 		1358FE6013D3B72F00FAD5B7 /* DropDownBox.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1358FDA113D3B72F00FAD5B7 /* DropDownBox.cpp */; };
-		1358FE6113D3B72F00FAD5B7 /* BuilderList.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1358FDA313D3B72F00FAD5B7 /* BuilderList.cpp */; };
 		1358FE6213D3B72F00FAD5B7 /* ChatManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1358FDA413D3B72F00FAD5B7 /* ChatManager.cpp */; };
 		1358FE6313D3B72F00FAD5B7 /* DuneStyle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1358FDA513D3B72F00FAD5B7 /* DuneStyle.cpp */; };
 		1358FE6413D3B72F00FAD5B7 /* GameOptionsWindow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1358FDA613D3B72F00FAD5B7 /* GameOptionsWindow.cpp */; };
@@ -497,7 +496,6 @@
 		1358FBBC13D3B71500FAD5B7 /* Container.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Container.h; sourceTree = "<group>"; };
 		1358FBBD13D3B71500FAD5B7 /* DropDownBox.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DropDownBox.h; sourceTree = "<group>"; };
 		1358FBBF13D3B71500FAD5B7 /* AnimationLabel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AnimationLabel.h; sourceTree = "<group>"; };
-		1358FBC013D3B71500FAD5B7 /* BuilderList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BuilderList.h; sourceTree = "<group>"; };
 		1358FBC113D3B71500FAD5B7 /* ChatManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ChatManager.h; sourceTree = "<group>"; };
 		1358FBC213D3B71500FAD5B7 /* DigitsCounter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DigitsCounter.h; sourceTree = "<group>"; };
 		1358FBC313D3B71500FAD5B7 /* DuneStyle.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DuneStyle.h; sourceTree = "<group>"; };
@@ -705,7 +703,6 @@
 		1358FD9E13D3B72F00FAD5B7 /* globals.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = globals.cpp; sourceTree = "<group>"; };
 		1358FDA013D3B72F00FAD5B7 /* Button.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Button.cpp; sourceTree = "<group>"; };
 		1358FDA113D3B72F00FAD5B7 /* DropDownBox.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DropDownBox.cpp; sourceTree = "<group>"; };
-		1358FDA313D3B72F00FAD5B7 /* BuilderList.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = BuilderList.cpp; sourceTree = "<group>"; };
 		1358FDA413D3B72F00FAD5B7 /* ChatManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ChatManager.cpp; sourceTree = "<group>"; };
 		1358FDA513D3B72F00FAD5B7 /* DuneStyle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DuneStyle.cpp; sourceTree = "<group>"; };
 		1358FDA613D3B72F00FAD5B7 /* GameOptionsWindow.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GameOptionsWindow.cpp; sourceTree = "<group>"; };
@@ -1228,7 +1225,6 @@
 			isa = PBXGroup;
 			children = (
 				1358FBBF13D3B71500FAD5B7 /* AnimationLabel.h */,
-				1358FBC013D3B71500FAD5B7 /* BuilderList.h */,
 				1358FBC113D3B71500FAD5B7 /* ChatManager.h */,
 				1358FBC213D3B71500FAD5B7 /* DigitsCounter.h */,
 				13E56494169B535A00D282B9 /* DigitsTextBox.h */,
@@ -1590,7 +1586,6 @@
 		1358FDA213D3B72F00FAD5B7 /* dune */ = {
 			isa = PBXGroup;
 			children = (
-				1358FDA313D3B72F00FAD5B7 /* BuilderList.cpp */,
 				1358FDA413D3B72F00FAD5B7 /* ChatManager.cpp */,
 				1358FDA513D3B72F00FAD5B7 /* DuneStyle.cpp */,
 				1358FDA613D3B72F00FAD5B7 /* GameOptionsWindow.cpp */,
@@ -2125,7 +2120,6 @@
 				1358FE5F13D3B72F00FAD5B7 /* Button.cpp in Sources */,
 				CEEB16A91CD69F7900CF91D9 /* surroundopl.cpp in Sources */,
 				1358FE6013D3B72F00FAD5B7 /* DropDownBox.cpp in Sources */,
-				1358FE6113D3B72F00FAD5B7 /* BuilderList.cpp in Sources */,
 				1358FE6213D3B72F00FAD5B7 /* ChatManager.cpp in Sources */,
 				1358FE6313D3B72F00FAD5B7 /* DuneStyle.cpp in Sources */,
 				E375D3192DB00A4E00F459C8 /* Random.cpp in Sources */,

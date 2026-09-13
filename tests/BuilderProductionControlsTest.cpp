@@ -68,8 +68,6 @@ TEST_CASE("BuilderInterface uses the dedicated right-hand control panel", "[prod
     REQUIRE(header.find("BuilderProductionControls.h") != std::string::npos);
     REQUIRE(header.find("BuilderProductionControls::create") != std::string::npos);
     REQUIRE(header.find("BuilderProductionControls* pBuilderProductionControls") != std::string::npos);
-    REQUIRE(header.find("BuilderList::create") == std::string::npos);
-    REQUIRE(header.find("BuilderList* pBuilderList") == std::string::npos);
 }
 
 TEST_CASE("BuilderProductionControls delegate all actions to shared helpers", "[production][controls][actions]") {

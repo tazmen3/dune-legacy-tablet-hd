@@ -122,17 +122,6 @@ TEST_CASE("Production catalogue: timestamp wrap preserves hold suppression", "[t
     REQUIRE(touch.release(120, 210, 0x000006D0u) == TouchInput::ProductionCatalogTouchAction::HoldSuppressed);
 }
 
-TEST_CASE("Production catalogue target slots preserve the historical BuilderList region", "[touch][production][targets]") {
-    TouchInput::ProductionCatalogTargetRegistry targets;
-    targets.set(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList, target());
-
-    const auto selection = targets.find(120, 210);
-    REQUIRE(selection.found);
-    REQUIRE(selection.source == TouchInput::ProductionCatalogTargetSource::LegacyBuilderList);
-    REQUIRE(selection.target.sameRegion(target()));
-    REQUIRE_FALSE(targets.find(20, 340).found);
-}
-
 TEST_CASE("Production catalogue target slots recognize the Grid independently", "[touch][production][targets]") {
     TouchInput::ProductionCatalogTargetRegistry targets;
     targets.set(TouchInput::ProductionCatalogTargetSource::Grid, gridTarget());
@@ -155,26 +144,26 @@ TEST_CASE("Production catalogue target slots recognize QueueControls independent
     REQUIRE_FALSE(targets.find(100, 340).found);
 }
 
-TEST_CASE("Production catalogue target slots select either visible catalogue without bridging the map", "[touch][production][targets]") {
+TEST_CASE("Production catalogue target slots select Grid and QueueControls without bridging the map", "[touch][production][targets]") {
     TouchInput::ProductionCatalogTargetRegistry targets;
-    targets.set(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList, target());
     targets.set(TouchInput::ProductionCatalogTargetSource::Grid, gridTarget());
+    targets.set(TouchInput::ProductionCatalogTargetSource::QueueControls, queueControlsTarget());
 
-    REQUIRE(targets.find(120, 210).source == TouchInput::ProductionCatalogTargetSource::LegacyBuilderList);
     REQUIRE(targets.find(100, 400).source == TouchInput::ProductionCatalogTargetSource::Grid);
+    REQUIRE(targets.find(100, 310).source == TouchInput::ProductionCatalogTargetSource::QueueControls);
     REQUIRE_FALSE(targets.find(400, 250).found);
 }
 
 TEST_CASE("Production catalogue target slots clear only their own surface", "[touch][production][targets]") {
     TouchInput::ProductionCatalogTargetRegistry targets;
-    targets.set(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList, target());
     targets.set(TouchInput::ProductionCatalogTargetSource::Grid, gridTarget());
+    targets.set(TouchInput::ProductionCatalogTargetSource::QueueControls, queueControlsTarget());
 
     REQUIRE(targets.clear(TouchInput::ProductionCatalogTargetSource::Grid));
-    REQUIRE(targets.has(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList));
+    REQUIRE(targets.has(TouchInput::ProductionCatalogTargetSource::QueueControls));
     REQUIRE_FALSE(targets.has(TouchInput::ProductionCatalogTargetSource::Grid));
-    REQUIRE(targets.clear(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList, target().builderObjectID));
-    REQUIRE_FALSE(targets.has(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList));
+    REQUIRE(targets.clear(TouchInput::ProductionCatalogTargetSource::QueueControls, queueControlsTarget().builderObjectID));
+    REQUIRE_FALSE(targets.has(TouchInput::ProductionCatalogTargetSource::QueueControls));
 }
 
 TEST_CASE("Production queue controls and Grid keep independent touch slots", "[touch][production][targets]") {
@@ -191,16 +180,16 @@ TEST_CASE("Production queue controls and Grid keep independent touch slots", "[t
 
 TEST_CASE("Production catalogue session tracks the slot where the gesture began", "[touch][production][targets]") {
     TouchInput::ProductionCatalogTouchSession session;
-    session.setTarget(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList, target());
     session.setTarget(TouchInput::ProductionCatalogTargetSource::Grid, gridTarget());
+    session.setTarget(TouchInput::ProductionCatalogTargetSource::QueueControls, queueControlsTarget());
 
     REQUIRE(session.begin(100, 400, 10));
     REQUIRE(session.activeSource() == TouchInput::ProductionCatalogTargetSource::Grid);
     REQUIRE(session.isTracking());
 
-    auto movedLegacy = target();
-    movedLegacy.x += 4;
-    session.setTarget(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList, movedLegacy);
+    auto movedQueueControls = queueControlsTarget();
+    movedQueueControls.x += 4;
+    session.setTarget(TouchInput::ProductionCatalogTargetSource::QueueControls, movedQueueControls);
     REQUIRE(session.isTracking());
 
     auto movedGrid = gridTarget();
@@ -240,10 +229,6 @@ TEST_CASE("Production catalogue Grid keeps horizontal motion and legacy gestures
     REQUIRE(gridSession.begin(100, 400, 10));
     REQUIRE(gridSession.release(150, 402, 110) == TouchInput::ProductionCatalogTouchAction::None);
 
-    TouchInput::ProductionCatalogTouchSession legacySession;
-    legacySession.setTarget(TouchInput::ProductionCatalogTargetSource::LegacyBuilderList, target());
-    REQUIRE(legacySession.begin(120, 210, 10));
-    REQUIRE(legacySession.release(120, 170, 110) == TouchInput::ProductionCatalogTouchAction::None);
 }
 
 TEST_CASE("Production queue controls keep swipe, hold and second-finger gestures inert", "[touch][production][targets][scroll]") {

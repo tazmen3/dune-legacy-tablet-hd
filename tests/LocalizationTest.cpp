@@ -93,9 +93,9 @@ TEST_CASE("Missing English translations fall back to canonical msgids", "[locali
     }
 }
 
-TEST_CASE("BuilderList uses only canonical gettext strings for production controls", "[localization][production]") {
+TEST_CASE("Production controls use only canonical gettext strings", "[localization][production]") {
     const auto sourceRoot = dataDirectory().parent_path();
-    const auto source = readTextFile(sourceRoot / "src" / "GUI" / "dune" / "BuilderList.cpp");
+    const auto source = readTextFile(sourceRoot / "src" / "GUI" / "dune" / "BuilderProductionControls.cpp");
 
     for(const auto& msgid : productionMsgIds) {
         REQUIRE(source.find("_(\"" + msgid + "\")") != std::string::npos);

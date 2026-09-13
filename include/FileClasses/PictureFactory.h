@@ -51,8 +51,6 @@ public:
     sdl2::surface_ptr createGreyHouseChoice(SDL_Surface* HouseChoice) const;
     sdl2::surface_ptr createMapChoiceScreen(int House) const;
     sdl2::surface_ptr createMentatHouseChoiceQuestion(int House, Palette& benePalette) const;
-    sdl2::surface_ptr createBuilderListUpperCap() const;
-    sdl2::surface_ptr createBuilderListLowerCap() const;
 
     sdl2::surface_ptr createHeraldFre(SDL_Surface* heraldHark) const;
     sdl2::surface_ptr createHeraldSard(SDL_Surface* heraldOrd, SDL_Surface* heraldAtre) const;
@@ -106,9 +104,6 @@ private:
     sdl2::surface_ptr messageBoxBorder;
 
     sdl2::surface_ptr mentatHouseChoiceQuestionSurface;
-
-    sdl2::surface_ptr builderListUpperCap;
-    sdl2::surface_ptr builderListLowerCap;
 
 };
 

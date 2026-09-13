@@ -270,8 +270,6 @@ typedef enum {
     UI_ButtonUp_Pressed,
     UI_ButtonDown,
     UI_ButtonDown_Pressed,
-    UI_BuilderListUpperCap,
-    UI_BuilderListLowerCap,
     UI_CustomGamePlayersArrow,
     UI_CustomGamePlayersArrowNeutral,
     UI_MessageBox,

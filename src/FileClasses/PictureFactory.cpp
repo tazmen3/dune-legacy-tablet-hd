@@ -203,59 +203,6 @@ PictureFactory::PictureFactory() {
     }
 
 
-    // create builder list upper cap
-    builderListUpperCap = sdl2::surface_ptr{ SDL_CreateRGBSurface(0, 112, 21, 8, 0, 0, 0, 0) };
-    if(builderListUpperCap == nullptr) {
-        THROW(std::runtime_error, "PictureFactory::PictureFactory: Cannot create new Picture!");
-    }
-    palette.applyToSurface(builderListUpperCap.get());
-    SDL_FillRect(builderListUpperCap.get(), nullptr, PALCOLOR_TRANSPARENT);
-
-    {
-        auto builderListUpperCapLeft = getSubPicture(ChoamPic.get(), 64, 3, 42, 18);
-        SDL_Rect dest5 = { 0, 0, 42, 18 };
-        SDL_BlitSurface(builderListUpperCapLeft.get(), nullptr, builderListUpperCap.get(), &dest5);
-    }
-    {
-        auto builderListUpperCapMiddle = getSubPicture(ChoamPic.get(), 69, 3, 38, 13);
-        SDL_Rect dest6 = { 42, 0, 38, 13 };
-        SDL_BlitSurface(builderListUpperCapMiddle.get(), nullptr, builderListUpperCap.get(), &dest6);
-    }
-    {
-        auto builderListUpperCapRight = getSubPicture(ChoamPic.get(), 69, 3, 48, 21);
-        SDL_Rect dest7 = { 64, 0, 48, 21 };
-        SDL_BlitSurface(builderListUpperCapRight.get(), nullptr, builderListUpperCap.get(), &dest7);
-    }
-    replaceColor(builderListUpperCap.get(), 30, 0);
-    SDL_SetColorKey(builderListUpperCap.get(), SDL_TRUE, 0);
-
-    // create builder list lower cap
-    builderListLowerCap = sdl2::surface_ptr{ SDL_CreateRGBSurface(0, 112, 17, 8, 0, 0, 0, 0) };
-    if(builderListLowerCap == nullptr) {
-        THROW(std::runtime_error, "PictureFactory::PictureFactory: Cannot create new Picture!");
-    }
-
-    palette.applyToSurface(builderListLowerCap.get());
-    SDL_FillRect(builderListLowerCap.get(), nullptr, PALCOLOR_TRANSPARENT);
-
-    {
-        auto builderListLowerCapLeft = getSubPicture(ChoamPic.get(), 64, 149, 44, 17);
-        SDL_Rect dest8 = { 0, 0, 44, 17 };
-        SDL_BlitSurface(builderListLowerCapLeft.get(), nullptr, builderListLowerCap.get(), &dest8);
-    }
-    {
-        auto builderListLowerCapMiddle = getSubPicture(ChoamPic.get(), 68, 152, 40, 14);
-        SDL_Rect dest9 = { 44, 3, 40, 14 };
-        SDL_BlitSurface(builderListLowerCapMiddle.get(), nullptr, builderListLowerCap.get(), &dest9);
-    }
-    {
-        auto builderListLowerCapRight = getSubPicture(ChoamPic.get(), 68, 149, 48, 17);
-        SDL_Rect dest10 = { 64, 0, 48, 17 };
-        SDL_BlitSurface(builderListLowerCapRight.get(), nullptr, builderListLowerCap.get(), &dest10);
-    }
-
-    replaceColor(builderListLowerCap.get(), 30, 0);
-    SDL_SetColorKey(builderListLowerCap.get(), SDL_TRUE, 0);
 }
 
 PictureFactory::~PictureFactory() = default;
@@ -756,14 +703,6 @@ sdl2::surface_ptr PictureFactory::createMentatHouseChoiceQuestion(int House, Pal
     SDL_BlitSurface(pQuestionPart2.get(),nullptr,pSurface.get(),&dest2);
 
     return pSurface;
-}
-
-sdl2::surface_ptr PictureFactory::createBuilderListUpperCap() const {
-    return copySurface(builderListUpperCap.get());
-}
-
-sdl2::surface_ptr PictureFactory::createBuilderListLowerCap() const {
-    return copySurface(builderListLowerCap.get());
 }
 
 sdl2::surface_ptr PictureFactory::createHeraldFre(SDL_Surface* heraldHark) const {

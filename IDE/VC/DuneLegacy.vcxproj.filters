@@ -501,9 +501,6 @@
     <ClInclude Include="..\..\include\GUI\dune\AnimationLabel.h">
       <Filter>include\GUI\dune</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\GUI\dune\BuilderList.h">
-      <Filter>include\GUI\dune</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\GUI\dune\ChatManager.h">
       <Filter>include\GUI\dune</Filter>
     </ClInclude>
@@ -1225,9 +1222,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\GUI\Window.cpp">
       <Filter>src\GUI</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\GUI\dune\BuilderList.cpp">
-      <Filter>src\GUI\dune</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\GUI\dune\ChatManager.cpp">
       <Filter>src\GUI\dune</Filter>

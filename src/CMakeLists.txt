@@ -178,7 +178,6 @@ target_sources(dunelegacy
         GUI/dune/InGameSettingsMenu.cpp
         GUI/dune/NewsTicker.cpp
         GUI/dune/MessageTicker.cpp
-        GUI/dune/BuilderList.cpp
         GUI/dune/BuilderProductionControls.cpp
         GUI/dune/ProductionCatalogGrid.cpp
         GUI/dune/ProductionQueueControls.cpp
