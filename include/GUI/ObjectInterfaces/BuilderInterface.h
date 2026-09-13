@@ -26,7 +26,7 @@
 #include <GUI/TextButton.h>
 #include <GUI/ProgressBar.h>
 #include <GUI/Label.h>
-#include <GUI/dune/BuilderList.h>
+#include <GUI/dune/BuilderProductionControls.h>
 
 #include <misc/draw_util.h>
 
@@ -62,10 +62,10 @@ protected:
         ObjectBase* pObject = currentGame->getObjectManager().getObject(objectID);
         BuilderBase* pBuilder = dynamic_cast<BuilderBase*>(pObject);
         if(pBuilder) {
-            pBuilderList = BuilderList::create(pBuilder->getObjectID());
-            mainHBox.addWidget(pBuilderList);
+            pBuilderProductionControls = BuilderProductionControls::create(pBuilder->getObjectID());
+            mainHBox.addWidget(pBuilderProductionControls);
         } else {
-            pBuilderList = nullptr;
+            pBuilderProductionControls = nullptr;
         }
 
         mainHBox.addWidget(Spacer::create());
@@ -97,11 +97,17 @@ protected:
     {
         ObjectBase* pObject = currentGame->getObjectManager().getObject(objectID);
         if(pObject == nullptr) {
+            if(pBuilderProductionControls != nullptr) {
+                pBuilderProductionControls->clear();
+            }
             return false;
         }
 
         BuilderBase* pBuilder = dynamic_cast<BuilderBase*>(pObject);
         if(pBuilder != nullptr) {
+            if(pBuilderProductionControls != nullptr) {
+                pBuilderProductionControls->setBuilderObjectID(pBuilder->getObjectID());
+            }
             StarPort* pStarport = dynamic_cast<StarPort*>(pBuilder);
             if(pStarport != nullptr) {
                 int arrivalTimer = pStarport->getArrivalTimer();
@@ -143,7 +149,7 @@ protected:
     TextButton      upgradeButton;
     TextProgressBar upgradeProgressBar;
     Label           starportTimerLabel;
-    BuilderList*    pBuilderList;
+    BuilderProductionControls* pBuilderProductionControls;
 };
 
 #endif // BUILDERINTERFACE_H

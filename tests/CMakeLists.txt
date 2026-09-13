@@ -22,6 +22,7 @@ target_sources(dunelegacy_tests
         ProductionControlsTest.cpp
         ProductionQueueControlsTest.cpp
         ProductionQueueControlsWidgetTestSupport.cpp
+        BuilderProductionControlsTest.cpp
         BuilderListInputRoutingTest.cpp
         SaveGameNameTest.cpp
         LocalizationTest.cpp

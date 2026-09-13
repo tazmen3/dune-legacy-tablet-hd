@@ -94,6 +94,7 @@ dunelegacy_SOURCES =	AStarSearch.cpp\
 						GUI/dune/NewsTicker.cpp\
 						GUI/dune/MessageTicker.cpp\
 						GUI/dune/BuilderList.cpp\
+						GUI/dune/BuilderProductionControls.cpp\
 						GUI/dune/WaitingForOtherPlayers.cpp\
 						$(NULL)\
 						FileClasses/INIFile.cpp\
