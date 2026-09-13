@@ -246,12 +246,15 @@ TEST_CASE("Production catalogue: structure footprint uses the shared structure s
     REQUIRE(footprint.visible);
     REQUIRE(footprint.width == 3);
     REQUIRE(footprint.height == 2);
+    REQUIRE(getProductionCatalogIconLeftOffset(true) == 25);
+    REQUIRE(getProductionCatalogIconWidth(82, true) == 54);
 
     const auto source = readTextFile(sourceRoot() / "src" / "GUI" / "dune" / "ProductionCatalogGrid.cpp");
     REQUIRE(source.find("isStructure") != std::string::npos);
     REQUIRE(source.find("getStructureSize") != std::string::npos);
     REQUIRE(source.find("UI_StructureSizeLattice") != std::string::npos);
     REQUIRE(source.find("UI_StructureSizeConcrete") != std::string::npos);
+    REQUIRE(source.find("PRODUCTION_CATALOG_STRUCTURE_FOOTPRINT_RESERVE_WIDTH") != std::string::npos);
 }
 
 TEST_CASE("Production catalogue: units have no footprint indicator", "[production][catalogue][footprint]") {
@@ -259,6 +262,8 @@ TEST_CASE("Production catalogue: units have no footprint indicator", "[productio
     REQUIRE_FALSE(footprint.visible);
     REQUIRE(footprint.width == 0);
     REQUIRE(footprint.height == 0);
+    REQUIRE(getProductionCatalogIconLeftOffset(false) == 3);
+    REQUIRE(getProductionCatalogIconWidth(82, false) == 76);
 }
 
 TEST_CASE("Production catalogue: Construction Yard starts on Support when available", "[production][catalogue][category]") {

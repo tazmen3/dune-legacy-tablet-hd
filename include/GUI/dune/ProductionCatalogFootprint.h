@@ -17,6 +17,23 @@ struct ProductionCatalogFootprint {
     int height = 0;
 };
 
+constexpr int PRODUCTION_CATALOG_ICON_HORIZONTAL_MARGIN = 3;
+constexpr int PRODUCTION_CATALOG_STRUCTURE_FOOTPRINT_RESERVE_WIDTH = 22;
+constexpr int PRODUCTION_CATALOG_STRUCTURE_FOOTPRINT_BACKGROUND_HEIGHT = 22;
+
+/** Keep the footprint corner clear without changing the catalogue cell size. */
+constexpr int getProductionCatalogIconLeftOffset(bool isStructureItem) {
+    return PRODUCTION_CATALOG_ICON_HORIZONTAL_MARGIN
+        + (isStructureItem ? PRODUCTION_CATALOG_STRUCTURE_FOOTPRINT_RESERVE_WIDTH : 0);
+}
+
+/** Keep the icon fully inside the cell after reserving the footprint corner. */
+constexpr int getProductionCatalogIconWidth(int cellWidth, bool isStructureItem) {
+    const int width = cellWidth - 2 * PRODUCTION_CATALOG_ICON_HORIZONTAL_MARGIN
+        - (isStructureItem ? PRODUCTION_CATALOG_STRUCTURE_FOOTPRINT_RESERVE_WIDTH : 0);
+    return width > 0 ? width : 1;
+}
+
 /** Structures expose their supplied size; units receive no indicator. */
 constexpr ProductionCatalogFootprint makeProductionCatalogFootprint(
         bool isStructureItem, int width, int height) {

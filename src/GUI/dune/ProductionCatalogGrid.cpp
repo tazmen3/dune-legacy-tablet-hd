@@ -428,21 +428,29 @@ void ProductionCatalogGrid::draw(Point position) {
         renderDrawRect(renderer, &cellBounds, COLOR_RGB(125,80,0));
 
         const auto& entry = entries[firstCatalogIndex + visibleIndex];
+        const bool isStructureItem = isStructure(static_cast<int>(entry.itemID));
         SDL_Texture* itemTexture = resolveItemPicture(static_cast<int>(entry.itemID));
         const SDL_Rect iconBounds = {
-            cellBounds.x + 3,
+            cellBounds.x + getProductionCatalogIconLeftOffset(isStructureItem),
             cellBounds.y + 2,
-            std::max(1, cellBounds.w - 6),
+            getProductionCatalogIconWidth(cellBounds.w, isStructureItem),
             std::max(1, cellBounds.h - PRICE_AREA_HEIGHT - 3)
         };
         drawCenteredTexture(itemTexture, iconBounds);
 
-        const bool isStructureItem = isStructure(static_cast<int>(entry.itemID));
         const Coord structureSize = isStructureItem
             ? getStructureSize(static_cast<int>(entry.itemID)) : Coord();
         const auto footprint = makeProductionCatalogFootprint(
             isStructureItem, structureSize.x, structureSize.y);
         if(footprint.visible) {
+            SDL_Rect footprintBackground = {
+                cellBounds.x + 2,
+                cellBounds.y + 2,
+                PRODUCTION_CATALOG_STRUCTURE_FOOTPRINT_RESERVE_WIDTH,
+                PRODUCTION_CATALOG_STRUCTURE_FOOTPRINT_BACKGROUND_HEIGHT
+            };
+            renderFillRect(renderer, &footprintBackground, COLOR_HALF_TRANSPARENT);
+
             SDL_Texture* lattice = pGFXManager->getUIGraphic(UI_StructureSizeLattice);
             const SDL_Rect latticeDestination = calcDrawingRect(
                 lattice, cellBounds.x + 3, cellBounds.y + 3);
