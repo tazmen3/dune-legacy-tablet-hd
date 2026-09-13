@@ -12,6 +12,7 @@
 
 #include <GUI/Widget.h>
 #include <GUI/dune/ProductionCatalogLayout.h>
+#include <GUI/dune/ProductionCatalogVisibility.h>
 #include <structures/ProductionCatalog.h>
 #include <definitions.h>
 
@@ -31,6 +32,7 @@ public:
     void draw(Point position) override;
 
 private:
+    void clearPlacementInteraction();
     void resetPressedCell();
     void resetCategorySelection();
     void selectCategory(ProductionCatalogCategory category);

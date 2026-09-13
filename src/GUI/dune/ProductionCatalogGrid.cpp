@@ -76,6 +76,14 @@ int getQueueCount(const BuilderBase& builder, Uint32 itemID) {
 
 } // namespace
 
+namespace {
+
+bool isPlacementModeActive() {
+    return currentGame != nullptr && currentGame->currentCursorMode == Game::CursorMode_Placing;
+}
+
+} // namespace
+
 ProductionCatalogGrid::ProductionCatalogGrid() {
     pLockedTextTexture = pFontManager->createTextureWithText(_("LOCKED"), COLOR_WHITE, 12);
     pSoldOutTextTexture = pFontManager->createTextureWithText(_("SOLD OUT"), COLOR_WHITE, 12);
@@ -88,6 +96,12 @@ ProductionCatalogGrid::ProductionCatalogGrid() {
 
 ProductionCatalogGrid::~ProductionCatalogGrid() {
     TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
+}
+
+void ProductionCatalogGrid::clearPlacementInteraction() {
+    TouchInput::clearProductionCatalogTarget(TouchInput::ProductionCatalogTargetSource::Grid);
+    resetPressedCell();
+    rightPressInsidePanel = false;
 }
 
 void ProductionCatalogGrid::resetPressedCell() {
@@ -150,7 +164,10 @@ void ProductionCatalogGrid::clear() {
 }
 
 bool ProductionCatalogGrid::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
-    if(!isVisible()) return false;
+    if(!shouldRenderProductionCatalogGrid(isVisible(), isPlacementModeActive())) {
+        if(isPlacementModeActive()) clearPlacementInteraction();
+        return false;
+    }
 
     const bool insideControl = isProductionCatalogPanelPointInside(controlBounds, x, y);
     if(pressed) {
@@ -228,6 +245,7 @@ bool ProductionCatalogGrid::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
             currentGame->setCursorMode(Game::CursorMode_Normal);
         } else {
             currentGame->setCursorMode(Game::CursorMode_Placing);
+            clearPlacementInteraction();
         }
     } else if(TouchInput::shouldUseLegacyMouseResume(
                   TouchInput::isTouchDispatch(), itemID == builder->getCurrentProducedItem(), builder->isOnHold())) {
@@ -242,7 +260,10 @@ bool ProductionCatalogGrid::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
 }
 
 bool ProductionCatalogGrid::handleMouseRight(Sint32 x, Sint32 y, bool pressed) {
-    if(!isVisible()) return false;
+    if(!shouldRenderProductionCatalogGrid(isVisible(), isPlacementModeActive())) {
+        if(isPlacementModeActive()) clearPlacementInteraction();
+        return false;
+    }
 
     const bool insideControl = isProductionCatalogPanelPointInside(controlBounds, x, y);
     if(pressed) {
@@ -257,14 +278,21 @@ bool ProductionCatalogGrid::handleMouseRight(Sint32 x, Sint32 y, bool pressed) {
 }
 
 bool ProductionCatalogGrid::handleMouseWheel(Sint32 x, Sint32 y, bool up) {
-    if(!isVisible() || !isProductionCatalogPanelPointInside(panelBounds, x, y)) return false;
+    if(!shouldRenderProductionCatalogGrid(isVisible(), isPlacementModeActive())) {
+        if(isPlacementModeActive()) clearPlacementInteraction();
+        return false;
+    }
+    if(!isProductionCatalogPanelPointInside(panelBounds, x, y)) return false;
 
     scrollRows(up ? -1 : 1);
     return true;
 }
 
 void ProductionCatalogGrid::draw(Point position) {
-    if(!isVisible()) return;
+    if(!shouldRenderProductionCatalogGrid(isVisible(), isPlacementModeActive())) {
+        if(isPlacementModeActive()) clearPlacementInteraction();
+        return;
+    }
 
     auto* builder = dynamic_cast<BuilderBase*>(currentGame->getObjectManager().getObject(builderObjectID));
     if(builder == nullptr) {

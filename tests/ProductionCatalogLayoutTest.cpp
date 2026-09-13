@@ -5,6 +5,7 @@
 #include <catch2/catch_all.hpp>
 
 #include <GUI/dune/ProductionCatalogLayout.h>
+#include <GUI/dune/ProductionCatalogVisibility.h>
 
 #include <cstdlib>
 #include <filesystem>
@@ -229,6 +230,14 @@ TEST_CASE("Production catalogue grid consumes only events inside its visual pane
     REQUIRE_FALSE(isProductionCatalogPanelPointInside(panel, 697, 527));
     REQUIRE_FALSE(isProductionCatalogPanelPointInside(panel, 4, 412));
     REQUIRE_FALSE(isProductionCatalogPanelPointInside(panel, 5, 528));
+}
+
+TEST_CASE("Production catalogue stays visible until the real placement cursor mode", "[production][catalogue][input-routing]") {
+    // A waiting builder is represented by a visible widget; waitingToPlace
+    // alone must not make the catalogue disappear.
+    REQUIRE(shouldRenderProductionCatalogGrid(true, false));
+    REQUIRE_FALSE(shouldRenderProductionCatalogGrid(true, true));
+    REQUIRE_FALSE(shouldRenderProductionCatalogGrid(false, false));
 }
 
 TEST_CASE("Production catalogue grid reuses the existing production handler only", "[production][catalogue][input-routing]") {
