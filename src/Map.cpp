@@ -570,6 +570,35 @@ bool Map::deselectObject(ObjectBase* pObject) {
     return true;
 }
 
+void Map::selectVisibleUnitsOfSameType(const House* pHouse, ObjectBase* target) {
+    if(pHouse == nullptr || target == nullptr || target->getOwner() != pHouse
+       || !target->isAUnit() || !target->isRespondable()) {
+        return;
+    }
+
+    currentGame->unselectAll(currentGame->getSelectedList());
+    currentGame->getSelectedList().clear();
+    currentGame->selectionChanged();
+
+    ObjectBase* lastCheckedObject = nullptr;
+    ObjectBase* lastSelectedObject = nullptr;
+    for(auto i = screenborder->getTopLeftTile().x; i <= screenborder->getBottomRightTile().x; i++) {
+        for(auto j = screenborder->getTopLeftTile().y; j <= screenborder->getBottomRightTile().y; j++) {
+            const auto tile = getTile_internal(i, j);
+
+            if(tile && tile->hasAnObject()) {
+                tile->selectAllPlayersUnitsOfType(
+                    pHouse->getHouseID(), target->getItemID(), &lastCheckedObject, &lastSelectedObject);
+            }
+        }
+    }
+
+    lastSinglySelectedObject = nullptr;
+    if(lastSelectedObject != nullptr) {
+        lastSelectedObject->playSelectSound();
+    }
+}
+
 void Map::selectObjects(const House* pHouse, int x1, int y1, int x2, int y2, int realX, int realY, bool objectARGMode) {
 
     ObjectBase *lastCheckedObject = nullptr;

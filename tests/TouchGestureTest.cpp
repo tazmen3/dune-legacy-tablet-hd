@@ -132,6 +132,22 @@ TEST_CASE("Unit touch: natural jitter below 12 logical pixels stays contextual",
     REQUIRE(route(gesture) == TouchMapTapAction::ContextAction);
 }
 
+TEST_CASE("Unit touch: double-tap requires the same target within the named window", "[touch][double-tap]") {
+    REQUIRE(TouchInput::isTouchDoubleTap(
+        TouchGestureOutcome::Tap, 1000, 1200, true, true));
+    REQUIRE_FALSE(TouchInput::isTouchDoubleTap(
+        TouchGestureOutcome::Tap, 1000, 1200, false, true));
+    REQUIRE_FALSE(TouchInput::isTouchDoubleTap(
+        TouchGestureOutcome::Tap, 1000, 1000 + TouchInput::TOUCH_DOUBLE_TAP_WINDOW_MS + 1, true, true));
+    REQUIRE_FALSE(TouchInput::isTouchDoubleTap(
+        TouchGestureOutcome::Tap, 1000, 1200, true, false));
+}
+
+TEST_CASE("Unit touch: drag never becomes a double-tap", "[touch][double-tap]") {
+    REQUIRE_FALSE(TouchInput::isTouchDoubleTap(
+        TouchGestureOutcome::Drag, 1000, 1100, true, true));
+}
+
 TEST_CASE("Unit touch: natural jitter keeps allied selection on the left-click path", "[touch][unit-command]") {
     auto gesture = startedGesture();
     gesture.move(107, 107);

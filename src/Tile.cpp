@@ -572,7 +572,9 @@ void Tile::selectAllPlayersUnits(int houseID, ObjectBase** lastCheckedObject, Ob
 
 void Tile::selectAllPlayersUnitsOfType(int houseID, int itemID, ObjectBase** lastCheckedObject, ObjectBase** lastSelectedObject) {
     selectFilter(houseID, lastCheckedObject, lastSelectedObject,
-        [=](ObjectBase* obj) { return  obj->getItemID() == itemID; });
+        [=](ObjectBase* obj) {
+            return obj->isAUnit() && obj->isRespondable() && obj->getItemID() == itemID;
+        });
 }
 
 void Tile::unassignAirUnit(Uint32 objectID) {

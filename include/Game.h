@@ -777,6 +777,11 @@ private:
     SDL_Rect    selectionRect = {0, 0, 0, 0};   ///< the drawn rectangle while selection multiple units
     bool        touchTapUsesRightButton = false; ///< Target-aware routing for one synthesized tap sequence
     bool        touchTapDeselects = false;       ///< The routed tap removes its already-selected unit
+    bool        touchTapIsDoubleTap = false;    ///< The current touch tap repeats the same controllable unit
+    bool        touchTapDoubleSelectionHandled = false;
+    bool        touchTapHasPreviousUnit = false;
+    Uint32      touchTapPreviousUnitID = NONE_ID;
+    Uint32      touchTapPreviousAt = 0;
 
     int         whatNextParam = GAME_NOTHING;
 

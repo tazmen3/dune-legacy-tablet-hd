@@ -1834,6 +1834,8 @@ void Game::doInput()
                     if(TouchInput::isTapDispatch()) {
                         touchTapUsesRightButton = false;
                         touchTapDeselects = false;
+                        touchTapIsDoubleTap = false;
+                        touchTapDoubleSelectionHandled = false;
                     }
                     if(mouse->button == SDL_BUTTON_LEFT && TouchInput::isTapDispatch()
                        && currentCursorMode == CursorMode_Normal) {
@@ -1857,15 +1859,48 @@ void Game::doInput()
                         // selection path selects an object owned by the local house.
                         const bool targetIsSelectableFriendly = touchTapTarget != nullptr
                             && touchTapTarget->getOwner() == pLocalHouse;
+                        const bool targetIsSelectableFriendlyUnit = targetIsSelectableFriendly
+                            && TouchInput::tapStartedInsideMap()
+                            && touchTapTarget->isAUnit() && touchTapTarget->isRespondable();
+
+                        touchTapIsDoubleTap = targetIsSelectableFriendlyUnit
+                            && TouchInput::isTouchDoubleTap(
+                                TouchInput::TouchGestureOutcome::Tap,
+                                touchTapPreviousAt,
+                                mouse->timestamp,
+                                touchTapHasPreviousUnit
+                                    && touchTapPreviousUnitID == touchTapTarget->getObjectID(),
+                                touchTapHasPreviousUnit);
+
+                        if(targetIsSelectableFriendlyUnit) {
+                            touchTapPreviousUnitID = touchTapTarget->getObjectID();
+                            touchTapPreviousAt = mouse->timestamp;
+                            touchTapHasPreviousUnit = true;
+                        } else {
+                            touchTapPreviousUnitID = NONE_ID;
+                            touchTapPreviousAt = 0;
+                            touchTapHasPreviousUnit = false;
+                        }
+
                         const auto tapAction = TouchInput::chooseTouchMapTapAction(
                             TouchInput::TouchGestureOutcome::Tap,
                             { true, TouchInput::tapStartedInsideMap(), endedInsideMap,
                               canIssueTouchMapAction(), targetIsSelectedUnit,
                               targetIsSelectableFriendly,
                               targetIsSelectedRallyStructure });
-                        touchTapUsesRightButton = tapAction != TouchInput::TouchMapTapAction::LeftClick;
-                        touchTapDeselects = tapAction == TouchInput::TouchMapTapAction::DeselectSelectedUnit;
+                        touchTapUsesRightButton = !touchTapIsDoubleTap
+                            && tapAction != TouchInput::TouchMapTapAction::LeftClick;
+                        touchTapDeselects = !touchTapIsDoubleTap
+                            && tapAction == TouchInput::TouchMapTapAction::DeselectSelectedUnit;
+                        if(touchTapIsDoubleTap) {
+                            currentGameMap->selectVisibleUnitsOfSameType(pLocalHouse, touchTapTarget);
+                            touchTapDoubleSelectionHandled = true;
+                        }
                         if(touchTapUsesRightButton) mouse->button = SDL_BUTTON_RIGHT;
+                    } else if(TouchInput::isTapDispatch()) {
+                        touchTapPreviousUnitID = NONE_ID;
+                        touchTapPreviousAt = 0;
+                        touchTapHasPreviousUnit = false;
                     }
 
                     bool interfaceInputConsumed = false;
@@ -1927,7 +1962,8 @@ void Game::doInput()
                                 case CursorMode_Normal:
                                 default: {
 
-                                    if (mouse->x < sideBarPos.x && mouse->y >= topBarPos.h) {
+                                    if (!touchTapDoubleSelectionHandled
+                                        && mouse->x < sideBarPos.x && mouse->y >= topBarPos.h) {
                                         // it isn't on the gamebar
 
                                         if(!selectionMode) {
@@ -2096,6 +2132,8 @@ void Game::doInput()
                     if(TouchInput::isTapDispatch()) {
                         touchTapUsesRightButton = false;
                         touchTapDeselects = false;
+                        touchTapIsDoubleTap = false;
+                        touchTapDoubleSelectionHandled = false;
                     }
 
                 } break;

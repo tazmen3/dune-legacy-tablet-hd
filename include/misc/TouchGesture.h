@@ -10,9 +10,12 @@
 #ifndef TOUCHGESTURE_H
 #define TOUCHGESTURE_H
 
+#include <cstdint>
+
 namespace TouchInput {
 
 constexpr int TOUCH_MOVEMENT_THRESHOLD = 12;
+constexpr std::uint32_t TOUCH_DOUBLE_TAP_WINDOW_MS = 350;
 
 enum class TouchGestureOutcome {
     None,
@@ -25,6 +28,19 @@ enum class TouchMapTapAction {
     ContextAction,
     DeselectSelectedUnit
 };
+
+constexpr bool isTouchDoubleTap(TouchGestureOutcome outcome,
+                                std::uint32_t previousTapAt,
+                                std::uint32_t currentTapAt,
+                                bool sameTarget,
+                                bool hasPreviousTap) {
+    if(outcome != TouchGestureOutcome::Tap || !sameTarget || !hasPreviousTap) {
+        return false;
+    }
+
+    // Unsigned subtraction also handles SDL_GetTicks() wrapping naturally.
+    return currentTapAt - previousTapAt <= TOUCH_DOUBLE_TAP_WINDOW_MS;
+}
 
 struct TouchMapTapContext {
     bool touchInput = false;

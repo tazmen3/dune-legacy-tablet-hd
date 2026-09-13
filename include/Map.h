@@ -49,6 +49,7 @@ public:
     void removeObjectFromMap(Uint32 objectID);
     void spiceRemoved(const Coord& coord);
     void selectObjects(const House* pHouse, int x1, int y1, int x2, int y2, int realX, int realY, bool objectARGMode);
+    void selectVisibleUnitsOfSameType(const House* pHouse, ObjectBase* target);
     ObjectBase* getObjectAt(const House* pHouse, int mapX, int mapY, int realX, int realY) const;
     bool deselectObject(ObjectBase* pObject);
     void clearLastSinglySelectedObject() noexcept { lastSinglySelectedObject = nullptr; }
