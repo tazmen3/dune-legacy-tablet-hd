@@ -23,9 +23,12 @@
 #include <FileClasses/TextManager.h>
 #include <FileClasses/music/MusicPlayer.h>
 #include <misc/format.h>
+#include <misc/fnkdat.h>
+#include <misc/SaveGame.h>
 #include <House.h>
 #include <SoundPlayer.h>
 #include <Game.h>
+#include <GUI/dune/LoadSaveWindow.h>
 #include <structures/StructureBase.h>
 #include <units/UnitBase.h>
 #include <units/Harvester.h>
@@ -198,6 +201,19 @@ CampaignStatsMenu::CampaignStatsMenu(int level) : MenuBase()
     buildingsEnemyLabel.setVisible(false);
     windowWidget.addWidget(&buildingsEnemyLabel, (getSize()/2) + Point(222, 146), Point(66,21));
 
+    saveButton.setText(_("Save Game"));
+    saveButton.setTextColor(colorYou);
+    saveButton.setOnClick(std::bind(&CampaignStatsMenu::onSave, this));
+    saveButtonRect = {
+        (getSize().x - 180) / 2,
+        (getSize().y / 2) + 180,
+        180,
+        40
+    };
+    saveButton.setVisible(false);
+    windowWidget.addWidget(&saveButton, Point(saveButtonRect.x, saveButtonRect.y),
+                           Point(saveButtonRect.w, saveButtonRect.h));
+
 }
 
 CampaignStatsMenu::~CampaignStatsMenu() = default;
@@ -214,9 +230,11 @@ int CampaignStatsMenu::showMenu()
 
 bool CampaignStatsMenu::doInput(SDL_Event &event)
 {
-    if(event.type == SDL_MOUSEBUTTONUP) {
+    if(event.type == SDL_MOUSEBUTTONUP && !hasChildWindow()) {
         if(currentState == State_Finished) {
-            quit();
+            if(!isSaveButtonClick(event)) {
+                quit();
+            }
         } else {
             while(currentState != State_Finished) {
                 doState(INT_MAX);
@@ -225,6 +243,31 @@ bool CampaignStatsMenu::doInput(SDL_Event &event)
     }
 
     return MenuBase::doInput(event);
+}
+
+void CampaignStatsMenu::onSave()
+{
+    char tmp[FILENAME_MAX];
+    fnkdat("save/", tmp, FILENAME_MAX, FNKDAT_USER | FNKDAT_CREAT);
+    const std::string savePath(tmp);
+    const std::string automaticName = SaveGame::createAutomaticName(
+        currentGame->getGameInitSettings(), savePath);
+
+    openWindow(LoadSaveWindow::create(true, _("Save Game"), savePath, "dls", automaticName));
+}
+
+void CampaignStatsMenu::onChildWindowClose(Window* pChildWindow)
+{
+    LoadSaveWindow* pLoadSaveWindow = dynamic_cast<LoadSaveWindow*>(pChildWindow);
+    if(pLoadSaveWindow != nullptr && pLoadSaveWindow->isSaveWindow()
+        && pLoadSaveWindow->getFilename() != "" && currentGame != nullptr) {
+        currentGame->saveGame(pLoadSaveWindow->getFilename());
+    }
+}
+
+bool CampaignStatsMenu::isSaveButtonClick(const SDL_Event& event)
+{
+    return CampaignStatsMenuInput::isSaveButtonReleaseInside(saveButtonRect, event.button, getPosition());
 }
 
 void CampaignStatsMenu::drawSpecificStuff()
@@ -402,6 +445,7 @@ void CampaignStatsMenu::doState(int elapsedTime)
                 soundPlayer->playSound(Sound_Tick);
                 currentState = State_Finished;
                 currentStateStartTime = SDL_GetTicks();
+                saveButton.setVisible(true);
             }
 
             buildingsEnemyLabel.setVisible(true);

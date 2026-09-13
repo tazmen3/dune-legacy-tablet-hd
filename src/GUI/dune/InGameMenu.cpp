@@ -23,7 +23,7 @@
 #include <FileClasses/TextManager.h>
 #include <misc/fnkdat.h>
 #include <misc/FileSystem.h>
-#include <misc/SaveGameName.h>
+#include <misc/SaveGame.h>
 #include <Game.h>
 #include <main.h>
 #include <GameInitSettings.h>
@@ -33,46 +33,6 @@
 #include <GUI/QstBox.h>
 #include <GUI/dune/InGameSettingsMenu.h>
 #include <GUI/dune/LoadSaveWindow.h>
-
-#include <ctime>
-#include <iomanip>
-#include <sstream>
-
-namespace {
-
-std::string getSaveGameContext() {
-    const GameInitSettings& initSettings = currentGame->getGameInitSettings();
-
-    if(initSettings.getGameType() == GameType::Campaign || initSettings.getGameType() == GameType::Skirmish) {
-        std::ostringstream context;
-        if(initSettings.getHouseID() >= 0 && initSettings.getHouseID() < NUM_HOUSES) {
-            context << getHouseNameByNumber(initSettings.getHouseID());
-        }
-        if(initSettings.getMission() > 0) {
-            if(context.tellp() > 0) context << " - ";
-            context << _("Mission") << ' ' << std::setfill('0') << std::setw(2) << initSettings.getMission();
-        }
-        return context.str();
-    }
-
-    if(initSettings.getGameType() == GameType::CustomGame
-        || initSettings.getGameType() == GameType::CustomMultiplayer) {
-        return getBasename(initSettings.getFilename(), true);
-    }
-
-    return "";
-}
-
-bool getLocalTime(std::time_t timestamp, std::tm& result) {
-#ifdef _WIN32
-    return localtime_s(&result, &timestamp) == 0;
-#else
-    return localtime_r(&timestamp, &result) != nullptr;
-#endif
-}
-
-} // namespace
-
 
 InGameMenu::InGameMenu(bool bMultiplayer, int color)
  : Window(0,0,0,0), bMultiplayer(bMultiplayer), color(color) {
@@ -234,13 +194,7 @@ void InGameMenu::onSave()
     fnkdat(bMultiplayer ? "mpsave/" : "save/", tmp, FILENAME_MAX, FNKDAT_USER | FNKDAT_CREAT);
     std::string savepath(tmp);
 
-    std::tm localTime = {};
-    const std::time_t now = std::time(nullptr);
-    const std::string automaticName = getLocalTime(now, localTime)
-        ? SaveGameName::create(getSaveGameContext(), localTime, [&savepath](const std::string& candidate) {
-            return existsFile(savepath + candidate + ".dls");
-        })
-        : "";
+    const std::string automaticName = SaveGame::createAutomaticName(currentGame->getGameInitSettings(), savepath);
 
     openWindow(LoadSaveWindow::create(true, _("Save Game"), savepath, "dls", automaticName, color));
 }

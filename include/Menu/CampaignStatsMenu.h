@@ -23,8 +23,23 @@
 #include <GUI/StaticContainer.h>
 #include <GUI/Label.h>
 #include <GUI/ProgressBar.h>
+#include <GUI/TextButton.h>
 
 #include <string>
+
+namespace CampaignStatsMenuInput {
+
+inline bool isSaveButtonReleaseInside(const SDL_Rect& buttonRect, const SDL_MouseButtonEvent& event,
+                                      const Point& windowPosition) {
+    return event.type == SDL_MOUSEBUTTONUP
+        && event.button == SDL_BUTTON_LEFT
+        && event.x >= windowPosition.x + buttonRect.x
+        && event.x < windowPosition.x + buttonRect.x + buttonRect.w
+        && event.y >= windowPosition.y + buttonRect.y
+        && event.y < windowPosition.y + buttonRect.y + buttonRect.h;
+}
+
+} // namespace CampaignStatsMenuInput
 
 class CampaignStatsMenu : public MenuBase {
 public:
@@ -35,10 +50,15 @@ public:
 
     bool doInput(SDL_Event &event) override;
 
+    void onChildWindowClose(Window* pChildWindow) override;
+
     void drawSpecificStuff() override;
 
 private:
     void doState(int elapsedTime);
+
+    void onSave();
+    bool isSaveButtonClick(const SDL_Event& event);
 
     void calculateScore(int level);
 
@@ -59,6 +79,7 @@ private:
 
 
     StaticContainer windowWidget;
+    TextButton saveButton;
     Label scoreLabel;
     Label timeLabel;
 
@@ -114,6 +135,8 @@ private:
     int totalScore = 0;
 
     std::string rank;
+
+    SDL_Rect saveButtonRect = {};
 };
 
 #endif //CAMPAIGNSTATSMENU_H
