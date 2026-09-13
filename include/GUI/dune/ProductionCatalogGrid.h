@@ -11,6 +11,7 @@
 #define PRODUCTIONCATALOGGRID_H
 
 #include <GUI/Widget.h>
+#include <GUI/dune/ProductionCatalogFootprint.h>
 #include <GUI/dune/ProductionCatalogLayout.h>
 #include <GUI/dune/ProductionCatalogVisibility.h>
 #include <structures/ProductionCatalog.h>

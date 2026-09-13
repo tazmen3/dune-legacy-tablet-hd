@@ -4,7 +4,13 @@
 
 #include <catch2/catch_all.hpp>
 
+#include <GUI/dune/ProductionCatalogFootprint.h>
 #include <structures/ProductionCatalog.h>
+
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 
 namespace {
 
@@ -51,6 +57,21 @@ namespace {
 
 StarPortCatalogEligibility availableStarPortItem() {
     return {true, true, false, 625, 3};
+}
+
+std::filesystem::path sourceRoot() {
+    const char* configured = std::getenv("DUNELEGACY_DATADIR");
+    return configured != nullptr && configured[0] != '\0'
+        ? std::filesystem::path(configured).parent_path()
+        : std::filesystem::path(".");
+}
+
+std::string readTextFile(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    REQUIRE(input.is_open());
+    std::ostringstream output;
+    output << input.rdbuf();
+    return output.str();
 }
 
 } // namespace
@@ -218,4 +239,60 @@ TEST_CASE("Production catalogue cell presentation clamps progress and keeps Star
     REQUIRE_FALSE(state.onHold);
     REQUIRE_FALSE(state.unitLimitReached);
     REQUIRE(state.queueCount == 2);
+}
+
+TEST_CASE("Production catalogue: structure footprint uses the shared structure size", "[production][catalogue][footprint]") {
+    const auto footprint = makeProductionCatalogFootprint(true, 3, 2);
+    REQUIRE(footprint.visible);
+    REQUIRE(footprint.width == 3);
+    REQUIRE(footprint.height == 2);
+
+    const auto source = readTextFile(sourceRoot() / "src" / "GUI" / "dune" / "ProductionCatalogGrid.cpp");
+    REQUIRE(source.find("isStructure") != std::string::npos);
+    REQUIRE(source.find("getStructureSize") != std::string::npos);
+    REQUIRE(source.find("UI_StructureSizeLattice") != std::string::npos);
+    REQUIRE(source.find("UI_StructureSizeConcrete") != std::string::npos);
+}
+
+TEST_CASE("Production catalogue: units have no footprint indicator", "[production][catalogue][footprint]") {
+    const auto footprint = makeProductionCatalogFootprint(false, 99, 99);
+    REQUIRE_FALSE(footprint.visible);
+    REQUIRE(footprint.width == 0);
+    REQUIRE(footprint.height == 0);
+}
+
+TEST_CASE("Production catalogue: Construction Yard starts on Support when available", "[production][catalogue][category]") {
+    const std::vector categories = {
+        ProductionCatalogCategory::Support,
+        ProductionCatalogCategory::Military};
+    REQUIRE(getInitialProductionCatalogCategory(
+        Structure_ConstructionYard, Unit_Tank, categories)
+            == ProductionCatalogCategory::Support);
+}
+
+TEST_CASE("Production catalogue: other builders keep current-item initialization", "[production][catalogue][category]") {
+    const std::vector categories = {
+        ProductionCatalogCategory::Support,
+        ProductionCatalogCategory::Military};
+    REQUIRE(getInitialProductionCatalogCategory(
+        Structure_HeavyFactory, Unit_Tank, categories)
+            == ProductionCatalogCategory::Military);
+    REQUIRE(getInitialProductionCatalogCategory(
+        Structure_HeavyFactory, Unit_Tank, {ProductionCatalogCategory::Support})
+            == ProductionCatalogCategory::Support);
+}
+
+TEST_CASE("Production catalogue: manual category selection is not an initialization decision", "[production][catalogue][category]") {
+    const std::vector categories = {
+        ProductionCatalogCategory::Support,
+        ProductionCatalogCategory::Military};
+    const auto manuallySelected = ProductionCatalogCategory::Military;
+    REQUIRE(manuallySelected != getInitialProductionCatalogCategory(
+        Structure_ConstructionYard, Unit_Tank, categories));
+    REQUIRE(manuallySelected == ProductionCatalogCategory::Military);
+
+    const auto source = readTextFile(sourceRoot() / "src" / "GUI" / "dune" / "ProductionCatalogGrid.cpp");
+    REQUIRE(source.find("if(!categorySelectionInitialized)") != std::string::npos);
+    REQUIRE(source.find("selectedCategory = getInitialProductionCatalogCategory") != std::string::npos);
+    REQUIRE(source.find("} else if(!selectedCategoryAvailable)") != std::string::npos);
 }

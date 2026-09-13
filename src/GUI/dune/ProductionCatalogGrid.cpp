@@ -12,6 +12,7 @@
 #include <globals.h>
 
 #include <FileClasses/FontManager.h>
+#include <FileClasses/GFXManager.h>
 #include <FileClasses/TextManager.h>
 #include <Game.h>
 #include <House.h>
@@ -322,7 +323,11 @@ void ProductionCatalogGrid::draw(Point position) {
 
     const auto selectedCategoryAvailable = std::find(
         renderedCategories.begin(), renderedCategories.end(), selectedCategory) != renderedCategories.end();
-    if(!categorySelectionInitialized || !selectedCategoryAvailable) {
+    if(!categorySelectionInitialized) {
+        selectedCategory = getInitialProductionCatalogCategory(
+            builder->getItemID(), builder->getCurrentProducedItem(), renderedCategories);
+        categorySelectionInitialized = true;
+    } else if(!selectedCategoryAvailable) {
         const auto currentCategory = getProductionCatalogCategory(builder->getCurrentProducedItem());
         const auto currentCategoryAvailable = std::find(
             renderedCategories.begin(), renderedCategories.end(), currentCategory) != renderedCategories.end();
@@ -431,6 +436,26 @@ void ProductionCatalogGrid::draw(Point position) {
             std::max(1, cellBounds.h - PRICE_AREA_HEIGHT - 3)
         };
         drawCenteredTexture(itemTexture, iconBounds);
+
+        const bool isStructureItem = isStructure(static_cast<int>(entry.itemID));
+        const Coord structureSize = isStructureItem
+            ? getStructureSize(static_cast<int>(entry.itemID)) : Coord();
+        const auto footprint = makeProductionCatalogFootprint(
+            isStructureItem, structureSize.x, structureSize.y);
+        if(footprint.visible) {
+            SDL_Texture* lattice = pGFXManager->getUIGraphic(UI_StructureSizeLattice);
+            const SDL_Rect latticeDestination = calcDrawingRect(
+                lattice, cellBounds.x + 3, cellBounds.y + 3);
+            SDL_RenderCopy(renderer, lattice, nullptr, &latticeDestination);
+
+            SDL_Texture* concrete = pGFXManager->getUIGraphic(UI_StructureSizeConcrete);
+            const SDL_Rect concreteSource = {
+                0, 0, 1 + footprint.width * 6, 1 + footprint.height * 6};
+            const SDL_Rect concreteDestination = {
+                cellBounds.x + 3, cellBounds.y + 3,
+                concreteSource.w, concreteSource.h};
+            SDL_RenderCopy(renderer, concrete, &concreteSource, &concreteDestination);
+        }
 
         const auto cellPresentation = makeProductionCatalogCellPresentation({
             entry.itemID == builder->getCurrentProducedItem(),

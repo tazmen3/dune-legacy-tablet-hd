@@ -12,6 +12,7 @@
 
 #include <data.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <vector>
@@ -100,6 +101,24 @@ inline std::vector<ProductionCatalogCategory> getProductionCatalogCategories(
         }
     }
     return categories;
+}
+
+inline ProductionCatalogCategory getInitialProductionCatalogCategory(
+        std::uint32_t builderItemID, std::uint32_t currentProducedItem,
+        const std::vector<ProductionCatalogCategory>& categories) {
+    if(categories.empty()) return ProductionCatalogCategory::Support;
+
+    const auto support = std::find(
+        categories.begin(), categories.end(), ProductionCatalogCategory::Support);
+    if(builderItemID == Structure_ConstructionYard && support != categories.end()) {
+        return ProductionCatalogCategory::Support;
+    }
+
+    const auto currentCategory = getProductionCatalogCategory(currentProducedItem);
+    if(std::find(categories.begin(), categories.end(), currentCategory) != categories.end()) {
+        return currentCategory;
+    }
+    return support != categories.end() ? ProductionCatalogCategory::Support : categories.front();
 }
 
 inline std::vector<ProductionCatalogEntry> getProductionCatalogEntriesForCategory(
