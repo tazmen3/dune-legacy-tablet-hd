@@ -1,85 +1,142 @@
 # Dune Legacy Tablet HD
 
-**Dune Legacy Tablet HD** est un fork communautaire non officiel de
-[Dune Legacy](https://dunelegacy.sourceforge.net/).
+**Dune Legacy Tablet HD** is an unofficial, community-driven fork of [Dune Legacy](https://dunelegacy.sourceforge.net/) focused on bringing the classic Dune II real-time strategy experience to modern Android tablets with controls and interfaces designed for touch.
 
-Le projet se concentre d'abord exclusivement sur Android et les tablettes. La
-priorité absolue est d'obtenir une base Android ARM64 stable, reproductible et
-facile à compiler, sans casser la compatibilité Windows et Linux héritée de
-Dune Legacy.
+The project is not intended to turn Dune Legacy into a simplified mobile game. The goal is to preserve the original gameplay while modernizing the way it is controlled, displayed and packaged for current hardware.
 
-## Première phase
+## Project goals
 
-La première phase vise uniquement à :
+The current priorities are:
 
-1. compiler correctement Dune Legacy pour Android ARM64 (`arm64-v8a`) ;
-2. produire un APK installable ;
-3. tester le jeu sur une tablette Android ;
-4. vérifier qu'une partie complète fonctionne ;
-5. identifier les problèmes liés à l'interface tactile ;
-6. préparer ensuite une vraie interface pensée pour tablette.
+- make Dune Legacy comfortable to play on 10–13 inch Android tablets;
+- provide a reproducible Android ARM64 (`arm64-v8a`) build and APK workflow;
+- replace mouse-dependent interactions with natural touch controls;
+- redesign production and construction interfaces for tablet use;
+- progressively improve high-resolution rendering and visual quality;
+- keep the inherited Windows and Linux code paths working whenever possible;
+- prepare a clean foundation for future multiplayer and online improvements.
 
-Le dépôt amont ne fournit actuellement ni projet Gradle Android, ni cible APK,
-ni procédure Android prête à l'emploi. Le premier jalon consiste donc à établir
-et documenter une chaîne de compilation Android minimale autour du code
-existant, avant toute modification fonctionnelle.
+## Current status
 
-## Hors périmètre pour le moment
+The Android ARM64 build pipeline is working and the tablet version has been tested on a Samsung Galaxy Tab S9. Active modernization work currently lives on the **`touch-ui`** branch.
 
-Aucune des fonctions avancées suivantes ne doit être développée pendant la
-première phase :
+The project has already moved well beyond the initial Android port and now includes substantial tablet-specific gameplay and UI work.
 
-- interface tactile complète ;
-- sélection d'unités adaptée au doigt ;
-- déplacement de caméra tactile ;
-- pinch-to-zoom ;
-- interface adaptée aux tablettes de 10 à 13 pouces ;
-- rendu haute résolution ;
-- nouveaux assets HD ;
-- amélioration des détails graphiques ;
-- modernisation du multijoueur et du lobby Internet.
+### Touch controls
 
-Ces améliorations sont prévues pour des phases ultérieures, après validation
-d'un APK ARM64 stable et d'une partie complète sur tablette.
+| Gesture | Action |
+| --- | --- |
+| Tap | Select units, activate buttons and perform the primary action |
+| One-finger drag | Rectangle selection |
+| Two-finger drag | Pan the battlefield |
+| Pinch | Zoom in and out using the existing game zoom levels |
+| Long press | Context / right-click action on the battlefield |
+| Double-tap a unit | Select nearby units of the same type |
 
-## Principes de développement
+Touch handling also includes gesture cancellation rules, larger hit targets for small controls and safeguards to prevent accidental mouse-style actions when a touch gesture changes.
 
-- La branche `android` porte le travail Android initial.
-- Les changements doivent rester minimaux et isolés par plateforme.
-- Les builds Windows et Linux existants doivent continuer à fonctionner.
-- Le code du jeu ne doit pas être remanié avant d'avoir caractérisé la
-  compilation Android de la base actuelle.
-- Les fichiers de données propriétaires de Dune II ne sont pas distribués par
-  ce projet. Les contributeurs et utilisateurs doivent fournir leurs propres
-  fichiers obtenus légalement.
+### Touch-friendly production and construction
 
-## État initial de la cible Android
+The original production interface is being replaced by a tablet-oriented system with:
 
-La base amont utilise CMake, C++17 et SDL2. Ses dépendances déclarées sont SDL2,
-SDL2_mixer, SDL2_ttf, libcurl, miniupnpc et discord-rpc. Une chaîne Android
-devra au minimum fournir le SDK Android, le NDK, CMake, Ninja, Gradle/JDK et des
-versions Android compatibles de ces bibliothèques.
+- a production catalogue/grid designed for touch;
+- unavailable buildings and units hidden until they are actually accessible instead of filling the interface with `LOCKED` entries;
+- touch-friendly production queue controls;
+- pause and cancellation handling adapted to touch;
+- long-press cancellation on production entries, including controlled repeat cancellation while the finger remains pressed;
+- production economy handling covered by dedicated regression tests;
+- multi-tile concrete slab placement support;
+- line-based wall placement support;
+- placement validation and visual feedback designed for finger input.
 
-Avant d'ajouter du code tactile ou graphique, le premier travail technique sera
-de vérifier chaque dépendance sur `arm64-v8a`, de désactiver proprement les
-intégrations de bureau non pertinentes sur Android si nécessaire, puis
-d'encapsuler l'exécutable SDL dans une application Android minimale.
+### Faster unit control
 
-## Projet amont et historique
+Tablet controls now include **double-tap same-type selection**: double-tapping a unit can select nearby units of the same type, matching a familiar control pattern from modern RTS games.
 
-Ce dépôt est basé sur le dépôt Git officiel de Dune Legacy :
+### Tablet quality-of-life improvements
 
-- dépôt amont : <https://git.code.sf.net/p/dunelegacy/code> ;
-- branche amont de référence : `master` ;
-- version observée lors de la création du fork : `0.99.5` ;
-- historique Git original conservé.
+Additional work includes:
 
-## Licence
+- a touch-accessible button for skipping intro/cutscene sequences;
+- improved touch interaction in save/load interfaces;
+- a save action available from the mission-end screen;
+- improved touch targets for small UI buttons;
+- Android-specific asset installation and application packaging;
+- crash-handling and platform adjustments needed for the Android runtime.
 
-Dune Legacy et ce fork sont distribués selon les termes de la GNU General
-Public License, version 2 ou ultérieure (`GPL-2.0-or-later`). Consultez le
-fichier [`COPYING`](COPYING) et les en-têtes des fichiers sources.
+### Automated regression tests
 
-Les marques, noms, graphismes et données du jeu original restent la propriété
-de leurs ayants droit. Ce projet n'est affilié ni à Westwood Studios, ni à
-Electronic Arts, ni aux ayants droit de *Dune*.
+The modernization work is backed by an expanding test suite covering areas such as:
+
+- touch gestures and touch targets;
+- pinch zoom;
+- rectangle and same-type selection logic;
+- production catalogue layout and visibility;
+- production queue controls and economy;
+- slab and wall placement;
+- save-game naming;
+- cutscene skip controls;
+- interface input routing and localization.
+
+## Active development branch
+
+Most Android and tablet modernization work is currently developed on:
+
+```text
+touch-ui
+```
+
+The repository's `master` branch remains the upstream-oriented baseline, while `touch-ui` contains the current tablet experience and the latest interface work.
+
+## Android build
+
+The project uses C++17, SDL2 and CMake for the game code, with an Android application wrapper built through the Android SDK/NDK, Gradle and Ninja.
+
+Detailed Android build instructions are available in [`ANDROID_BUILD.md`](https://github.com/tazmen3/dune-legacy-tablet-hd/blob/touch-ui/ANDROID_BUILD.md).
+
+The Android application currently targets **ARM64 (`arm64-v8a`)**.
+
+## Roadmap
+
+The next major areas of work include:
+
+- continued tablet UI polish and usability testing;
+- broader validation on Android tablets in the 10–13 inch range;
+- high-resolution rendering improvements;
+- upgraded HD-ready graphical assets and visual detail;
+- further construction and placement UX improvements;
+- multiplayer and Internet lobby modernization;
+- preparation of a polished public demo suitable for wider testing and contributors.
+
+The long-term direction is a modernized open-source RTS experience that remains faithful to Dune Legacy while being genuinely enjoyable on current tablet hardware.
+
+## Contributing
+
+Contributions, testing and technical feedback are welcome, especially around:
+
+- Android and SDL2 development;
+- touch and tablet UX;
+- RTS interface design;
+- high-resolution rendering;
+- automated testing;
+- multiplayer/networking;
+- cross-platform compatibility.
+
+If you are interested in classic RTS games, touch-first interfaces or helping modernize an established open-source game engine, this project is actively evolving.
+
+## Upstream project
+
+This repository is based on the official Dune Legacy Git repository:
+
+- upstream repository: <https://git.code.sf.net/p/dunelegacy/code>;
+- upstream reference branch: `master`;
+- upstream version used when this fork was created: `0.99.5`;
+- original Git history is preserved.
+
+## Game data and legal notice
+
+This project **does not distribute the proprietary Dune II game data files**. Users and contributors must provide their own legally obtained game data.
+
+Dune Legacy and this fork are distributed under the **GNU General Public License, version 2 or later (`GPL-2.0-or-later`)**. See [`COPYING`](COPYING) and the source file headers for details.
+
+Dune, Dune II, their names, trademarks, graphics and original game data remain the property of their respective rights holders. This community project is not affiliated with Westwood Studios, Electronic Arts or the Dune rights holders.
