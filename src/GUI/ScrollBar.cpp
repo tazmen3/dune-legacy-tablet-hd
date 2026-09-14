@@ -17,6 +17,8 @@
 
 #include <GUI/ScrollBar.h>
 
+#include <algorithm>
+
 ScrollBar::ScrollBar() : Widget() {
     color = COLOR_DEFAULT;
     minValue = 1;
@@ -24,6 +26,7 @@ ScrollBar::ScrollBar() : Widget() {
     currentValue = 1;
     bigStepSize = 10;
     bDragSlider = false;
+    touchPressPart = -1;
 
     enableResizing(false,true);
 
@@ -38,6 +41,47 @@ ScrollBar::ScrollBar() : Widget() {
 }
 
 ScrollBar::~ScrollBar() = default;
+
+bool ScrollBar::findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) {
+    if((isEnabled() == false) || (isVisible() == false)) {
+        return false;
+    }
+
+    const TouchTarget::Rect arrow1Visual{0, 0, arrow1.getSize().x, arrow1.getSize().y};
+    const TouchTarget::Rect arrow2Visual{
+        0, getSize().y - arrow2.getSize().y, arrow2.getSize().x, arrow2.getSize().y};
+    const TouchTarget::Rect sliderVisual{
+        sliderPosition.x, sliderPosition.y, sliderButton.getSize().x, sliderButton.getSize().y};
+
+    bool found = false;
+    TouchTargetCandidate best;
+    const auto consider = [&](const TouchTarget::Rect& visual, std::size_t part) {
+        const auto touch = TouchTarget::centeredRect(
+            visual, TouchInput::getTouchTargetSize(visual.width, visual.height));
+        if(!touch.contains(x, y)) {
+            return;
+        }
+
+        TouchTargetCandidate current;
+        current.widget = this;
+        current.visual = visual;
+        current.touch = touch;
+        current.stablePath = { part };
+        if(!found || TouchTarget::isBetterCandidate(current, best, x, y)) {
+            best = std::move(current);
+            found = true;
+        }
+    };
+
+    consider(arrow1Visual, 0);
+    consider(sliderVisual, 1);
+    consider(arrow2Visual, 2);
+
+    if(found) {
+        candidate = std::move(best);
+    }
+    return found;
+}
 
 void ScrollBar::handleMouseMovement(Sint32 x, Sint32 y, bool insideOverlay) {
     arrow1.handleMouseMovement(x,y,insideOverlay);
@@ -54,6 +98,89 @@ void ScrollBar::handleMouseMovement(Sint32 x, Sint32 y, bool insideOverlay) {
 }
 
 bool ScrollBar::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
+    if(TouchInput::isTapDispatch()) {
+        const auto capture = TouchInput::getTouchTarget();
+        if(pressed) {
+            if(capture.widget != this) {
+                return false;
+            }
+
+            const TouchTarget::Rect arrow1Visual{0, 0, arrow1.getSize().x, arrow1.getSize().y};
+            const TouchTarget::Rect arrow2Visual{
+                0, getSize().y - arrow2.getSize().y, arrow2.getSize().x, arrow2.getSize().y};
+            const TouchTarget::Rect sliderVisual{
+                sliderPosition.x, sliderPosition.y, sliderButton.getSize().x, sliderButton.getSize().y};
+            const auto arrow1Touch = TouchTarget::centeredRect(
+                arrow1Visual, TouchInput::getTouchTargetSize(arrow1Visual.width, arrow1Visual.height));
+            const auto arrow2Touch = TouchTarget::centeredRect(
+                arrow2Visual, TouchInput::getTouchTargetSize(arrow2Visual.width, arrow2Visual.height));
+            const auto sliderTouch = TouchTarget::centeredRect(
+                sliderVisual, TouchInput::getTouchTargetSize(sliderVisual.width, sliderVisual.height));
+
+            TouchTargetCandidate best;
+            bool found = false;
+            const auto consider = [&](const TouchTarget::Rect& visual,
+                                      const TouchTarget::Rect& touch,
+                                      int part) {
+                if(!touch.contains(x, y)) {
+                    return;
+                }
+
+                TouchTargetCandidate current;
+                current.visual = visual;
+                current.touch = touch;
+                current.stablePath = { static_cast<std::size_t>(part) };
+                if(!found || TouchTarget::isBetterCandidate(current, best, x, y)) {
+                    best = std::move(current);
+                    found = true;
+                }
+            };
+            consider(arrow1Visual, arrow1Touch, 0);
+            consider(sliderVisual, sliderTouch, 1);
+            consider(arrow2Visual, arrow2Touch, 2);
+
+            if(!found) {
+                touchPressPart = -1;
+                return false;
+            }
+            touchPressPart = static_cast<int>(best.stablePath.front());
+
+            if(touchPressPart == 0 || touchPressPart == 2) {
+                auto* arrow = touchPressPart == 0 ? &arrow1 : &arrow2;
+                const auto& visual = touchPressPart == 0 ? arrow1Visual : arrow2Visual;
+                TouchInput::setTouchTarget(arrow, 0, 0);
+                arrow->handleMouseLeft(
+                    std::max(0, std::min(x, visual.width - 1)),
+                    std::max(0, std::min(y - visual.y, visual.height - 1)), true);
+                TouchInput::setTouchTarget(this, 0, 0);
+            } else {
+                bDragSlider = true;
+                dragPositionFromSliderTop = std::max(0, std::min(
+                    y - sliderPosition.y, sliderButton.getSize().y - 1));
+            }
+            return true;
+        }
+
+        if(touchPressPart < 0) {
+            return false;
+        }
+        if(touchPressPart == 0 || touchPressPart == 2) {
+            auto* arrow = touchPressPart == 0 ? &arrow1 : &arrow2;
+            const TouchTarget::Rect visual = touchPressPart == 0
+                ? TouchTarget::Rect{0, 0, arrow1.getSize().x, arrow1.getSize().y}
+                : TouchTarget::Rect{0, getSize().y - arrow2.getSize().y,
+                                    arrow2.getSize().x, arrow2.getSize().y};
+            TouchInput::setTouchTarget(arrow, 0, 0);
+            arrow->handleMouseLeft(
+                std::max(0, std::min(x, visual.width - 1)),
+                std::max(0, std::min(y - visual.y, visual.height - 1)), false);
+            TouchInput::setTouchTarget(this, 0, 0);
+        }
+        bDragSlider = false;
+        touchPressPart = -1;
+        return true;
+    }
+
     if(pressed == false) {
         bDragSlider = false;
     }

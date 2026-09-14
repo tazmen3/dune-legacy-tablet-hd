@@ -20,6 +20,7 @@
 
 #include <misc/DrawingRectHelper.h>
 #include <misc/SDL2pp.h>
+#include <misc/TouchTarget.h>
 
 #include <functional>
 #include <iostream>
@@ -109,6 +110,16 @@ inline Point getTextureSize(SDL_Texture* pTexture) {
 // forward declarations
 class Window;
 template<class WidgetData> class Container;
+class Widget;
+
+struct TouchTargetCandidate {
+    Widget* widget = nullptr;
+    Sint32 originX = 0;
+    Sint32 originY = 0;
+    TouchTarget::Rect visual;
+    TouchTarget::Rect touch;
+    std::vector<std::size_t> stablePath;
+};
 
 /// The abstract base class for all widgets
 class Widget
@@ -296,6 +307,14 @@ public:
         \return true = click was processed by the widget, false = click was not processed by the widget
     */
     virtual inline bool handleMouseLeft(Sint32 x, Sint32 y, bool pressed) { return false; };
+
+    /** Finds the interactive descendant that should receive a touch tap. */
+    virtual bool findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) {
+        (void)x;
+        (void)y;
+        (void)candidate;
+        return false;
+    }
 
     /**
         Handles a right mouse click.

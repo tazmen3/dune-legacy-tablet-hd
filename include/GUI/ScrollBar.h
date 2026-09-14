@@ -21,6 +21,7 @@
 #include "Widget.h"
 #include "PictureButton.h"
 #include "TextButton.h"
+#include <misc/TouchInput.h>
 
 #include <functional>
 
@@ -54,6 +55,8 @@ public:
         \return true = click was processed by the widget, false = click was not processed by the widget
     */
     bool handleMouseLeft(Sint32 x, Sint32 y, bool pressed) override;
+
+    bool findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) override;
 
     /**
         Handles mouse wheel scrolling.
@@ -247,6 +250,7 @@ private:
 
     bool bDragSlider;
     int dragPositionFromSliderTop;
+    int touchPressPart;
 
     Uint32 color;                           ///< the color
 };

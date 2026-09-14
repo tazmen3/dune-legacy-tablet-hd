@@ -23,6 +23,15 @@ bool isLongPressDispatch();
 bool isTouchDispatch();
 bool isTapDispatch();
 bool tapStartedInsideMap();
+SDL_Point getTouchTargetSize(Sint32 visualWidth, Sint32 visualHeight);
+struct TouchTargetCapture {
+    void* widget = nullptr;
+    Sint32 originX = 0;
+    Sint32 originY = 0;
+};
+void setTouchTarget(void* widget, Sint32 originX, Sint32 originY);
+TouchTargetCapture getTouchTarget();
+void clearTouchTarget();
 bool allowProductionRepeat(Uint32 builder, Uint32 item);
 void setProductionCatalogTarget(ProductionCatalogTargetSource source, const ProductionCatalogTarget& target);
 void clearProductionCatalogTarget(ProductionCatalogTargetSource source, Uint32 builderObjectID = 0);
@@ -33,6 +42,17 @@ inline bool isLongPressDispatch() { return false; }
 inline bool isTouchDispatch() { return false; }
 inline bool isTapDispatch() { return false; }
 inline bool tapStartedInsideMap() { return false; }
+inline SDL_Point getTouchTargetSize(Sint32 visualWidth, Sint32 visualHeight) {
+    return { visualWidth, visualHeight };
+}
+struct TouchTargetCapture {
+    void* widget = nullptr;
+    Sint32 originX = 0;
+    Sint32 originY = 0;
+};
+inline void setTouchTarget(void*, Sint32, Sint32) {}
+inline TouchTargetCapture getTouchTarget() { return {}; }
+inline void clearTouchTarget() {}
 inline bool allowProductionRepeat(Uint32, Uint32) { return true; }
 inline void setProductionCatalogTarget(ProductionCatalogTargetSource, const ProductionCatalogTarget&) {}
 inline void clearProductionCatalogTarget(ProductionCatalogTargetSource, Uint32 = 0) {}

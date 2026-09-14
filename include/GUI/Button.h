@@ -22,6 +22,7 @@
 #include "GUIStyle.h"
 #include "misc/draw_util.h"
 #include <misc/SDL2pp.h>
+#include <misc/TouchInput.h>
 
 #include <string>
 #include <functional>
@@ -142,6 +143,8 @@ public:
         \return true = click was processed by the widget, false = click was not processed by the widget
     */
     bool handleMouseLeft(Sint32 x, Sint32 y, bool pressed) override;
+
+    bool findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) override;
 
     /**
         Handles a key stroke. This method is neccessary for controlling an application

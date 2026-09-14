@@ -22,6 +22,7 @@
 #include "PictureButton.h"
 #include "ListBox.h"
 #include <misc/SDL2pp.h>
+#include <misc/TouchInput.h>
 
 #include <vector>
 #include <string>
@@ -60,6 +61,8 @@ public:
         \return true = click was processed by the widget, false = click was not processed by the widget
     */
     bool handleMouseLeft(Sint32 x, Sint32 y, bool pressed) override;
+
+    bool findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) override;
 
     /**
         Handles a left mouse click in overlays.
@@ -455,6 +458,7 @@ private:
 
     Uint32 color;                                   ///< the color
     bool bHover;                                    ///< true = currenlty mouse hover, false = currently no mouse hover
+    bool bTouchPressed;
 };
 
 #endif //DROPDOWNBOX_H

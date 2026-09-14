@@ -20,6 +20,7 @@
 #include <globals.h>
 
 #include <SoundPlayer.h>
+#include <misc/TouchInput.h>
 
 Button::Button() {
     bPressed = false;
@@ -46,6 +47,52 @@ void Button::handleMouseMovement(Sint32 x, Sint32 y, bool insideOverlay) {
 }
 
 bool Button::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
+    if(TouchInput::isTapDispatch()) {
+        const auto capture = TouchInput::getTouchTarget();
+        const bool captured = capture.widget == this;
+        const TouchTarget::Rect visual{ 0, 0, getSize().x, getSize().y };
+        const bool insideTarget = TouchTarget::centeredRect(
+            visual,
+            TouchInput::getTouchTargetSize(getSize().x, getSize().y)).contains(x, y);
+
+        if(pressed) {
+            if(!captured || !insideTarget) {
+                return false;
+            }
+        } else if(!captured && !bPressed) {
+            return false;
+        }
+
+        if((isEnabled() == false) || (isVisible() == false)) {
+            bPressed = false;
+            return true;
+        }
+
+        if(pressed) {
+            bPressed = true;
+            if(!bToggleButton) {
+                soundPlayer->playSound(Sound_ButtonClick);
+            }
+        } else {
+            const bool shouldClick = bPressed && insideTarget;
+            bPressed = false;
+            if(shouldClick) {
+                if(bToggleButton) {
+                    bool oldState = getToggleState();
+                    setToggleState(!bToggleState);
+                    if(getToggleState() != oldState) {
+                        soundPlayer->playSound(Sound_ButtonClick);
+                    }
+                }
+
+                if(pOnClick) {
+                    pOnClick();
+                }
+            }
+        }
+        return true;
+    }
+
     if((x < 0) || (x >= getSize().x) || (y < 0) || (y >= getSize().y)) {
         return false;
     }
@@ -77,6 +124,28 @@ bool Button::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
             }
         }
     }
+    return true;
+}
+
+bool Button::findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) {
+    if((isEnabled() == false) || (isVisible() == false)) {
+        return false;
+    }
+
+    const TouchTarget::Rect visual{ 0, 0, getSize().x, getSize().y };
+    const TouchTarget::Rect touch = TouchTarget::centeredRect(
+        visual,
+        TouchInput::getTouchTargetSize(getSize().x, getSize().y));
+    if(!touch.contains(x, y)) {
+        return false;
+    }
+
+    candidate.widget = this;
+    candidate.originX = 0;
+    candidate.originY = 0;
+    candidate.visual = visual;
+    candidate.touch = touch;
+    candidate.stablePath.clear();
     return true;
 }
 

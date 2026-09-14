@@ -20,6 +20,7 @@
 
 #include "Widget.h"
 #include <misc/RobustList.h>
+#include <misc/TouchInput.h>
 
 /// The abstract base class for container widgets
 /**
@@ -101,6 +102,33 @@ public:
     {
         if((isEnabled() == false) || (isVisible() == false)) {
             return false;
+        }
+
+        if(TouchInput::isTapDispatch()) {
+            if(pressed) {
+                TouchInput::clearTouchTarget();
+                TouchTargetCandidate candidate;
+                if(!findTouchTarget(x, y, candidate) || candidate.widget == nullptr) {
+                    return false;
+                }
+
+                TouchInput::setTouchTarget(candidate.widget, candidate.originX, candidate.originY);
+                return candidate.widget->handleMouseLeft(x - candidate.originX,
+                                                         y - candidate.originY,
+                                                         true);
+            }
+
+            const auto capture = TouchInput::getTouchTarget();
+            if(capture.widget == nullptr) {
+                return false;
+            }
+
+            auto* target = static_cast<Widget*>(capture.widget);
+            const bool processed = target->handleMouseLeft(x - capture.originX,
+                                                            y - capture.originY,
+                                                            false);
+            TouchInput::clearTouchTarget();
+            return processed;
         }
 
         bool bWidgetFound = false;
@@ -451,6 +479,39 @@ public:
         \return true = container, false = any other widget
     */
     inline bool isContainer() const override { return true; }
+
+    bool findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) override
+    {
+        if((isEnabled() == false) || (isVisible() == false)
+           || x < 0 || y < 0 || x >= getSize().x || y >= getSize().y) {
+            return false;
+        }
+
+        bool found = false;
+        std::size_t childIndex = 0;
+        for(const WidgetData& widgetData : containedWidgets) {
+            Point pos = getPosition(widgetData);
+            TouchTargetCandidate childCandidate;
+            if(widgetData.pWidget->findTouchTarget(x - pos.x, y - pos.y, childCandidate)) {
+                childCandidate.originX += pos.x;
+                childCandidate.originY += pos.y;
+                childCandidate.visual.x += pos.x;
+                childCandidate.visual.y += pos.y;
+                childCandidate.touch.x += pos.x;
+                childCandidate.touch.y += pos.y;
+                childCandidate.stablePath.insert(childCandidate.stablePath.begin(), childIndex);
+
+                if(!found || TouchTarget::isBetterCandidate(
+                        childCandidate, candidate, x, y)) {
+                    candidate = std::move(childCandidate);
+                    found = true;
+                }
+            }
+            ++childIndex;
+        }
+
+        return found;
+    }
 
 protected:
     /**

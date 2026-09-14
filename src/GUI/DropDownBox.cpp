@@ -40,11 +40,33 @@ DropDownBox::DropDownBox() {
     bListBoxAbove = false;
     bAutocloseListBoxOnSelectionChange = true;
     bOnClickEnabled = true;
+    bTouchPressed = false;
 
     resize(DropDownBox::getMinimumSize().x, DropDownBox::getMinimumSize().y);
 }
 
 DropDownBox::~DropDownBox() = default;
+
+bool DropDownBox::findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) {
+    if((isEnabled() == false) || (isVisible() == false)) {
+        return false;
+    }
+
+    const TouchTarget::Rect visual{0, 0, getSize().x, getSize().y};
+    const auto touch = TouchTarget::centeredRect(
+        visual, TouchInput::getTouchTargetSize(getSize().x, getSize().y));
+    if(!touch.contains(x, y)) {
+        return false;
+    }
+
+    candidate.widget = this;
+    candidate.originX = 0;
+    candidate.originY = 0;
+    candidate.visual = visual;
+    candidate.touch = touch;
+    candidate.stablePath.clear();
+    return true;
+}
 
 void DropDownBox::handleMouseMovement(Sint32 x, Sint32 y, bool insideOverlay) {
     if((x < 0) || (x >= getSize().x - openListBoxButton.getSize().x - 1) || (y < 0) || (y >= getSize().y)) {
@@ -68,6 +90,47 @@ bool DropDownBox::handleMouseMovementOverlay(Sint32 x, Sint32 y) {
 }
 
 bool DropDownBox::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
+    const bool touchEvent = TouchInput::isTapDispatch();
+    const TouchTarget::Rect visual{0, 0, getSize().x, getSize().y};
+    const auto touch = TouchTarget::centeredRect(
+        visual, TouchInput::getTouchTargetSize(getSize().x, getSize().y));
+
+    if(touchEvent && !touch.contains(x, y)) {
+        return false;
+    }
+
+    if(touchEvent) {
+        if(pressed) {
+            bTouchPressed = true;
+            return true;
+        }
+
+        if(!bTouchPressed) {
+            return false;
+        }
+        bTouchPressed = false;
+
+        const TouchTarget::Rect openVisual{
+            getSize().x - openListBoxButton.getSize().x - 1,
+            1,
+            openListBoxButton.getSize().x,
+            openListBoxButton.getSize().y
+        };
+        const auto openTouch = TouchTarget::centeredRect(
+            openVisual,
+            TouchInput::getTouchTargetSize(openVisual.width, openVisual.height));
+        if(openTouch.contains(x, y) || openVisual.contains(x, y)) {
+            setActive();
+            onOpenListBoxButton();
+        } else if(bOnClickEnabled && pOnClick) {
+            pOnClick();
+        } else {
+            setActive();
+            onOpenListBoxButton();
+        }
+        return true;
+    }
+
     if((isEnabled() == false) || (isVisible() == false)) {
         // onClick works even when widget is disabled
         if(bOnClickEnabled && isVisible() && pOnClick) {

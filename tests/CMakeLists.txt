@@ -24,6 +24,8 @@ target_sources(dunelegacy_tests
         ProductionQueueControlsWidgetTestSupport.cpp
         BuilderProductionControlsTest.cpp
         InterfaceInputRoutingTest.cpp
+        TouchTargetTest.cpp
+        TouchTargetButtonLink.cpp
         CampaignStatsMenuInputTest.cpp
         SaveGameNameTest.cpp
         LocalizationTest.cpp

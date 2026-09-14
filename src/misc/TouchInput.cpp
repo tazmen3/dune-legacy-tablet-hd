@@ -76,6 +76,7 @@ struct TouchState {
     bool mapTapEligible = false;
     bool lastPointerWasTouch = false;
     TouchInput::ProductionCatalogTouchSession productionCatalogTouch;
+    TouchInput::TouchTargetCapture touchTarget;
 };
 
 TouchState state;
@@ -409,6 +410,44 @@ bool isPhysicalMouseEvent(const SDL_Event& event) {
 } // namespace
 
 namespace TouchInput {
+
+SDL_Point getTouchTargetSize(Sint32 visualWidth, Sint32 visualHeight) {
+    int windowWidth = 0;
+    int windowHeight = 0;
+    int logicalWidth = 0;
+    int logicalHeight = 0;
+    SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+    SDL_RenderGetLogicalSize(renderer, &logicalWidth, &logicalHeight);
+
+    const float logicalScaleX = logicalWidth > 0 ? static_cast<float>(windowWidth) / logicalWidth : 1.0f;
+    const float logicalScaleY = logicalHeight > 0 ? static_cast<float>(windowHeight) / logicalHeight : 1.0f;
+
+    float dpiX = 160.0f;
+    float dpiY = 160.0f;
+    float diagonalDpi = 0.0f;
+    if(SDL_GetDisplayDPI(SDL_GetWindowDisplayIndex(window), &diagonalDpi, &dpiX, &dpiY) != 0) {
+        dpiX = dpiY = 160.0f;
+    }
+
+    constexpr float TARGET_DP = 46.0f;
+    const Sint32 targetWidth = static_cast<Sint32>(std::lround(
+        TARGET_DP * dpiX / 160.0f / std::max(1.0f, logicalScaleX)));
+    const Sint32 targetHeight = static_cast<Sint32>(std::lround(
+        TARGET_DP * dpiY / 160.0f / std::max(1.0f, logicalScaleY)));
+    return { std::max(visualWidth, targetWidth), std::max(visualHeight, targetHeight) };
+}
+
+void setTouchTarget(void* widget, Sint32 originX, Sint32 originY) {
+    state.touchTarget = { widget, originX, originY };
+}
+
+TouchTargetCapture getTouchTarget() {
+    return state.touchTarget;
+}
+
+void clearTouchTarget() {
+    state.touchTarget = {};
+}
 
 bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview) {
     state.touchDispatch = false;
