@@ -32,12 +32,6 @@ namespace {
 
 constexpr int PRICE_AREA_HEIGHT = 16;
 
-bool isLocked(ProductionCatalogAvailability availability) {
-    return availability == ProductionCatalogAvailability::LockedTechLevel
-        || availability == ProductionCatalogAvailability::LockedUpgrade
-        || availability == ProductionCatalogAvailability::MissingPrerequisite;
-}
-
 void drawCenteredTexture(SDL_Texture* texture, const SDL_Rect& bounds) {
     if(texture == nullptr || bounds.w <= 0 || bounds.h <= 0) return;
 
@@ -86,7 +80,6 @@ bool isPlacementModeActive() {
 } // namespace
 
 ProductionCatalogGrid::ProductionCatalogGrid() {
-    pLockedTextTexture = pFontManager->createTextureWithText(_("LOCKED"), COLOR_WHITE, 12);
     pSoldOutTextTexture = pFontManager->createTextureWithText(_("SOLD OUT"), COLOR_WHITE, 12);
     pPlaceItTextTexture = pFontManager->createTextureWithText(_("PLACE IT"), COLOR_WHITE, 12);
     pOnHoldTextTexture = pFontManager->createTextureWithText(_("ON HOLD"), COLOR_WHITE, 12);
@@ -486,15 +479,13 @@ void ProductionCatalogGrid::draw(Point position) {
         }
 
         const bool soldOut = entry.availability == ProductionCatalogAvailability::SoldOut;
-        const bool unavailable = isLocked(entry.availability) || soldOut
+        const bool unavailable = soldOut
             || (entry.availability == ProductionCatalogAvailability::Available && !purchasesEnabled);
         if(unavailable) {
             renderFillRect(renderer, &cellBounds, COLOR_HALF_TRANSPARENT);
         }
         if(soldOut) {
             drawCenteredTexture(pSoldOutTextTexture.get(), cellBounds);
-        } else if(isLocked(entry.availability)) {
-            drawCenteredTexture(pLockedTextTexture.get(), cellBounds);
         } else if(cellPresentation.palaceAlreadyBuilt) {
             renderFillRect(renderer, &cellBounds, COLOR_HALF_TRANSPARENT);
             drawCenteredTexture(pAlreadyBuiltTextTexture.get(), cellBounds);

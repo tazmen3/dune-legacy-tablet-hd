@@ -53,6 +53,22 @@ TEST_CASE("Production catalogue: unrelated item is excluded", "[production][cata
             == ProductionCatalogAvailability::NotProducedByBuilder);
 }
 
+TEST_CASE("Production catalogue visibility keeps only available and sold-out entries", "[production][catalogue]") {
+    for(const auto availability : {
+            ProductionCatalogAvailability::Available,
+            ProductionCatalogAvailability::SoldOut }) {
+        REQUIRE(isProductionCatalogEntryDisplayed({73, 625, availability}));
+    }
+
+    for(const auto availability : {
+            ProductionCatalogAvailability::LockedTechLevel,
+            ProductionCatalogAvailability::LockedUpgrade,
+            ProductionCatalogAvailability::MissingPrerequisite,
+            ProductionCatalogAvailability::NotProducedByBuilder }) {
+        REQUIRE_FALSE(isProductionCatalogEntryDisplayed({73, 625, availability}));
+    }
+}
+
 namespace {
 
 StarPortCatalogEligibility availableStarPortItem() {
@@ -175,7 +191,7 @@ TEST_CASE("Production catalogue categories classify structures and units without
     REQUIRE(getProductionCatalogCategory(9999) == ProductionCatalogCategory::Military);
 }
 
-TEST_CASE("Production catalogue category filtering preserves source order and locked entries", "[production][catalogue]") {
+TEST_CASE("Production catalogue category filtering hides locked entries and preserves visible source order", "[production][catalogue]") {
     const std::vector<ProductionCatalogEntry> catalog = {
         {Structure_Wall, 50, ProductionCatalogAvailability::LockedTechLevel},
         {Structure_Slab1, 20, ProductionCatalogAvailability::Available},
@@ -191,13 +207,26 @@ TEST_CASE("Production catalogue category filtering preserves source order and lo
         ProductionCatalogCategory::Military};
     REQUIRE(categories == expectedCategories);
     const auto defense = getProductionCatalogEntriesForCategory(catalog, ProductionCatalogCategory::Defense);
-    REQUIRE(defense.size() == 2);
-    REQUIRE(defense[0].itemID == Structure_Wall);
-    REQUIRE(defense[1].itemID == Structure_GunTurret);
+    REQUIRE(defense.size() == 1);
+    REQUIRE(defense[0].itemID == Structure_GunTurret);
     const auto military = getProductionCatalogEntriesForCategory(catalog, ProductionCatalogCategory::Military);
     REQUIRE(military.size() == 1);
     REQUIRE(military[0].availability == ProductionCatalogAvailability::SoldOut);
     REQUIRE(catalog[0].availability == ProductionCatalogAvailability::LockedTechLevel);
+}
+
+TEST_CASE("Production catalogue omits categories made only of hidden entries", "[production][catalogue]") {
+    const std::vector<ProductionCatalogEntry> catalog = {
+        {Structure_Wall, 50, ProductionCatalogAvailability::LockedTechLevel},
+        {Structure_RocketTurret, 125, ProductionCatalogAvailability::MissingPrerequisite},
+        {Unit_Frigate, 0, ProductionCatalogAvailability::NotProducedByBuilder},
+        {Structure_Slab1, 20, ProductionCatalogAvailability::Available}
+    };
+
+    const auto categories = getProductionCatalogCategories(catalog);
+    REQUIRE(categories == std::vector<ProductionCatalogCategory>{ProductionCatalogCategory::Support});
+    REQUIRE(getProductionCatalogEntriesForCategory(catalog, ProductionCatalogCategory::Defense).empty());
+    REQUIRE(getProductionCatalogEntriesForCategory(catalog, ProductionCatalogCategory::Military).empty());
 }
 
 TEST_CASE("Production catalogue derives a stable panel width from its widest category", "[production][catalogue]") {
@@ -218,6 +247,20 @@ TEST_CASE("Production catalogue derives a stable panel width from its widest cat
     };
     const auto categories = getProductionCatalogCategories(catalog);
     REQUIRE(getProductionCatalogStableColumnCount(catalog, categories) == 6);
+}
+
+TEST_CASE("Production catalogue stable columns ignore hidden entries", "[production][catalogue]") {
+    const std::vector<ProductionCatalogEntry> catalog = {
+        {Structure_Slab1, 20, ProductionCatalogAvailability::Available},
+        {Structure_Slab4, 20, ProductionCatalogAvailability::Available},
+        {Structure_WindTrap, 20, ProductionCatalogAvailability::Available},
+        {Structure_Wall, 20, ProductionCatalogAvailability::LockedTechLevel},
+        {Structure_GunTurret, 20, ProductionCatalogAvailability::LockedUpgrade},
+        {Structure_RocketTurret, 20, ProductionCatalogAvailability::MissingPrerequisite},
+        {Unit_Tank, 20, ProductionCatalogAvailability::NotProducedByBuilder}
+    };
+    const auto categories = getProductionCatalogCategories(catalog);
+    REQUIRE(getProductionCatalogStableColumnCount(catalog, categories) == 3);
 }
 
 TEST_CASE("Production catalogue cell presentation clamps progress and keeps Starport progress-free", "[production][catalogue]") {

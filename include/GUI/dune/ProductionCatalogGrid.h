@@ -55,7 +55,6 @@ private:
     int pressedCellIndex = -1;
     int pressedCategoryIndex = -1;
     Uint32 pressedItemID = 0;
-    sdl2::texture_ptr pLockedTextTexture;
     sdl2::texture_ptr pSoldOutTextTexture;
     sdl2::texture_ptr pPlaceItTextTexture;
     sdl2::texture_ptr pOnHoldTextTexture;

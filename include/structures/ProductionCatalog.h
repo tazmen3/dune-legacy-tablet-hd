@@ -75,7 +75,8 @@ constexpr ProductionCatalogCategory getProductionCatalogCategory(std::uint32_t i
 }
 
 constexpr bool isProductionCatalogEntryDisplayed(const ProductionCatalogEntry& entry) {
-    return entry.availability != ProductionCatalogAvailability::NotProducedByBuilder;
+    return entry.availability == ProductionCatalogAvailability::Available
+        || entry.availability == ProductionCatalogAvailability::SoldOut;
 }
 
 constexpr bool isProductionCatalogEntryInCategory(
