@@ -28,6 +28,7 @@ public:
     void clear();
 
     bool handleMouseLeft(Sint32 x, Sint32 y, bool pressed) override;
+    bool findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) override;
     bool handleMouseRight(Sint32 x, Sint32 y, bool pressed) override;
     bool handleMouseWheel(Sint32 x, Sint32 y, bool up) override;
     void draw(Point position) override;

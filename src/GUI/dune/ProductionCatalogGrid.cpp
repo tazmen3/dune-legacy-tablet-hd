@@ -157,6 +157,21 @@ void ProductionCatalogGrid::clear() {
     setVisible(false);
 }
 
+bool ProductionCatalogGrid::findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) {
+    if(!isEnabled() || !shouldRenderProductionCatalogGrid(isVisible(), isPlacementModeActive())
+       || !isProductionCatalogPanelPointInside(controlBounds, x, y)) {
+        return false;
+    }
+
+    candidate.widget = this;
+    candidate.originX = 0;
+    candidate.originY = 0;
+    candidate.visual = {controlBounds.x, controlBounds.y, controlBounds.width, controlBounds.height};
+    candidate.touch = candidate.visual;
+    candidate.stablePath.clear();
+    return true;
+}
+
 bool ProductionCatalogGrid::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
     if(!shouldRenderProductionCatalogGrid(isVisible(), isPlacementModeActive())) {
         if(isPlacementModeActive()) clearPlacementInteraction();

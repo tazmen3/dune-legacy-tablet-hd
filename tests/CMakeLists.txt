@@ -29,6 +29,7 @@ target_sources(dunelegacy_tests
         CampaignStatsMenuInputTest.cpp
         SaveGameNameTest.cpp
         LocalizationTest.cpp
+        RenderResolutionTest.cpp
         PathBudgetTestCase/PathBudgetTestCase.cpp
         NetworkManagerTestCase/NetworkManagerTestCase.cpp
         # ENet library sources (needed for NetworkManager tests)

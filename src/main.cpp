@@ -85,6 +85,10 @@
 #include <misc/MacFunctions.h>
 #endif
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 #if !defined(__GNUG__) || (defined(_GLIBCXX_HAS_GTHREADS) && defined(_GLIBCXX_USE_C99_STDINT_TR1) && (ATOMIC_INT_LOCK_FREE > 1) && !defined(_GLIBCXX_HAS_GTHREADS))
 // g++ does not provide std::async on all platforms
 #define HAS_ASYNC
@@ -211,7 +215,45 @@ void setVideoMode(int displayIndex)
         SDL_Log("VSync disabled");
     }
     SDL_RenderSetLogicalSize(renderer, settings.video.width, settings.video.height);
-    screenTexture = SDL_CreateTexture(renderer, SCREEN_FORMAT, SDL_TEXTUREACCESS_TARGET, settings.video.width, settings.video.height);
+
+    int rendererPhysicalWidth = 0;
+    int rendererPhysicalHeight = 0;
+    if(SDL_GetRendererOutputSize(renderer, &rendererPhysicalWidth, &rendererPhysicalHeight) != 0) {
+        rendererPhysicalWidth = settings.video.physicalWidth;
+        rendererPhysicalHeight = settings.video.physicalHeight;
+        SDL_Log("HD Renderer: SDL_GetRendererOutputSize failed, using configured physical size: %s", SDL_GetError());
+    }
+
+#ifdef __ANDROID__
+    const int requestedRenderScale = getLogicalToPhysicalResolutionFactor(rendererPhysicalWidth, rendererPhysicalHeight);
+#else
+    // Keep the historical desktop framebuffer and presentation path unchanged.
+    const int requestedRenderScale = 1;
+#endif
+    renderResolution = RenderResolution::create(settings.video.width,
+                                                 settings.video.height,
+                                                 rendererPhysicalWidth,
+                                                 rendererPhysicalHeight,
+                                                 requestedRenderScale);
+
+    const bool useHdFramebuffer = renderResolution.usesHdFramebuffer();
+    const int screenTextureWidth = useHdFramebuffer ? renderResolution.framebufferWidth() : settings.video.width;
+    const int screenTextureHeight = useHdFramebuffer ? renderResolution.framebufferHeight() : settings.video.height;
+    screenTexture = SDL_CreateTexture(renderer, SCREEN_FORMAT, SDL_TEXTUREACCESS_TARGET, screenTextureWidth, screenTextureHeight);
+
+    // A large target is optional: retain the historical logical target if the
+    // driver cannot allocate it, so the game can still start.
+    if(!screenTexture && useHdFramebuffer) {
+        SDL_Log("HD Renderer: failed to create %dx%d framebuffer: %s; falling back to %dx%d logical framebuffer",
+                screenTextureWidth, screenTextureHeight, SDL_GetError(), settings.video.width, settings.video.height);
+        renderResolution = RenderResolution::create(settings.video.width,
+                                                     settings.video.height,
+                                                     rendererPhysicalWidth,
+                                                     rendererPhysicalHeight,
+                                                     1);
+        screenTexture = SDL_CreateTexture(renderer, SCREEN_FORMAT, SDL_TEXTUREACCESS_TARGET,
+                                          settings.video.width, settings.video.height);
+    }
 
     // Check if texture creation failed
     if (!screenTexture) {
@@ -222,6 +264,25 @@ void setVideoMode(int displayIndex)
     // Enable hardware acceleration
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_SetTextureScaleMode(screenTexture, SDL_ScaleModeNearest);
+
+    SDL_RendererInfo rendererInfo{};
+    SDL_GetRendererInfo(renderer, &rendererInfo);
+    float actualScaleX = 1.0f;
+    float actualScaleY = 1.0f;
+    SDL_RenderGetScale(renderer, &actualScaleX, &actualScaleY);
+    const SDL_Rect presentationViewport = renderResolution.presentationViewport();
+    SDL_Log("HD Renderer: renderer=%s physical=%dx%d logical=%dx%d scale=%d framebuffer=%dx%d "
+            "presentationViewport=%d,%d %dx%d integerScale=%s actualScale=%.3fx%.3f pipeline=%s",
+            rendererInfo.name ? rendererInfo.name : "unknown",
+            renderResolution.physicalWidth, renderResolution.physicalHeight,
+            renderResolution.logicalWidth, renderResolution.logicalHeight,
+            renderResolution.renderScale,
+            renderResolution.framebufferWidth(), renderResolution.framebufferHeight(),
+            presentationViewport.x, presentationViewport.y,
+            presentationViewport.w, presentationViewport.h,
+            SDL_RenderGetIntegerScale(renderer) ? "on" : "off",
+            actualScaleX, actualScaleY,
+            renderResolution.usesHdFramebuffer() ? "android-hd" : "historical");
 
     SDL_ShowCursor(SDL_ENABLE);
 }
@@ -611,6 +672,9 @@ void logOutputFunction(void *userdata, int category, SDL_LogPriority priority, c
     */
     fprintf(stderr, "%s\n", message);
     fflush(stderr);
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "DuneLegacy", "%s", message);
+#endif
 }
 
 void showMissingFilesMessageBox() {

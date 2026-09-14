@@ -178,8 +178,8 @@ void Sandworm::blitToScreen() {
 
             // now copy r,g,b colors from screen but don't change alpha values in mask
             SDL_SetTextureBlendMode(screenTexture, SDL_BLENDMODE_ADD);
-            SDL_Rect source = dest;
-            source.x += shimmerOffset[(shimmerOffsetIndex+i)%8]*2;
+            SDL_Rect source = renderResolution.logicalRectToRenderTargetRect(dest);
+            source.x += shimmerOffset[(shimmerOffsetIndex+i)%8]*2*renderResolution.renderScale;
             SDL_RenderCopy(renderer, screenTexture, &source, nullptr);
             SDL_SetTextureBlendMode(screenTexture, SDL_BLENDMODE_NONE);
 

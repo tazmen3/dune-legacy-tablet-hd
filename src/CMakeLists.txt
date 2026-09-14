@@ -428,6 +428,10 @@ if(WIN32)
     )
 endif()
 
+if(ANDROID)
+    target_link_libraries(dunelegacy PRIVATE log)
+endif()
+
 # macOS-specific frameworks
 if(APPLE)
     target_link_libraries(dunelegacy

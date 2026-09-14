@@ -331,9 +331,9 @@ void Bullet::blitToScreen() const
 
         // now copy r,g,b colors from screen but don't change alpha values in mask
         SDL_SetTextureBlendMode(screenTexture, SDL_BLENDMODE_ADD);
-        SDL_Rect source = dest;
+        SDL_Rect source = renderResolution.logicalRectToRenderTargetRect(dest);
         int shimmerOffsetIndex = ((currentGame->getGameCycleCount() + getBulletID()) % 24)/3;
-        source.x += shimmerOffset[shimmerOffsetIndex%8]*2;
+        source.x += shimmerOffset[shimmerOffsetIndex%8]*2*renderResolution.renderScale;
         SDL_RenderCopy(renderer, screenTexture, &source, nullptr);
         SDL_SetTextureBlendMode(screenTexture, SDL_BLENDMODE_NONE);
 

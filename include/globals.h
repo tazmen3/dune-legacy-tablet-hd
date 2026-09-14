@@ -25,6 +25,7 @@
 #include <data.h>
 #include <misc/RobustList.h>
 #include <misc/DrawingRectHelper.h>
+#include <misc/RenderResolution.h>
 
 #include <misc/SDL2pp.h>
 
@@ -63,6 +64,7 @@ class Bullet;
 EXTERN SDL_Window*          window;                     ///< the window
 EXTERN SDL_Renderer*        renderer;                   ///< the renderer
 EXTERN SDL_Texture*         screenTexture;              ///< the texture
+EXTERN RenderResolution     renderResolution;           ///< logical/physical render geometry
 EXTERN Palette              palette;                    ///< the palette for the screen
 EXTERN int                  drawnMouseX;                ///< the current mouse position (x coordinate)
 EXTERN int                  drawnMouseY;                ///< the current mouse position (y coordinate)

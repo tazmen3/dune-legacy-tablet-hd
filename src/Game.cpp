@@ -1664,7 +1664,7 @@ void Game::drawScreen()
     // draw chat message currently typed
     if(chatMode) {
         sdl2::texture_ptr pChatTexture = pFontManager->createTextureWithText("Chat: " + typingChatMessage + (((SDL_GetTicks() / 150) % 2 == 0) ? "_" : ""), COLOR_WHITE, 14);
-        SDL_Rect drawLocation = calcDrawingRect(pChatTexture.get(), 20, getRendererHeight() - 40);
+        SDL_Rect drawLocation = calcDrawingRect(pChatTexture.get(), 20, settings.video.height - 40);
         SDL_RenderCopy(renderer, pChatTexture.get(), nullptr, &drawLocation);
     }
 
@@ -1696,7 +1696,7 @@ void Game::drawScreen()
         }
 
         sdl2::texture_ptr pFinishMessageTexture = pFontManager->createTextureWithText(message.c_str(), COLOR_WHITE, 28);
-        SDL_Rect drawLocation = calcDrawingRect(pFinishMessageTexture.get(), sideBarPos.x/2, topBarPos.h + (getRendererHeight()-topBarPos.h)/2, HAlign::Center, VAlign::Center);
+        SDL_Rect drawLocation = calcDrawingRect(pFinishMessageTexture.get(), sideBarPos.x/2, topBarPos.h + (settings.video.height-topBarPos.h)/2, HAlign::Center, VAlign::Center);
         SDL_RenderCopy(renderer, pFinishMessageTexture.get(), nullptr, &drawLocation);
     }
 
@@ -2577,8 +2577,19 @@ void Game::initializeGameLoop() {
 
 void Game::renderFrame() {
     const Uint64 renderStart = SDL_GetPerformanceCounter();
-    
     SDL_SetRenderTarget(renderer, screenTexture);
+    const bool useHdFramebuffer = renderResolution.usesHdFramebuffer();
+    if(useHdFramebuffer) {
+        // Render-target switches keep window logical/viewport state.  The HD
+        // target is physical pixels, so restore its unscaled state before
+        // applying the central integer game-to-framebuffer transform.
+        SDL_RenderSetLogicalSize(renderer, 0, 0);
+        SDL_RenderSetViewport(renderer, nullptr);
+        SDL_RenderSetClipRect(renderer, nullptr);
+        SDL_RenderSetScale(renderer,
+                           static_cast<float>(renderResolution.renderScale),
+                           static_cast<float>(renderResolution.renderScale));
+    }
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
     
@@ -2586,8 +2597,35 @@ void Game::renderFrame() {
     
     // Copy to main screen and present in one step
     SDL_SetRenderTarget(renderer, nullptr);
-    SDL_RenderCopy(renderer, screenTexture, nullptr, nullptr);
+    if(useHdFramebuffer) {
+        // Present at the exact target dimensions.  Nearest filtering remains
+        // selected on screenTexture, so this is a 1:1 copy with at most a
+        // one-pixel centered border on either axis.
+        SDL_RenderSetScale(renderer, 1.0f, 1.0f);
+        // Leave SDL's logical-size viewport before clearing the physical
+        // backbuffer.  The HD framebuffer is intentionally one pixel smaller
+        // than the output on this device, so the whole output must be cleared
+        // explicitly before the 1:1 copy.
+        SDL_RenderSetLogicalSize(renderer, 0, 0);
+        SDL_RenderSetViewport(renderer, nullptr);
+        SDL_RenderSetClipRect(renderer, nullptr);
+        // The game draw pass may leave a UI color active (for example the
+        // red selection color).  The one-pixel physical border must always
+        // be cleared independently of that state before the 1:1 copy.
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+        const SDL_Rect presentationViewport = renderResolution.presentationViewport();
+        SDL_RenderCopy(renderer, screenTexture, nullptr, &presentationViewport);
+    } else {
+        SDL_RenderCopy(renderer, screenTexture, nullptr, nullptr);
+    }
     SDL_RenderPresent(renderer);
+
+    if(useHdFramebuffer) {
+        // Restore SDL's logical-size state for window-to-logical input
+        // conversion and for the next render-target switch.
+        SDL_RenderSetLogicalSize(renderer, settings.video.width, settings.video.height);
+    }
     
     const Uint64 renderEnd = SDL_GetPerformanceCounter();
     const double renderMs = getElapsedMs(renderStart, renderEnd);

@@ -124,10 +124,14 @@ void GameInterface::draw(Point position) {
 
     // draw Power Indicator and Spice indicator
 
-    SDL_Rect powerIndicatorPos = {  getRendererWidth() - sideBar.getSize().x + 14, 146, 4, getRendererHeight() - 146 - 2 };
+    // drawScreen() is rendered into the HD framebuffer, where SDL has no
+    // logical renderer size.  Keep these HUD rectangles in game-logical space.
+    const int logicalHudWidth = settings.video.width;
+    const int logicalHudHeight = settings.video.height;
+    SDL_Rect powerIndicatorPos = {  logicalHudWidth - sideBar.getSize().x + 14, 146, 4, logicalHudHeight - 146 - 2 };
     renderFillRect(renderer, &powerIndicatorPos, COLOR_BLACK);
 
-    SDL_Rect spiceIndicatorPos = {  getRendererWidth() - sideBar.getSize().x + 20, 146, 4, getRendererHeight() - 146 - 2 };
+    SDL_Rect spiceIndicatorPos = {  logicalHudWidth - sideBar.getSize().x + 20, 146, 4, logicalHudHeight - 146 - 2 };
     renderFillRect(renderer, &spiceIndicatorPos, COLOR_BLACK);
 
     int xCount = 0, yCount = 0;
@@ -183,9 +187,14 @@ void GameInterface::draw(Point position) {
     const auto NumDigits = CreditsBuffer.length();
     SDL_Texture* digitsTex = pGFXManager->getUIGraphic(UI_CreditsDigits);
 
+    // The HD render target has no SDL logical size while drawScreen() is in
+    // progress, so getRendererWidth() reports its physical width here.  HUD
+    // coordinates must remain in the configured game-logical space.
+    const int creditsBaseX = settings.video.width - sideBar.getSize().x + 49;
+
     for(int i=NumDigits-1; i>=0; i--) {
         SDL_Rect source = calcSpriteSourceRect(digitsTex, CreditsBuffer[i] - '0', 10);
-        SDL_Rect dest = calcSpriteDrawingRect(digitsTex, getRendererWidth() - sideBar.getSize().x + 49 + (6 - NumDigits + i)*10, 135, 10);
+        SDL_Rect dest = calcSpriteDrawingRect(digitsTex, creditsBaseX + (6 - NumDigits + i)*10, 135, 10);
         SDL_RenderCopy(renderer, digitsTex, &source, &dest);
     }
 }

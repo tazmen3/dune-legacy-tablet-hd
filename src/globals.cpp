@@ -31,6 +31,7 @@
 SDL_Window*          window = nullptr;
 SDL_Renderer*        renderer = nullptr;
 SDL_Texture*         screenTexture = nullptr;
+RenderResolution     renderResolution;
 Palette              palette;
 int                  drawnMouseX = 0;
 int                  drawnMouseY = 0;
