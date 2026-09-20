@@ -320,6 +320,17 @@ void Bullet::blitToScreen() const
 
         // switch to texture 'shimmerTex' for rendering
         SDL_Texture* oldRenderTarget = SDL_GetRenderTarget(renderer);
+        float oldRenderScaleX = 1.0f;
+        float oldRenderScaleY = 1.0f;
+        SDL_RenderGetScale(renderer, &oldRenderScaleX, &oldRenderScaleY);
+        int oldLogicalWidth = 0;
+        int oldLogicalHeight = 0;
+        SDL_RenderGetLogicalSize(renderer, &oldLogicalWidth, &oldLogicalHeight);
+        SDL_Rect oldViewport;
+        SDL_RenderGetViewport(renderer, &oldViewport);
+        const SDL_bool oldClipEnabled = SDL_RenderIsClipEnabled(renderer);
+        SDL_Rect oldClipRect;
+        SDL_RenderGetClipRect(renderer, &oldClipRect);
         SDL_SetRenderTarget(renderer, shimmerTex);
 
         // copy complete mask
@@ -338,7 +349,13 @@ void Bullet::blitToScreen() const
         SDL_SetTextureBlendMode(screenTexture, SDL_BLENDMODE_NONE);
 
         // switch back to old rendering target (from texture 'shimmerTex')
-        SDL_SetRenderTarget(renderer, oldRenderTarget);
+        if(SDL_SetRenderTarget(renderer, oldRenderTarget) == 0) {
+            // Logical size can change scale and viewport, so restore it first.
+            SDL_RenderSetLogicalSize(renderer, oldLogicalWidth, oldLogicalHeight);
+            SDL_RenderSetScale(renderer, oldRenderScaleX, oldRenderScaleY);
+            SDL_RenderSetViewport(renderer, &oldViewport);
+            SDL_RenderSetClipRect(renderer, oldClipEnabled == SDL_TRUE ? &oldClipRect : nullptr);
+        }
 
         // now blend shimmerTex to screen (= make use of alpha values in mask)
         SDL_SetTextureBlendMode(shimmerTex, SDL_BLENDMODE_BLEND);
