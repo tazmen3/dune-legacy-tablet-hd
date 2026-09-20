@@ -16,6 +16,9 @@
  */
 
 #include <GUI/ListBox.h>
+#include <GUI/ListBoxHitTest.h>
+
+#include <utility>
 
 ListBox::ListBox() {
     enableResizing(true,true);
@@ -41,6 +44,49 @@ void ListBox::handleMouseMovement(Sint32 x, Sint32 y, bool insideOverlay) {
     scrollbar.handleMouseMovement(x - getSize().x + scrollbar.getSize().x,y,insideOverlay);
 }
 
+bool ListBox::findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) {
+    if((isEnabled() == false) || (isVisible() == false)
+       || x < 0 || y < 0 || x >= getSize().x || y >= getSize().y) {
+        return false;
+    }
+
+    const Sint32 scrollbarWidth = isScrollbarVisible() ? scrollbar.getSize().x : 0;
+    const auto entryVisual = ListBoxHitTest::entryArea(
+        getSize().x, getSize().y, scrollbarWidth);
+
+    bool found = false;
+    TouchTargetCandidate best;
+    if(entryVisual.contains(x, y)) {
+        best.widget = this;
+        best.originX = 0;
+        best.originY = 0;
+        best.visual = entryVisual;
+        best.touch = entryVisual;
+        best.stablePath = {0};
+        found = true;
+    }
+
+    if(scrollbarWidth > 0) {
+        TouchTargetCandidate scrollbarCandidate;
+        if(scrollbar.findTouchTarget(x - entryVisual.width, y, scrollbarCandidate)) {
+            scrollbarCandidate.originX += entryVisual.width;
+            scrollbarCandidate.visual.x += entryVisual.width;
+            scrollbarCandidate.touch.x += entryVisual.width;
+            scrollbarCandidate.stablePath.insert(scrollbarCandidate.stablePath.begin(), 1);
+
+            if(!found || TouchTarget::isBetterCandidate(scrollbarCandidate, best, x, y)) {
+                best = std::move(scrollbarCandidate);
+                found = true;
+            }
+        }
+    }
+
+    if(found) {
+        candidate = std::move(best);
+    }
+    return found;
+}
+
 bool ListBox::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
     int scrollbarWidth = isScrollbarVisible() ? scrollbar.getSize().x : 0;
 
@@ -48,8 +94,10 @@ bool ListBox::handleMouseLeft(Sint32 x, Sint32 y, bool pressed) {
         && (y>=0) && (y < getSize().y)) {
 
         if(pressed == true) {
-            int index = ((y - 1) / GUIStyle::getInstance().getListBoxEntryHeight()) + firstVisibleElement;
-            if((index >= 0) && (index < getNumEntries())) {
+            const int index = ListBoxHitTest::entryIndexAt(
+                y, getSize().y, GUIStyle::getInstance().getListBoxEntryHeight(),
+                firstVisibleElement, getNumEntries());
+            if(index >= 0) {
                 selectedElement = index;
 
                 if(SDL_GetTicks() - lastClickTime < 200) {

@@ -56,6 +56,9 @@ public:
     */
     bool handleMouseLeft(Sint32 x, Sint32 y, bool pressed) override;
 
+    /** Finds the list entries or scrollbar that should receive a touch tap. */
+    bool findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) override;
+
     /**
         Handles mouse wheel scrolling.
         \param  x x-coordinate (relative to the left top corner of the widget)

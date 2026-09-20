@@ -2,6 +2,7 @@
 
 #include <catch2/catch_all.hpp>
 
+#include <GUI/ListBoxHitTest.h>
 #include <misc/TouchTarget.h>
 
 namespace {
@@ -52,3 +53,29 @@ TEST_CASE("Touch targets reject points outside their extended area", "[touch-tar
     REQUIRE_FALSE(touch.contains(10, 20));
 }
 
+TEST_CASE("List box touch geometry targets entries without expanding outside the widget",
+          "[touch-target][list-box]") {
+    const auto entries = ListBoxHitTest::entryArea(120, 100, 16);
+
+    REQUIRE(entries.contains(0, 0));
+    REQUIRE(entries.contains(103, 99));
+    REQUIRE_FALSE(entries.contains(104, 50)); // scrollbar
+    REQUIRE_FALSE(entries.contains(-1, 50));
+    REQUIRE_FALSE(entries.contains(50, 100));
+}
+
+TEST_CASE("List box row hit testing remains deterministic at visible boundaries",
+          "[touch-target][list-box]") {
+    constexpr Sint32 height = 100;
+    constexpr Sint32 entryHeight = 16;
+    constexpr int firstVisible = 4;
+    constexpr int entries = 10;
+
+    REQUIRE(ListBoxHitTest::entryIndexAt(0, height, entryHeight, firstVisible, entries) == -1);
+    REQUIRE(ListBoxHitTest::entryIndexAt(1, height, entryHeight, firstVisible, entries) == 4);
+    REQUIRE(ListBoxHitTest::entryIndexAt(16, height, entryHeight, firstVisible, entries) == 4);
+    REQUIRE(ListBoxHitTest::entryIndexAt(17, height, entryHeight, firstVisible, entries) == 5);
+    REQUIRE(ListBoxHitTest::entryIndexAt(96, height, entryHeight, firstVisible, entries) == 9);
+    REQUIRE(ListBoxHitTest::entryIndexAt(-1, height, entryHeight, firstVisible, entries) == -1);
+    REQUIRE(ListBoxHitTest::entryIndexAt(100, height, entryHeight, firstVisible, entries) == -1);
+}

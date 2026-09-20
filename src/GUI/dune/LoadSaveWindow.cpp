@@ -184,9 +184,11 @@ void LoadSaveWindow::draw(Point position) {
 
 void LoadSaveWindow::updatePositionForTextInput() {
 #ifdef __ANDROID__
-    const int centeredX = std::max(0, (getRendererWidth() - getSize().x) / 2);
-    const int centeredY = std::max(0, (getRendererHeight() - getSize().y) / 2);
-    const int textInputY = std::min(TextInputTopMargin, std::max(0, getRendererHeight() - getSize().y));
+    const int logicalWidth = renderResolution.logicalWidth > 0 ? renderResolution.logicalWidth : settings.video.width;
+    const int logicalHeight = renderResolution.logicalHeight > 0 ? renderResolution.logicalHeight : settings.video.height;
+    const int centeredX = std::max(0, (logicalWidth - getSize().x) / 2);
+    const int centeredY = std::max(0, (logicalHeight - getSize().y) / 2);
+    const int textInputY = std::min(TextInputTopMargin, std::max(0, logicalHeight - getSize().y));
     const int y = (bSaveWindow && SDL_IsTextInputActive()) ? textInputY : centeredY;
 
     if((getPosition().x != centeredX) || (getPosition().y != y)) {
