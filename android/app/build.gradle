@@ -2,7 +2,7 @@ plugins {
     id "com.android.application"
 }
 
-def androidVersionName = "0.99.5-android13"
+def androidVersionName = "0.99.5-android14"
 // Increment whenever the bundled engine-data content changes.  This is kept
 // separate from the application version because APK updates retain filesDir.
 def bundledAssetVersion = "2026.09.09.3"
@@ -80,7 +80,7 @@ android {
         applicationId "org.dunelegacy.tablethd"
         minSdk 28
         targetSdk 35
-        versionCode 13
+        versionCode 14
         versionName androidVersionName
 
         ndk {

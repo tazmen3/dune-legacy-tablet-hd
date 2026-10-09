@@ -78,6 +78,8 @@ public:
     */
     RadarView& getRadarView() { return radarView; };
 
+    TouchInput::RadarTouchTarget getRadarTouchTarget();
+
     /**
         Returns the chat manager
         \return the chat manager

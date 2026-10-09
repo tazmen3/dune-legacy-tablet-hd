@@ -119,6 +119,10 @@ GameInterface::~GameInterface() {
     removeOldContainer();
 }
 
+TouchInput::RadarTouchTarget GameInterface::getRadarTouchTarget() {
+    return {&radarView, {settings.video.width - sideBar.getSize().x + SIDEBAR_COLUMN_WIDTH, 0}};
+}
+
 void GameInterface::draw(Point position) {
     Window::draw(position);
 

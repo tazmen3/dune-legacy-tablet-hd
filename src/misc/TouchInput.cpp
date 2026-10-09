@@ -10,11 +10,13 @@
 #include <misc/TouchInput.h>
 #include <misc/PinchZoom.h>
 #include <misc/TouchGesture.h>
+#include <misc/RadarTouchGesture.h>
 
 #ifdef __ANDROID__
 
 #include <globals.h>
 #include <ScreenBorder.h>
+#include <RadarViewBase.h>
 
 #include <algorithm>
 #include <cmath>
@@ -44,6 +46,8 @@ struct PendingEvent {
 struct TouchState {
     std::map<FingerKey, LogicalPoint> fingers;
     ScreenBorder* camera = nullptr;
+    TouchInput::RadarTouchTarget radarTarget;
+    TouchInput::RadarTouchGesture radarGesture;
     bool panEligible = false;
     bool panning = false;
     bool panBlocked = false;
@@ -179,6 +183,7 @@ void queueProductionCatalogScroll(TouchInput::ProductionCatalogTouchAction actio
 }
 
 void resetGesture() {
+    state.radarGesture.reset();
     state.primaryActive = false;
     state.gesture.reset();
     state.placementGesture = false;
@@ -196,6 +201,7 @@ void resetGesture() {
 }
 
 void queueLongPressIfReady(Uint32 now) {
+    if(state.radarGesture.ownsGesture()) return;
     if(!state.camera || !state.primaryActive || state.gesture.isDragging() || state.fingers.size() != 1
        || state.productionCatalogTouch.isTracking() || state.placementGesture) return;
     if(state.longPressFired) {
@@ -239,6 +245,13 @@ float fingerDistance() {
     return std::sqrt(dx*dx + dy*dy);
 }
 
+void navigateRadar(LogicalPoint point) {
+    if(!state.radarGesture.isActive() || !state.radarTarget.view) return;
+    const auto clamped = state.radarGesture.clamp({point.x, point.y});
+    state.radarTarget.view->navigateTouch(clamped.x - state.radarTarget.origin.x,
+                                         clamped.y - state.radarTarget.origin.y);
+}
+
 void handleFingerDown(const SDL_TouchFingerEvent& finger) {
     state.lastPointerWasTouch = true;
     const FingerKey key{ finger.touchId, finger.fingerId };
@@ -253,6 +266,19 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
         state.pressedAt = finger.timestamp;
         state.primaryActive = true;
         state.gesture.begin(point.x, point.y);
+        if(state.radarTarget.view && state.radarTarget.view->isEnabled()
+           && state.radarTarget.view->isVisible()) {
+            auto bounds = state.radarTarget.view->getMapRect();
+            bounds.x += state.radarTarget.origin.x;
+            bounds.y += state.radarTarget.origin.y;
+            if(state.radarGesture.begin(bounds, {point.x, point.y})) {
+                state.gesture.cancel();
+                state.panEligible = state.mapTapEligible = false;
+                state.panBlocked = true;
+                navigateRadar(point);
+                return;
+            }
+        }
         state.panEligible = state.camera && state.camera->isScreenCoordInsideMap(point.x, point.y);
         state.mapTapEligible = state.panEligible;
         if(state.productionCatalogTouch.begin(point.x, point.y, finger.timestamp)) {
@@ -264,6 +290,7 @@ void handleFingerDown(const SDL_TouchFingerEvent& finger) {
             queueEvent(makeMouseMotion(state.last, { 0, 0 }, state.windowID, 0));
         }
     } else {
+        state.radarGesture.cancel();
         // No mouse event has been emitted yet, so cancellation has no side effect.
         state.placementCancellationPending = state.placementCancellationPending || state.placementGesture;
         state.repeatProduction = false;
@@ -289,6 +316,10 @@ void handleFingerMotion(const SDL_TouchFingerEvent& finger) {
     const auto found = state.fingers.find(key);
     if(found == state.fingers.end()) return;
     found->second = toLogicalPoint(finger);
+    if(state.radarGesture.ownsGesture()) {
+        if(key == state.primaryFinger) navigateRadar(found->second);
+        return;
+    }
     if(state.productionCatalogTouch.isTracking() && key == state.primaryFinger) {
         state.productionCatalogTouch.move(found->second.x, found->second.y);
         return;
@@ -352,6 +383,14 @@ void handleFingerUp(const SDL_TouchFingerEvent& finger) {
     state.lastPointerWasTouch = true;
     const FingerKey key{ finger.touchId, finger.fingerId };
     if(state.fingers.find(key) == state.fingers.end()) return;
+
+    if(state.radarGesture.ownsGesture()) {
+        if(key == state.primaryFinger) navigateRadar(toLogicalPoint(finger));
+        state.radarGesture.cancel();
+        state.fingers.erase(key);
+        if(state.fingers.empty()) resetGesture();
+        return;
+    }
 
     if(state.primaryActive && key == state.primaryFinger && state.productionCatalogTouch.isTracking()) {
         state.last = toLogicalPoint(finger);
@@ -449,7 +488,7 @@ void clearTouchTarget() {
     state.touchTarget = {};
 }
 
-bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview) {
+bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview, RadarTouchTarget radar) {
     state.touchDispatch = false;
     state.tapDispatch = false;
     state.tapStartedInsideMap = false;
@@ -459,6 +498,7 @@ bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview) {
     }
 
     if(state.camera != camera) {
+        state.radarGesture.cancel();
         state.camera = camera;
         // A gesture cannot cross a menu/game boundary.
         state.gesture.cancel();
@@ -468,6 +508,13 @@ bool pollEvent(SDL_Event* event, ScreenBorder* camera, bool placementPreview) {
         state.pendingEvents.clear();
         if(state.fingers.empty()) resetGesture();
     }
+
+    if(state.radarTarget.view != radar.view
+       || state.radarTarget.origin.x != radar.origin.x
+       || state.radarTarget.origin.y != radar.origin.y) {
+        state.radarGesture.cancel();
+    }
+    state.radarTarget = radar;
 
     if(state.placementPreviewEnabled != placementPreview) {
         state.placementPreviewEnabled = placementPreview;

@@ -14,8 +14,14 @@
 #include <misc/ProductionControls.h>
 
 class ScreenBorder;
+class RadarViewBase;
 
 namespace TouchInput {
+
+struct RadarTouchTarget {
+    RadarViewBase* view = nullptr;
+    SDL_Point origin{};
+};
 
 // True only while dispatching a right-button event from a long press.
 #ifdef __ANDROID__
@@ -65,13 +71,15 @@ inline bool consumePlacementCancellation() { return false; }
  * gestures are normalized into the existing mouse input path.
  * Passing the active map camera enables two-finger pan and pinch. Menus omit it.
  * placementPreview emits live touch motion only for a one-finger placement gesture.
+ * radar captures one-finger navigation on the minimap without mouse commands.
  * Validated taps stay left-button events and carry touch metadata so Game can
  * choose selection, deselection or the existing contextual action path by target.
  */
 #ifdef __ANDROID__
-bool pollEvent(SDL_Event* event, ScreenBorder* camera = nullptr, bool placementPreview = false);
+bool pollEvent(SDL_Event* event, ScreenBorder* camera = nullptr, bool placementPreview = false,
+               RadarTouchTarget radar = {});
 #else
-inline bool pollEvent(SDL_Event* event, ScreenBorder* = nullptr, bool = false) {
+inline bool pollEvent(SDL_Event* event, ScreenBorder* = nullptr, bool = false, RadarTouchTarget = {}) {
     return event != nullptr && SDL_PollEvent(event) != 0;
 }
 #endif

@@ -1720,7 +1720,9 @@ void Game::doInput()
     SDL_Event event;
     while(TouchInput::pollEvent(&event,
             (!pInGameMenu && !pInGameMentat && !pWaitingForOtherPlayers) ? screenborder : nullptr,
-            currentCursorMode == CursorMode_Placing)) {
+            currentCursorMode == CursorMode_Placing,
+            (!pInGameMenu && !pInGameMentat && !pWaitingForOtherPlayers)
+                ? pInterface->getRadarTouchTarget() : TouchInput::RadarTouchTarget{})) {
         // check for a key press
 
         // first of all update mouse

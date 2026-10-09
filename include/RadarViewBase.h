@@ -98,6 +98,33 @@ public:
         return ((mouseX >= left) && (mouseX < right) && (mouseY >= top) && (mouseY < bottom));
     }
 
+    // Only the drawn map is interactive; letterboxing and the frame are excluded.
+    SDL_Rect getMapRect() const {
+        const auto scale = calculateScaleAndOffsets(getMapSizeX(), getMapSizeY());
+        return {scale.offsetX + RADARVIEW_BORDERTHICKNESS,
+                scale.offsetY + RADARVIEW_BORDERTHICKNESS,
+                scale.scaledWidth, scale.scaledHeight};
+    }
+
+    bool findTouchTarget(Sint32 x, Sint32 y, TouchTargetCandidate& candidate) override {
+        if(!isEnabled() || !isVisible() || !isOnRadar(x, y)) return false;
+        const auto rect = getMapRect();
+        candidate.widget = this;
+        candidate.originX = candidate.originY = 0;
+        candidate.visual = {rect.x, rect.y, rect.w, rect.h};
+        candidate.touch = candidate.visual;
+        candidate.stablePath.clear();
+        return true;
+    }
+
+    // Touch navigation always moves the camera, even with an action mode selected.
+    // It never enters the mouse drag state or emits an order on the minimap.
+    void navigateTouch(Sint32 x, Sint32 y) {
+        if(isEnabled() && isVisible() && isOnRadar(x, y) && pOnRadarClick) {
+            pOnRadarClick(getWorldCoords(x, y), false, true);
+        }
+    }
+
     /**
         This method returns the corresponding world coordinates for a point on the radar
         \param mouseX  the position on the radar screen (relative to the top left corner of the radar)

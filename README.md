@@ -28,12 +28,17 @@ The project has already moved well beyond the initial Android port and now inclu
 | --- | --- |
 | Tap | Select units, activate buttons and perform the primary action |
 | One-finger drag | Rectangle selection |
+| Tap or one-finger drag on the minimap | Recenter the camera and follow the finger continuously |
 | Two-finger drag | Pan the battlefield |
 | Pinch | Zoom in and out using the existing game zoom levels |
 | Long press | Context / right-click action on the battlefield |
 | Double-tap a unit | Select nearby units of the same type |
 
 Touch handling also includes gesture cancellation rules, larger hit targets for small controls and safeguards to prevent accidental mouse-style actions when a touch gesture changes.
+
+Minimap navigation is limited to the drawn map area and stays inside its edges.
+A second finger cancels navigation until all fingers lift; holding the minimap
+does not issue unit orders, including while Move or Attack mode is selected.
 
 ### Touch-friendly production and construction
 
