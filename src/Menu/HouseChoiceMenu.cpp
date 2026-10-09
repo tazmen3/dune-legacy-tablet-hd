@@ -63,9 +63,10 @@ HouseChoiceMenu::HouseChoiceMenu() : MenuBase()
 
     // set up window
     int xpos = std::max(0,(getRendererWidth() - 640)/2);
-    int ypos = std::max(0,(getRendererHeight() - 560)/2);
+    const int menuHeight = std::min(560, getRendererHeight());
+    int ypos = std::max(0,(getRendererHeight() - menuHeight)/2);
 
-    setCurrentPosition(xpos,ypos,640,560);
+    setCurrentPosition(xpos,ypos,640,menuHeight);
 
     setTransparentBackground(true);
 
@@ -85,24 +86,26 @@ HouseChoiceMenu::HouseChoiceMenu() : MenuBase()
     house3Button.setOnClick(std::bind(&HouseChoiceMenu::onHouseButton, this, 2));
     windowWidget.addWidget(&house3Button, Point(430,108),   Point(168,182));
 
+    // Keep the options and navigation inside the screen at 480/533 logical pixels.
+    const int optionsY = std::min(390, menuHeight - 140);
+    const int arrowsY = optionsY - 30;
     SDL_Texture *pArrowLeft = pGFXManager->getUIGraphic(UI_Herald_ArrowLeftLarge);
     SDL_Texture *pArrowLeftHighlight = pGFXManager->getUIGraphic(UI_Herald_ArrowLeftHighlightLarge);
     houseLeftButton.setTextures(pArrowLeftHighlight, pArrowLeftHighlight, pArrowLeftHighlight);
     houseLeftButton.setOnClick(std::bind(&HouseChoiceMenu::onHouseLeft, this));
     houseLeftButton.setVisible(true);
-    windowWidget.addWidget( &houseLeftButton, Point(320 - getWidth(pArrowLeft) - 85, 360), getTextureSize(pArrowLeft));
+    windowWidget.addWidget( &houseLeftButton, Point(320 - getWidth(pArrowLeft) - 85, arrowsY), getTextureSize(pArrowLeft));
 
     SDL_Texture *pArrowRight = pGFXManager->getUIGraphic(UI_Herald_ArrowRightLarge);
     SDL_Texture *pArrowRightHighlight = pGFXManager->getUIGraphic(UI_Herald_ArrowRightHighlightLarge);
     houseRightButton.setTextures(pArrowRightHighlight, pArrowRightHighlight, pArrowRightHighlight);
     houseRightButton.setOnClick(std::bind(&HouseChoiceMenu::onHouseRight, this));
     houseRightButton.setVisible(true);
-    windowWidget.addWidget( &houseRightButton, Point(320 + 85, 360), getTextureSize(pArrowRight));
+    windowWidget.addWidget( &houseRightButton, Point(320 + 85, arrowsY), getTextureSize(pArrowRight));
 
     // Add AI options below the house selection and arrows
-    // Position these centered below the arrows (at Y=390)
+    // Position these centered below the arrows.
     int optionsX = 240;  // Centered at 320 (half of 640) - 80 (half of 160)
-    int optionsY = 390;
     
     // AI Support label
     Label* supportLabel = Label::create(_("AI support: help you fight"));
@@ -141,7 +144,11 @@ HouseChoiceMenu::HouseChoiceMenu() : MenuBase()
     // Game Options button
     gameOptionsButton.setText(_("Game Options"));
     gameOptionsButton.setOnClick(std::bind(&HouseChoiceMenu::onGameOptions, this));
-    windowWidget.addWidget(&gameOptionsButton, Point(optionsX, optionsY + 100), Point(160, 20));
+    windowWidget.addWidget(&gameOptionsButton, Point(optionsX, optionsY + 100), Point(160, 30));
+
+    backButton.setText(_("BACK"));
+    backButton.setOnClick([this]() { quit(); });
+    windowWidget.addWidget(&backButton, Point(40, optionsY + 100), Point(160, 30));
 
     updateHouseChoice();
 }

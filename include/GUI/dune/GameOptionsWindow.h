@@ -40,6 +40,8 @@ public:
     virtual ~GameOptionsWindow();
 
     void onOK();
+    void onCancel();
+    bool handleKeyPress(SDL_KeyboardEvent& key) override;
 
     const SettingsClass::GameOptionsClass& getGameOptions() const { return gameOptions; };
 
@@ -90,6 +92,8 @@ private:
     HBox            maxHarvestersOverrideHBox;      ///< The HBox containing the override option for the maximum number of harvesters
     Checkbox        maxHarvestersOverrideCheckbox;  ///< If checked the maximum number of harvesters is set directly, otherwise it is determined by map size from ObjectData.ini
     DigitsTextBox   maxHarvestersOverrideTextBox;   ///< The maximum number of harvesters
+    HBox buttonsHBox;
+    TextButton cancelButton;
     TextButton okbutton;                            ///< the ok button
 };
 

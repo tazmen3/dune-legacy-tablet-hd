@@ -160,7 +160,12 @@ GameOptionsWindow::GameOptionsWindow(SettingsClass::GameOptionsClass& initialGam
 
     okbutton.setText(_("OK"));
     okbutton.setOnClick(std::bind(&GameOptionsWindow::onOK, this));
-    vboxRight.addWidget(&okbutton, 30);
+    cancelButton.setText(_("BACK"));
+    cancelButton.setOnClick(std::bind(&GameOptionsWindow::onCancel, this));
+    buttonsHBox.addWidget(&cancelButton);
+    buttonsHBox.addWidget(HSpacer::create(6));
+    buttonsHBox.addWidget(&okbutton);
+    vboxRight.addWidget(&buttonsHBox, 30);
     vboxRight.addWidget(VSpacer::create(6));
 
 
@@ -190,10 +195,22 @@ void GameOptionsWindow::onOK() {
     gameOptions.maximumNumberOfUnitsOverride = maxUnitsOverrideCheckbox.isChecked() ? maxUnitsOverrideTextBox.getValue() : -1;
     gameOptions.maximumNumberOfHarvestersOverride = maxHarvestersOverrideCheckbox.isChecked() ? maxHarvestersOverrideTextBox.getValue() : -1;
 
+    onCancel();
+}
+
+void GameOptionsWindow::onCancel() {
     Window* pParentWindow = dynamic_cast<Window*>(getParent());
     if(pParentWindow != nullptr) {
         pParentWindow->closeChildWindow();
     }
+}
+
+bool GameOptionsWindow::handleKeyPress(SDL_KeyboardEvent& key) {
+    if(isEnabled() && key.keysym.sym == SDLK_ESCAPE) {
+        onCancel();
+        return true;
+    }
+    return Window::handleKeyPress(key);
 }
 
 void GameOptionsWindow::onGameSpeedMinus() {

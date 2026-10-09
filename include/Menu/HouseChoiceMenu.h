@@ -66,6 +66,7 @@ private:
     DropDownBox     supportBotDropDown;
     DropDownBox     enemyAIDropDown;
     TextButton      gameOptionsButton;
+    TextButton      backButton;
 
     int currentHouseChoiceScrollPos;
 
